@@ -1,0 +1,57 @@
+# Environment files & secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Dependencies
+node_modules/
+/jspm_packages/
+
+# Logs and Crash Dumps
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.stackdump
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build outputs & Temporary files
+/dist
+/build
+/out
+.tmp/
+tmp/
+temp/
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output/
+
+# Diagnostic & Scratch files
+*.pid
+*.seed
+*.pid.lock

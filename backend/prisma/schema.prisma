@@ -1,0 +1,129 @@
+// Prisma Schema for Social Media Autopilot Backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  LINKEDIN
+  X
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  PARTIALLY_PUBLISHED
+  CANCELLED
+}
+
+enum SocialPostStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum AITone {
+  PROFESSIONAL
+  CASUAL
+  ENGAGING
+  EDUCATIONAL
+  PROMOTIONAL
+  HUMOROUS
+}
+
+model User {
+  id             String            @id @default(uuid())
+  email          String            @unique
+  name           String?
+  avatarUrl      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  socialAccounts SocialAccount[]
+  posts          Post[]
+  aiLogs         AIGenerationLog[]
+
+  @@map("users")
+}
+
+model SocialAccount {
+  id                String          @id @default(uuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform          SocialPlatform
+  platformAccountId String
+  username          String
+  accountName       String?
+  accessToken       String
+  refreshToken      String?
+  expiresAt         DateTime?
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  socialPostLogs    SocialPostLog[]
+
+  @@unique([userId, platform, platformAccountId])
+  @@map("social_accounts")
+}
+
+model Post {
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content        String
+  mediaUrls      String[]        @default([])
+  mediaType      String?
+  targetPlatforms SocialPlatform[]
+  status         PostStatus      @default(DRAFT)
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  aiGenerated    Boolean         @default(false)
+  aiPrompt       String?
+  tone           AITone?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  socialPostLogs SocialPostLog[]
+
+  @@index([status, scheduledAt])
+  @@map("posts")
+}
+
+model SocialPostLog {
+  id              String           @id @default(uuid())
+  postId          String
+  post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  socialAccountId String?
+  socialAccount   SocialAccount?   @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  platform        SocialPlatform
+  status          SocialPostStatus @default(PENDING)
+  externalPostId  String?
+  externalPostUrl String?
+  errorMessage    String?
+  publishedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("social_post_logs")
+}
+
+model AIGenerationLog {
+  id             String          @id @default(uuid())
+  userId         String?
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  prompt         String
+  targetPlatform SocialPlatform?
+  tone           AITone?
+  generatedText  String
+  modelUsed      String?
+  tokensUsed     Int?            @default(0)
+  createdAt      DateTime        @default(now())
+
+  @@map("ai_generation_logs")
+}
