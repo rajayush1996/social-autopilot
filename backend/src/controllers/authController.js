@@ -1,18 +1,18 @@
-import { prisma } from '../config/db.js';
 import config from '../config/env.js';
 import { catchAsync, successResponse } from '../utils/responseHandler.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
 import logger from '../utils/logger.js';
-import LinkedinService from '../services/social/linkedinService.js';
-import XService from '../services/social/xService.js';
+import SocialAdapterFactory from '../services/social/socialAdapterFactory.js';
+import UserService from '../services/userService.js';
+import SocialAccountService from '../services/socialAccountService.js';
 
 /**
  * Controller: Generate OAuth authorization URLs for target social platforms.
  */
 export const getOAuthUrl = catchAsync(async (req, res) => {
   const { platform } = req.query;
-  const redirectUri = req.query.redirectUri || process.env.OAUTH_REDIRECT_URI || 'http://localhost:3000/oauth/callback';
+  const redirectUri = req.query.redirectUri || config.oauth.redirectUri;
 
   if (!platform) {
     throw ApiError.badRequest('Query parameter "platform" is required (INSTAGRAM, LINKEDIN, X).');
@@ -23,18 +23,18 @@ export const getOAuthUrl = catchAsync(async (req, res) => {
 
   switch (platform.toUpperCase()) {
     case 'LINKEDIN':
-      const linkedinClientId = process.env.LINKEDIN_CLIENT_ID || 'mock_linkedin_client_id';
-      url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=openid%20profile%20w_member_social`;
+      const linkedinClientId = config.social.linkedin.clientId || 'mock_linkedin_client_id';
+      url = `${config.social.linkedin.oauthBaseUrl}/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=openid%20profile%20w_member_social`;
       break;
 
     case 'X':
     case 'TWITTER':
-      const xClientId = process.env.X_CLIENT_ID || 'mock_x_client_id';
+      const xClientId = config.social.x.clientId || 'mock_x_client_id';
       url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${xClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
       break;
 
     case 'INSTAGRAM':
-      const fbAppId = process.env.FACEBOOK_APP_ID || 'mock_fb_app_id';
+      const fbAppId = config.social.instagram.appId || 'mock_fb_app_id';
       url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list&state=${state}`;
       break;
 
@@ -69,56 +69,46 @@ export const handleOAuthCallback = catchAsync(async (req, res) => {
   };
 
   try {
-    if (platformUpper === 'LINKEDIN' && process.env.LINKEDIN_CLIENT_ID) {
-      const exchanged = await LinkedinService.getAccessToken({
+    const adapter = SocialAdapterFactory.getAdapter(platformUpper);
+    let exchanged = null;
+
+    if (platformUpper === 'LINKEDIN' && config.social.linkedin.clientId) {
+      exchanged = await adapter.exchangeToken({
         code,
         redirectUri,
-        clientId: process.env.LINKEDIN_CLIENT_ID,
-        clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+        clientId: config.social.linkedin.clientId,
+        clientSecret: config.social.linkedin.clientSecret,
       });
       tokenData.accessToken = exchanged.accessToken;
-    } else if (platformUpper === 'X' && process.env.X_CLIENT_ID) {
-      const exchanged = await XService.exchangeToken({
+      tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+    } else if (platformUpper === 'X' && config.social.x.clientId) {
+      exchanged = await adapter.exchangeToken({
         code,
         codeVerifier: codeVerifier || 'challenge',
         redirectUri,
-        clientId: process.env.X_CLIENT_ID,
-        clientSecret: process.env.X_CLIENT_SECRET,
+        clientId: config.social.x.clientId,
+        clientSecret: config.social.x.clientSecret,
       });
       tokenData.accessToken = exchanged.accessToken;
       tokenData.refreshToken = exchanged.refreshToken;
+      tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
     }
   } catch (err) {
     logger.warn(`[AuthController] OAuth exchange fallback used: ${err.message}`);
   }
 
-  // Ensure user exists
-  await ensureDefaultUserExists(userId);
+  // Ensure user exists (Service pattern)
+  await UserService.ensureUserExists(userId);
 
-  const account = await prisma.socialAccount.upsert({
-    where: {
-      userId_platform_platformAccountId: {
-        userId,
-        platform: platformUpper,
-        platformAccountId: tokenData.platformAccountId,
-      },
-    },
-    update: {
-      accessToken: tokenData.accessToken,
-      refreshToken: tokenData.refreshToken,
-      expiresAt: tokenData.expiresAt,
-      isActive: true,
-    },
-    create: {
-      userId,
-      platform: platformUpper,
-      platformAccountId: tokenData.platformAccountId,
-      username: tokenData.username,
-      accessToken: tokenData.accessToken,
-      refreshToken: tokenData.refreshToken,
-      expiresAt: tokenData.expiresAt,
-      isActive: true,
-    },
+  // Link account using SocialAccountService
+  const account = await SocialAccountService.upsertAccount({
+    userId,
+    platform: platformUpper,
+    platformAccountId: tokenData.platformAccountId,
+    username: tokenData.username,
+    accessToken: tokenData.accessToken,
+    refreshToken: tokenData.refreshToken,
+    expiresAt: tokenData.expiresAt,
   });
 
   return successResponse(res, HttpStatus.OK, `${platformUpper} social account connected.`, { account });
@@ -139,32 +129,19 @@ export const connectAccount = catchAsync(async (req, res) => {
     throw ApiError.badRequest('Invalid platform. Must be INSTAGRAM, LINKEDIN, or X.');
   }
 
-  await ensureDefaultUserExists(userId);
+  // Ensure user exists (Service pattern)
+  await UserService.ensureUserExists(userId);
 
   const accountId = platformAccountId || `id_${platformLower(platformUpper)}_${Date.now()}`;
 
-  const account = await prisma.socialAccount.upsert({
-    where: {
-      userId_platform_platformAccountId: {
-        userId,
-        platform: platformUpper,
-        platformAccountId: accountId,
-      },
-    },
-    update: {
-      username,
-      accessToken: accessToken || `mock_${platformLower(platformUpper)}_token`,
-      isActive: true,
-    },
-    create: {
-      userId,
-      platform: platformUpper,
-      platformAccountId: accountId,
-      username,
-      accountName: `@${username} (${platformUpper})`,
-      accessToken: accessToken || `mock_${platformLower(platformUpper)}_token`,
-      isActive: true,
-    },
+  const account = await SocialAccountService.upsertAccount({
+    userId,
+    platform: platformUpper,
+    platformAccountId: accountId,
+    username,
+    accessToken: accessToken || `mock_${platformLower(platformUpper)}_token`,
+    refreshToken: null,
+    expiresAt: null,
   });
 
   return successResponse(res, HttpStatus.CREATED, `Social account @${username} connected successfully.`, { account });
@@ -176,18 +153,7 @@ export const connectAccount = catchAsync(async (req, res) => {
 export const getUserAccounts = catchAsync(async (req, res) => {
   const { userId = 'default-user-id' } = req.query;
 
-  const accounts = await prisma.socialAccount.findMany({
-    where: { userId, isActive: true },
-    select: {
-      id: true,
-      platform: true,
-      username: true,
-      accountName: true,
-      platformAccountId: true,
-      expiresAt: true,
-      createdAt: true,
-    },
-  });
+  const accounts = await SocialAccountService.findActiveAccountsByUserId(userId);
 
   return successResponse(res, HttpStatus.OK, 'Social accounts retrieved successfully.', {
     count: accounts.length,
@@ -201,35 +167,16 @@ export const getUserAccounts = catchAsync(async (req, res) => {
 export const disconnectAccount = catchAsync(async (req, res) => {
   const { id } = req.params;
 
-  const account = await prisma.socialAccount.findUnique({ where: { id } });
+  const account = await SocialAccountService.findAccountById(id);
   if (!account) {
     throw ApiError.notFound(`Social account with ID "${id}" not found.`);
   }
 
-  const updatedAccount = await prisma.socialAccount.update({
-    where: { id },
-    data: { isActive: false },
-  });
+  const updatedAccount = await SocialAccountService.disconnectAccount(id);
 
   return successResponse(res, HttpStatus.OK, 'Social account disconnected successfully.', { account: updatedAccount });
 });
 
 function platformLower(p) {
   return (p || '').toLowerCase();
-}
-
-async function ensureDefaultUserExists(userId) {
-  try {
-    await prisma.user.upsert({
-      where: { id: userId },
-      update: {},
-      create: {
-        id: userId,
-        email: `user_${userId}@socialautopilot.internal`,
-        name: 'Demo Content Creator',
-      },
-    });
-  } catch (err) {
-    logger.warn(`DB User warning: ${err.message}`);
-  }
 }

@@ -44,6 +44,8 @@ model User {
   email          String            @unique
   name           String?
   avatarUrl      String?
+  aiCredits      Int               @default(15)
+  plan           String            @default("FREE")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   socialAccounts SocialAccount[]

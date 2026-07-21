@@ -2,12 +2,14 @@ import { prisma } from '../config/db.js';
 import { catchAsync, successResponse } from '../utils/responseHandler.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
-import { POST_STATUS, SOCIAL_PLATFORM, AI_TONE } from '../config/constants.js';
+import { POST_STATUS } from '../config/constants.js';
 import logger from '../utils/logger.js';
 import { generatePostContent, optimizePostForPlatforms } from '../services/aiService.js';
 import { enqueuePostJob, removePostJob } from '../queues/postQueue.js';
 import { syncScheduledPostsToQueue } from '../jobs/postScheduler.js';
 import { processPostPublishing } from '../workers/postWorker.js';
+import UserService from '../services/userService.js';
+import PostService from '../services/postService.js';
 
 /**
  * Controller: Generate post content using OpenAI / AI service.
@@ -20,23 +22,33 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
     throw ApiError.badRequest('Field "prompt" or "topic" is required.');
   }
 
+  // 1. Retrieve User and Validate AI Credits (Service layer)
+  const user = await UserService.ensureUserExists(userId);
+
+  if (user.aiCredits <= 0) {
+    throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'AI generation limit reached. Please upgrade your plan.');
+  }
+
+  let aiResult = null;
+
   if (adaptAllPlatforms) {
-    const multiResult = await optimizePostForPlatforms({
+    aiResult = await optimizePostForPlatforms({
       content: inputTopic,
       platforms: ['INSTAGRAM', 'LINKEDIN', 'X'],
       tone,
     });
-
-    return successResponse(res, HttpStatus.OK, 'AI content adapted for all target platforms.', multiResult);
+  } else {
+    aiResult = await generatePostContent({
+      prompt: inputTopic,
+      platform,
+      tone,
+    });
   }
 
-  const aiResult = await generatePostContent({
-    prompt: inputTopic,
-    platform,
-    tone,
-  });
+  // 2. Decrement AI credits (Service layer)
+  const updatedUser = await UserService.decrementCredits(userId);
 
-  // Log AI generation
+  // 3. Log AI generation in audit logs
   try {
     await prisma.aIGenerationLog.create({
       data: {
@@ -44,16 +56,20 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
         prompt: inputTopic,
         targetPlatform: ['INSTAGRAM', 'LINKEDIN', 'X'].includes(platform.toUpperCase()) ? platform.toUpperCase() : null,
         tone: ['PROFESSIONAL', 'CASUAL', 'ENGAGING', 'EDUCATIONAL', 'PROMOTIONAL', 'HUMOROUS'].includes(tone.toUpperCase()) ? tone.toUpperCase() : 'ENGAGING',
-        generatedText: aiResult.content,
-        modelUsed: aiResult.modelUsed,
-        tokensUsed: aiResult.tokensUsed,
+        generatedText: adaptAllPlatforms ? JSON.stringify(aiResult) : aiResult.content,
+        modelUsed: aiResult.modelUsed || 'MockEngine',
+        tokensUsed: aiResult.tokensUsed || 0,
       },
     });
   } catch (logErr) {
     logger.warn(`[PostController] AI log db warning: ${logErr.message}`);
   }
 
-  return successResponse(res, HttpStatus.OK, 'AI post content generated successfully.', aiResult);
+  // 4. Return success response detailing remaining credits
+  return successResponse(res, HttpStatus.OK, 'AI post content generated successfully.', {
+    ...aiResult,
+    aiCreditsRemaining: updatedUser.aiCredits,
+  });
 });
 
 /**
@@ -94,7 +110,8 @@ export const createPost = catchAsync(async (req, res) => {
     throw ApiError.badRequest(`Invalid platform "${invalidPlatform}". Must be INSTAGRAM, LINKEDIN, or X.`);
   }
 
-  await ensureDefaultUserExists(userId);
+  // Ensure user profile exists
+  await UserService.ensureUserExists(userId);
 
   let initialStatus = POST_STATUS.DRAFT;
   let parseScheduledDate = null;
@@ -107,19 +124,17 @@ export const createPost = catchAsync(async (req, res) => {
     initialStatus = POST_STATUS.SCHEDULED;
   }
 
-  // 1. Create database record
-  const post = await prisma.post.create({
-    data: {
-      userId,
-      content,
-      mediaUrls,
-      mediaType: resolvedMediaType,
-      targetPlatforms: formattedPlatforms,
-      status: publishNow ? POST_STATUS.SCHEDULED : initialStatus,
-      scheduledAt: parseScheduledDate,
-      aiGenerated,
-      aiPrompt,
-    },
+  // 1. Create database record using PostService
+  const post = await PostService.createPost({
+    userId,
+    content,
+    mediaUrls,
+    mediaType: resolvedMediaType,
+    targetPlatforms: formattedPlatforms,
+    status: publishNow ? POST_STATUS.SCHEDULED : initialStatus,
+    scheduledAt: parseScheduledDate,
+    aiGenerated,
+    aiPrompt,
   });
 
   // 2. Enqueue in BullMQ (Immediate or Delayed Job)
@@ -196,16 +211,7 @@ export const listPosts = catchAsync(async (req, res) => {
 export const getPostById = catchAsync(async (req, res) => {
   const { id } = req.params;
 
-  const post = await prisma.post.findUnique({
-    where: { id },
-    include: {
-      socialPostLogs: {
-        include: {
-          socialAccount: true,
-        },
-      },
-    },
-  });
+  const post = await PostService.findPostById(id);
 
   if (!post) {
     throw ApiError.notFound(`Post with ID "${id}" not found.`);
@@ -220,7 +226,7 @@ export const getPostById = catchAsync(async (req, res) => {
 export const cancelScheduledPost = catchAsync(async (req, res) => {
   const { id } = req.params;
 
-  const post = await prisma.post.findUnique({ where: { id } });
+  const post = await PostService.findPostById(id);
   if (!post) {
     throw ApiError.notFound(`Post with ID "${id}" not found.`);
   }
@@ -232,10 +238,7 @@ export const cancelScheduledPost = catchAsync(async (req, res) => {
   // Remove from BullMQ queue
   await removePostJob(id);
 
-  const updatedPost = await prisma.post.update({
-    where: { id },
-    data: { status: POST_STATUS.CANCELLED },
-  });
+  const updatedPost = await PostService.updatePostStatus(id, POST_STATUS.CANCELLED);
 
   return successResponse(res, HttpStatus.OK, 'Scheduled post cancelled and removed from queue.', { post: updatedPost });
 });
@@ -247,15 +250,3 @@ export const triggerScheduledPostsNow = catchAsync(async (req, res) => {
   const result = await syncScheduledPostsToQueue();
   return successResponse(res, HttpStatus.OK, 'Scheduled posts synchronized with BullMQ queue.', result);
 });
-
-async function ensureDefaultUserExists(userId) {
-  try {
-    await prisma.user.upsert({
-      where: { id: userId },
-      update: {},
-      create: { id: userId, email: `user_${userId}@socialautopilot.internal`, name: 'Demo Content Creator' },
-    });
-  } catch (err) {
-    logger.warn(`DB User warning: ${err.message}`);
-  }
-}

@@ -8,35 +8,9 @@ import {
   triggerScheduledPostsNow,
 } from '../controllers/postController.js';
 import { validate } from '../middlewares/validate.js';
-import { z } from 'zod';
+import { generateAiSchema, createPostSchema } from '../validations/postValidation.js';
 
 const router = Router();
-
-// Validation Schemas
-const generateAiSchema = {
-  body: z.object({
-    prompt: z.string().optional(),
-    topic: z.string().optional(),
-    platform: z.string().optional(),
-    tone: z.string().optional(),
-    adaptAllPlatforms: z.boolean().optional(),
-    userId: z.string().optional(),
-  }),
-};
-
-const createPostSchema = {
-  body: z.object({
-    userId: z.string().optional(),
-    content: z.string().min(1, 'Post content cannot be empty.'),
-    mediaUrls: z.array(z.string().url('Each mediaUrl must be a valid URL')).optional(),
-    mediaType: z.string().optional(),
-    targetPlatforms: z.array(z.string()).optional(),
-    scheduledAt: z.string().datetime({ offset: true }).or(z.string()).optional(),
-    publishNow: z.boolean().optional(),
-    aiGenerated: z.boolean().optional(),
-    aiPrompt: z.string().optional(),
-  }),
-};
 
 /**
  * POST /api/posts/ai-generate - Generate Post Content using OpenAI
