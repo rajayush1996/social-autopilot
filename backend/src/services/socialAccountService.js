@@ -57,6 +57,7 @@ export class SocialAccountService {
         username: true,
         accountName: true,
         platformAccountId: true,
+        isActive: true,
         expiresAt: true,
         createdAt: true,
       },

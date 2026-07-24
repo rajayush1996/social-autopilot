@@ -5,7 +5,7 @@ import { prisma } from '../config/db.js';
 import { POST_STATUS, SOCIAL_PLATFORM, SOCIAL_POST_STATUS } from '../config/constants.js';
 import SocialAdapterFactory from '../services/social/socialAdapterFactory.js';
 import { getValidAccessToken } from '../services/auth/tokenManager.js';
-import { updateUserMemory } from '../services/ai/memoryService.js';
+import socketManager from '../services/socketService.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -125,6 +125,21 @@ export async function processPostPublishing(postId) {
       status: finalStatus,
       publishedAt: new Date(),
     },
+  });
+
+  // Emit realtime WebSockets status event & push notification
+  socketManager.emitPostStatusChange({
+    userId: post.userId,
+    postId: post.id,
+    status: finalStatus,
+    details: { successCount, failureCount },
+  });
+
+  socketManager.emitNotification({
+    userId: post.userId,
+    title: 'Post Dispatch Status',
+    message: `Post ${post.id.slice(0, 8)} updated to ${finalStatus}`,
+    type: finalStatus === POST_STATUS.PUBLISHED ? 'success' : 'info',
   });
 
   // Trigger Rolling Summary Memory Compaction Hook asynchronously (non-blocking)

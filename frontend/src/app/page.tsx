@@ -31,6 +31,7 @@ import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
 import { Post, SocialAccount, User } from '@/lib/api';
 import { useTheme } from '@/context/ThemeContext';
+import { formatDateTime } from '@/utils/date';
 
 interface AutopilotReport {
   userId: string;
@@ -631,7 +632,7 @@ export default function Home() {
                           {post.status}
                         </span>
                         <span className="text-[9px] text-slate-500 font-semibold">
-                          {post.scheduledAt ? new Date(post.scheduledAt).toLocaleString() : 'Instantly published'}
+                          {post.scheduledAt ? `${formatDateTime(post.scheduledAt)} UTC` : 'Instantly published'}
                         </span>
                       </div>
                       <p className="text-xs text-slate-350 line-clamp-2 leading-relaxed">

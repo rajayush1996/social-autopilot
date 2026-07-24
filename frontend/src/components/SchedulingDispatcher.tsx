@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import ApiService, { AutomationSchedule } from '@/services/apiService';
 import { useToast } from '@/context/ToastContext';
+import { formatDateTime } from '@/utils/date';
 
 const DAYS_OF_WEEK = [
   { key: 'MON', label: 'M', full: 'Monday' },
@@ -435,7 +436,7 @@ export function SchedulingDispatcher() {
                 {/* Footer status line */}
                 {sched.lastRunAt && (
                   <div className="mt-3 pt-2 border-t border-slate-850 flex items-center justify-between text-[10px] text-slate-400">
-                    <span>Last run: {new Date(sched.lastRunAt).toLocaleString()}</span>
+                    <span>Last run: {formatDateTime(sched.lastRunAt)} UTC</span>
                   </div>
                 )}
               </div>

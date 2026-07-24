@@ -14,11 +14,12 @@ import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
 import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import { formatDateTime, formatDate } from '@/utils/date';
 
 // Custom Instagram icon component to avoid missing lucide exports
-export function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
+function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
@@ -27,9 +28,9 @@ export function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 // Custom Linkedin icon component to avoid missing lucide exports
-export function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
+function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
       <rect x="2" y="9" width="4" height="12" />
       <circle cx="4" cy="4" r="2" />
@@ -38,9 +39,9 @@ export function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 // Custom X (Twitter) icon component to avoid missing lucide exports
-export function XPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
+function XPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M4 4l11.733 16h4.267l-11.733 -16z" />
       <path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" />
     </svg>
@@ -190,7 +191,7 @@ export default function PostsPage() {
                     <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">{post.content}</p>
                     <span className="text-[10px] text-slate-500 font-semibold uppercase flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5 text-slate-500" />
-                      {post.scheduledAt ? new Date(post.scheduledAt).toLocaleString() : 'Published Immediate'}
+                      {post.scheduledAt ? `${formatDateTime(post.scheduledAt)} UTC` : 'Published Immediate'}
                     </span>
                   </div>
 
@@ -325,7 +326,7 @@ export default function PostsPage() {
 
             {/* Bottom Actions */}
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-400">Created: {new Date(selectedPost.createdAt).toLocaleDateString()}</span>
+              <span className="text-xs text-slate-400">Created: {formatDate(selectedPost.createdAt)} UTC</span>
               {selectedPost.status === 'SCHEDULED' && (
                 <button
                   onClick={(e) => handleCancelSchedule(e, selectedPost.id)}

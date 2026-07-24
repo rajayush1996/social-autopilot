@@ -28,11 +28,27 @@ import CONFIG from '@/config';
 import { useToast } from '@/context/ToastContext';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import accountEvents from '@/utils/accountEvents';
-import getSocket from '@/utils/socket';
+import socketClient from '@/utils/socket';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  togglePlatformAction,
+  setSelectedPlatforms,
+  setTopicAction,
+  setToneAction,
+  setInputSourceAction,
+  setArticleUrlAction,
+  setEmojiDensityAction,
+  setHashtagCountAction,
+  setFormatStyleAction,
+  setDraftForPlatformAction,
+  setAllDraftsAction,
+  setComposerModeAction,
+  resetDraftsAndInputsAction,
+} from '@/store/composerSlice';
 
 type PlatformKey = 'INSTAGRAM' | 'LINKEDIN' | 'X';
 
-export function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
+function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
@@ -42,7 +58,7 @@ export function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
+function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
@@ -52,7 +68,7 @@ export function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export function XPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
+function XPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M4 4l11.733 16h4.267l-11.733 -16z" />
@@ -69,19 +85,36 @@ const PRESET_PROMPTS = [
 ];
 
 export default function ComposerPage() {
-  const [composerMode, setComposerMode] = useState<'SINGLE' | 'RECURRING'>('SINGLE');
+  const dispatch = useAppDispatch();
+  const reduxComposer = useAppSelector((state) => state.composer);
 
-  // Single Composer States
-  const [topic, setTopic] = useState('');
-  const [tone, setTone] = useState('ENGAGING');
-  const [platforms, setPlatforms] = useState<PlatformKey[]>(['LINKEDIN', 'X']);
-  
-  // Advanced AI Prompt Controls
-  const [inputSource, setInputSource] = useState<'PROMPT' | 'URL'>('PROMPT');
-  const [articleUrl, setArticleUrl] = useState('');
-  const [emojiDensity, setEmojiDensity] = useState('MEDIUM');
-  const [hashtagCount, setHashtagCount] = useState('MODERATE');
-  const [formatStyle, setFormatStyle] = useState('SINGLE');
+  const composerMode = reduxComposer.composerMode;
+  const topic = reduxComposer.topic;
+  const tone = reduxComposer.tone;
+  const platforms = reduxComposer.selectedPlatforms;
+  const inputSource = reduxComposer.inputSource;
+  const articleUrl = reduxComposer.articleUrl;
+  const emojiDensity = reduxComposer.emojiDensity;
+  const hashtagCount = reduxComposer.hashtagCount;
+  const formatStyle = reduxComposer.formatStyle;
+  const generatedDrafts = reduxComposer.generatedDrafts;
+
+  const setComposerMode = (mode: 'SINGLE' | 'RECURRING') => dispatch(setComposerModeAction(mode));
+  const setTopic = (val: string) => dispatch(setTopicAction(val));
+  const setTone = (val: string) => dispatch(setToneAction(val));
+  const setInputSource = (src: 'PROMPT' | 'URL') => dispatch(setInputSourceAction(src));
+  const setArticleUrl = (val: string) => dispatch(setArticleUrlAction(val));
+  const setEmojiDensity = (val: string) => dispatch(setEmojiDensityAction(val));
+  const setHashtagCount = (val: string) => dispatch(setHashtagCountAction(val));
+  const setFormatStyle = (val: string) => dispatch(setFormatStyleAction(val));
+  const setGeneratedDrafts = (drafts: any) => {
+    if (typeof drafts === 'function') {
+      const next = drafts(reduxComposer.generatedDrafts);
+      dispatch(setAllDraftsAction(next));
+    } else {
+      dispatch(setAllDraftsAction(drafts));
+    }
+  };
 
   // Media Upload States
   const [uploading, setUploading] = useState(false);
@@ -91,15 +124,11 @@ export default function ComposerPage() {
   // AI Generation States
   const [generating, setGenerating] = useState(false);
   const [aiLimitReached, setAiLimitReached] = useState(false);
-  const [generatedDrafts, setGeneratedDrafts] = useState<Record<PlatformKey, string>>({
-    INSTAGRAM: '',
-    LINKEDIN: '',
-    X: '',
-  });
 
   // Connected Accounts State
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformKey[]>([]);
-  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [initialChecked, setInitialChecked] = useState(false);
 
   const [publishNow, setPublishNow] = useState(true);
   const [scheduledDate, setScheduledDate] = useState('');
@@ -107,16 +136,14 @@ export default function ComposerPage() {
   const toast = useToast();
 
   useEffect(() => {
-    // Initialize Socket.io connection for realtime WebSocket event handling
-    getSocket();
+    socketClient.connect();
 
     const fetchAccounts = async () => {
-      setLoadingAccounts(true);
       try {
         const accounts = await ApiService.getConnectedAccounts();
         if (Array.isArray(accounts)) {
           const activePlatforms = accounts
-            .filter((acc: any) => acc.isActive)
+            .filter((acc: any) => acc.isActive !== false)
             .map((acc: any) => acc.platform.toUpperCase() as PlatformKey);
           setConnectedPlatforms(activePlatforms);
         }
@@ -124,21 +151,57 @@ export default function ComposerPage() {
         console.error('Failed to load connected accounts:', err);
       } finally {
         setLoadingAccounts(false);
+        setInitialChecked(true);
       }
     };
     fetchAccounts();
 
+    // Verify channel statuses via WebSocket immediately on mount
+    ['LINKEDIN', 'X', 'INSTAGRAM'].forEach((p) => {
+      socketClient.checkPlatform(p);
+    });
+
     window.addEventListener('focus', fetchAccounts);
-    const unsubscribe = accountEvents.subscribe((event) => {
-      console.log('Realtime Account Event Received:', event);
+
+    const unsubscribeSocket = socketClient.onAccountStatusChange((payload) => {
+      console.log('⚡ [Composer] Socket Account Event Received:', payload);
       fetchAccounts();
+      if (payload.platform) {
+        socketClient.checkPlatform(payload.platform);
+      }
+    });
+
+    const unsubscribePlatformStatus = socketClient.onPlatformCheck((payload) => {
+      console.log('⚡ [Composer] "check_platform" Socket Response Received:', payload);
+      const connected = payload.connected ?? payload.isConnected;
+      if (connected) {
+        setConnectedPlatforms((prev) => Array.from(new Set([...prev, payload.platform as PlatformKey])));
+      } else {
+        setConnectedPlatforms((prev) => prev.filter((item) => item !== payload.platform));
+      }
+      setInitialChecked(true);
+    });
+
+    const unsubscribeNotification = socketClient.onNotification((notif) => {
+      if (notif.type === 'success') toast.success(notif.message);
+      else toast.info(notif.message);
+    });
+
+    const unsubscribeEvents = accountEvents.subscribe((event) => {
+      fetchAccounts();
+      if (event.platform) {
+        socketClient.checkPlatform(event.platform);
+      }
     });
 
     return () => {
       window.removeEventListener('focus', fetchAccounts);
-      unsubscribe();
+      unsubscribeSocket();
+      unsubscribePlatformStatus();
+      unsubscribeNotification();
+      unsubscribeEvents();
     };
-  }, []);
+  }, [toast]);
 
   const handlePresetSelect = (presetText: string) => {
     setTopic(presetText);
@@ -263,13 +326,17 @@ export default function ComposerPage() {
   };
 
   const togglePlatform = (p: PlatformKey) => {
-    setPlatforms(prev => 
-      prev.includes(p) ? prev.filter(item => item !== p) : [...prev, p]
-    );
+    const isSelecting = !platforms.includes(p);
+    dispatch(togglePlatformAction(p));
+
+    if (isSelecting) {
+      // Emit WebSocket event "check_platform" with payload { platform: "LINKEDIN" }
+      socketClient.checkPlatform(p);
+    }
   };
 
   const handleTextChange = (plt: PlatformKey, val: string) => {
-    setGeneratedDrafts(prev => ({ ...prev, [plt]: val }));
+    dispatch(setDraftForPlatformAction({ platform: plt, content: val }));
   };
 
   return (
@@ -425,6 +492,8 @@ export default function ComposerPage() {
                       {(['LINKEDIN', 'X', 'INSTAGRAM'] as PlatformKey[]).map((p) => {
                         const active = platforms.includes(p);
                         const isConnected = connectedPlatforms.includes(p);
+                        const isVerifying = !initialChecked;
+
                         return (
                           <button
                             key={p}
@@ -432,15 +501,24 @@ export default function ComposerPage() {
                             onClick={() => togglePlatform(p)}
                             className={`flex-1 py-2 rounded-xl border text-[10px] font-extrabold tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 ${
                               active
-                                ? isConnected
+                                ? isVerifying
+                                  ? 'bg-slate-900 text-slate-300 border-slate-800'
+                                  : isConnected
                                   ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                  : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
                                 : 'bg-slate-955 text-slate-500 border-slate-850'
                             }`}
-                            title={isConnected ? `${p} Connected` : `${p} Not Connected - Click to connect`}
+                            title={isVerifying ? `Verifying ${p}...` : isConnected ? `${p} Connected` : `${p} Not Connected - Click to connect in Social Accounts`}
                           >
-                            {active && isConnected && <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />}
-                            {active && !isConnected && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 animate-pulse" />}
+                            {active && isVerifying && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-slate-600 shrink-0 animate-pulse" />
+                            )}
+                            {active && !isVerifying && isConnected && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0 animate-pulse shadow-sm shadow-emerald-400/60" />
+                            )}
+                            {active && !isVerifying && !isConnected && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 animate-pulse shadow-sm shadow-rose-500/50" />
+                            )}
                             {p}
                           </button>
                         );

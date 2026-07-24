@@ -204,8 +204,11 @@ export const listPosts = catchAsync(async (req, res) => {
   const { page = 1, limit = 10, status, platform } = req.query;
   const userId = req.user.id;
 
-  const skip = (parseInt(page) - 1) * parseInt(limit);
-  const take = parseInt(limit);
+  const pageNumber = Number.isNaN(Number(page)) ? 1 : parseInt(page, 10);
+  const pageSize = Number.isNaN(Number(limit)) ? 10 : parseInt(limit, 10);
+  const skip = (pageNumber - 1) * pageSize;
+  const take = pageSize;
+  const targetUserId = req.user.role === 'ADMIN' && req.query.userId ? req.query.userId : userId;
 
   const where = {
     userId: targetUserId,
@@ -230,9 +233,9 @@ export const listPosts = catchAsync(async (req, res) => {
     posts,
     meta: {
       totalCount,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(totalCount / limit) || 1,
+      page: pageNumber,
+      limit: pageSize,
+      totalPages: Math.ceil(totalCount / pageSize) || 1,
     },
   });
 });

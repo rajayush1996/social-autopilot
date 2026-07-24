@@ -11,9 +11,10 @@ import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
 import { SocialAccount } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import { formatDate } from '@/utils/date';
 
 // Custom Instagram icon component
-export function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
+function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
@@ -24,7 +25,7 @@ export function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 // Custom Linkedin icon component
-export function LinkedinIcon(props: React.SVGProps<SVGSVGElement>) {
+function LinkedinIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
@@ -35,7 +36,7 @@ export function LinkedinIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 // Custom X (Twitter) icon component
-export function XIcon(props: React.SVGProps<SVGSVGElement>) {
+function XIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M4 4l11.733 16h4.267l-11.733 -16z" />
@@ -45,7 +46,7 @@ export function XIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 import accountEvents from '@/utils/accountEvents';
-import getSocket from '@/utils/socket';
+import socketClient from '@/utils/socket';
 
 export default function SocialAccountsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -66,7 +67,7 @@ export default function SocialAccountsPage() {
   };
 
   useEffect(() => {
-    getSocket();
+    socketClient.connect();
     fetchAccounts();
 
     // Check for callback parameters when returning from real OAuth provider redirect
@@ -130,7 +131,7 @@ export default function SocialAccountsPage() {
     try {
       await ApiService.disconnectAccount(accountId);
       toast.success(`Disconnected ${platform} account successfully.`);
-      accountEvents.notifyAccountChange('DISCONNECTED', platform);
+      accountEvents.notifyAccountChange('DISCONNECTED', platform.toUpperCase());
       fetchAccounts();
     } catch (err) {
       console.error('Disconnect Error:', err);
@@ -229,12 +230,16 @@ export default function SocialAccountsPage() {
                   <div className={`p-3 bg-gradient-to-br ${plt.color} rounded-2xl text-white shadow-lg`}>
                     <Icon className="h-6 w-6" />
                   </div>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
                     isLinked 
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
                       : 'bg-slate-955 text-slate-400 border-slate-800'
                   }`}>
-                    {isLinked && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                    {isLinked ? (
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse shadow-sm shadow-emerald-400/60" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-slate-600 shrink-0" />
+                    )}
                     {isLinked ? 'Connected' : 'Unlinked'}
                   </span>
                 </div>
@@ -255,7 +260,7 @@ export default function SocialAccountsPage() {
                         <p className="text-xs font-semibold text-slate-200 truncate">@{linkedAccount.username}</p>
                         {linkedAccount.expiresAt && (
                           <span className="text-[9px] text-slate-500 font-semibold block uppercase">
-                            Expires: {new Date(linkedAccount.expiresAt).toLocaleDateString()}
+                            Expires: {formatDate(linkedAccount.expiresAt)} UTC
                           </span>
                         )}
                       </div>

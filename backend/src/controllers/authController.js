@@ -7,6 +7,7 @@ import logger from '../utils/logger.js';
 import SocialAdapterFactory from '../services/social/socialAdapterFactory.js';
 import UserService from '../services/userService.js';
 import SocialAccountService from '../services/socialAccountService.js';
+import { emitAccountStatusChange } from '../services/socketService.js';
 import { encrypt } from '../utils/encryption.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -279,15 +280,37 @@ export const getUserAccounts = catchAsync(async (req, res) => {
  */
 export const disconnectAccount = catchAsync(async (req, res) => {
   const { id } = req.params;
+  const userId = req.user?.id || req.body?.userId || 'default-user-id';
 
-  const account = await SocialAccountService.findAccountById(id);
-  if (!account) {
-    throw ApiError.notFound(`Social account with ID "${id}" not found.`);
+  let account = null;
+  try {
+    account = await SocialAccountService.findAccountById(id);
+  } catch (err) {
+    account = null;
   }
 
-  const updatedAccount = await SocialAccountService.disconnectAccount(id);
+  if (!account) {
+    const platformUpper = id.toUpperCase();
+    account = await prisma.socialAccount.findFirst({
+      where: {
+        userId,
+        platform: platformUpper,
+        isActive: true,
+      },
+    });
+  }
 
-  emitAccountStatusChange({ userId: account.userId, platform: account.platform, action: 'DISCONNECTED' });
+  if (!account) {
+    throw ApiError.notFound(`Social account with ID or platform "${id}" not found.`);
+  }
+
+  const updatedAccount = await SocialAccountService.disconnectAccount(account.id);
+
+  emitAccountStatusChange({
+    userId: account.userId,
+    platform: account.platform.toUpperCase(),
+    action: 'DISCONNECTED',
+  });
 
   return successResponse(res, HttpStatus.OK, 'Social account disconnected successfully.', { account: updatedAccount });
 });

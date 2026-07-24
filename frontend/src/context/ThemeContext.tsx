@@ -51,7 +51,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <div className={theme === 'light' ? 'theme-light' : 'theme-dark'}>
+      <div className={theme === 'light' ? 'theme-light' : 'theme-dark'} suppressHydrationWarning>
         {children}
       </div>
     </ThemeContext.Provider>
