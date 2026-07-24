@@ -9,8 +9,12 @@ import {
 } from '../controllers/postController.js';
 import { validate } from '../middlewares/validate.js';
 import { generateAiSchema, createPostSchema } from '../validations/postValidation.js';
+import { authenticateJwt } from '../middlewares/auth.js';
 
 const router = Router();
+
+// Apply JWT authentication guard globally across all post campaigning scopes
+router.use(authenticateJwt);
 
 /**
  * POST /api/posts/ai-generate - Generate Post Content using OpenAI

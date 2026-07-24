@@ -8,22 +8,30 @@ export class SocialAccountService {
    * Link or upsert connected social media profile token metadata.
    */
   static async upsertAccount({ userId, platform, platformAccountId, username, accessToken, refreshToken, expiresAt }) {
-    return prisma.socialAccount.upsert({
+    const existingAccount = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform_platformAccountId: {
-          userId,
-          platform,
+        userId,
+        platform,
+      },
+    });
+
+    if (existingAccount) {
+      return prisma.socialAccount.update({
+        where: { id: existingAccount.id },
+        data: {
           platformAccountId,
+          username,
+          accountName: `@${username} (${platform})`,
+          accessToken,
+          refreshToken,
+          expiresAt,
+          isActive: true,
         },
-      },
-      update: {
-        username,
-        accessToken,
-        refreshToken,
-        expiresAt,
-        isActive: true,
-      },
-      create: {
+      });
+    }
+
+    return prisma.socialAccount.create({
+      data: {
         userId,
         platform,
         platformAccountId,

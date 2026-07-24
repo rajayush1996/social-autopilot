@@ -110,9 +110,25 @@ export class LinkedinAdapter extends SocialAdapter {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
 
+      const accessToken = response.data.access_token;
+      let platformAccountId = null;
+      let username = null;
+
+      try {
+        const userinfoRes = await axios.get(`${config.social.linkedin.apiBaseUrl}/userinfo`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        platformAccountId = userinfoRes.data?.sub || null;
+        username = userinfoRes.data?.name || userinfoRes.data?.email || null;
+      } catch (profileErr) {
+        logger.warn(`[LinkedinAdapter] userinfo fetch warning: ${profileErr.message}`);
+      }
+
       return {
-        accessToken: response.data.access_token,
+        accessToken,
         expiresIn: response.data.expires_in,
+        platformAccountId,
+        username,
       };
     } catch (error) {
       logger.error(`[LinkedinAdapter] OAuth Error: ${error.response?.data?.message || error.message}`);

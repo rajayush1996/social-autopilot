@@ -5,6 +5,7 @@ import { prisma } from '../config/db.js';
 import { POST_STATUS, SOCIAL_PLATFORM, SOCIAL_POST_STATUS } from '../config/constants.js';
 import SocialAdapterFactory from '../services/social/socialAdapterFactory.js';
 import { getValidAccessToken } from '../services/auth/tokenManager.js';
+import { updateUserMemory } from '../services/ai/memoryService.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -49,6 +50,21 @@ export async function processPostPublishing(postId) {
     const account = userAccounts.find((acc) => acc.platform === platform);
 
     try {
+      // Resolve platform-specific caption if post.content is a platform draft JSON map
+      let platformCaption = post.content;
+      try {
+        if (post.content && post.content.trim().startsWith('{')) {
+          const parsedDrafts = JSON.parse(post.content);
+          if (parsedDrafts[platform]) {
+            platformCaption = parsedDrafts[platform];
+          } else if (parsedDrafts.content) {
+            platformCaption = parsedDrafts.content;
+          }
+        }
+      } catch (e) {
+        // Fallback to original post.content string if not JSON
+      }
+
       // Get valid access token (auto-refreshes if expired)
       const validAccessToken = await getValidAccessToken(post.userId, platform);
       const platformAccountId = account?.platformAccountId || `mock_${platform.toLowerCase()}_user`;
@@ -59,7 +75,7 @@ export async function processPostPublishing(postId) {
       const result = await adapter.publishPost({
         accessToken: validAccessToken,
         platformAccountId,
-        caption: post.content,
+        caption: platformCaption,
         mediaUrls: post.mediaUrls,
         mediaType: post.mediaType,
       });
@@ -110,6 +126,13 @@ export async function processPostPublishing(postId) {
       publishedAt: new Date(),
     },
   });
+
+  // Trigger Rolling Summary Memory Compaction Hook asynchronously (non-blocking)
+  if (successCount > 0) {
+    updateUserMemory(post.userId, post.content).catch((err) => {
+      logger.error(`[BullMQ Worker] Error in memory service hook: ${err.message}`);
+    });
+  }
 
   logger.info(`[BullMQ Worker] ✅ Post ID ${post.id} updated to status "${finalStatus}" (${successCount} succeeded, ${failureCount} failed).`);
 

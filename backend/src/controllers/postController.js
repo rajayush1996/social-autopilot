@@ -10,17 +10,33 @@ import { syncScheduledPostsToQueue } from '../jobs/postScheduler.js';
 import { processPostPublishing } from '../workers/postWorker.js';
 import UserService from '../services/userService.js';
 import PostService from '../services/postService.js';
+import { decrypt } from '../utils/encryption.js';
 
 /**
  * Controller: Generate post content using OpenAI / AI service.
  */
 export const generateAiPostContent = catchAsync(async (req, res) => {
-  const { prompt, topic, platform = 'GENERAL', tone = 'ENGAGING', adaptAllPlatforms = false, userId = 'default-user-id' } = req.body;
+  const { 
+    prompt, 
+    topic, 
+    platform = 'GENERAL', 
+    targetPlatforms, 
+    platforms, 
+    tone = 'ENGAGING', 
+    adaptAllPlatforms = false,
+    emojiDensity = 'MEDIUM',
+    hashtagCount = 'MODERATE',
+    formatStyle = 'SINGLE',
+    articleUrl,
+  } = req.body;
+  const userId = req.user.id;
 
   const inputTopic = prompt || topic;
-  if (!inputTopic) {
-    throw ApiError.badRequest('Field "prompt" or "topic" is required.');
+  if (!inputTopic && !articleUrl) {
+    throw ApiError.badRequest('Field "prompt", "topic", or "articleUrl" is required.');
   }
+
+  const selectedPlatforms = targetPlatforms || platforms || ['INSTAGRAM', 'LINKEDIN', 'X'];
 
   // 1. Retrieve User and Validate AI Credits (Service layer)
   const user = await UserService.ensureUserExists(userId);
@@ -30,18 +46,32 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
   }
 
   let aiResult = null;
+  const contentSummary = decrypt(user.contentSummary);
+  const brandContext = user.brandContext || null;
 
-  if (adaptAllPlatforms) {
+  if (adaptAllPlatforms || selectedPlatforms.length > 0) {
     aiResult = await optimizePostForPlatforms({
       content: inputTopic,
-      platforms: ['INSTAGRAM', 'LINKEDIN', 'X'],
+      platforms: selectedPlatforms,
       tone,
+      contentSummary,
+      brandContext,
+      emojiDensity,
+      hashtagCount,
+      formatStyle,
+      articleUrl,
     });
   } else {
     aiResult = await generatePostContent({
       prompt: inputTopic,
       platform,
       tone,
+      contentSummary,
+      brandContext,
+      emojiDensity,
+      hashtagCount,
+      formatStyle,
+      articleUrl,
     });
   }
 
@@ -56,7 +86,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
         prompt: inputTopic,
         targetPlatform: ['INSTAGRAM', 'LINKEDIN', 'X'].includes(platform.toUpperCase()) ? platform.toUpperCase() : null,
         tone: ['PROFESSIONAL', 'CASUAL', 'ENGAGING', 'EDUCATIONAL', 'PROMOTIONAL', 'HUMOROUS'].includes(tone.toUpperCase()) ? tone.toUpperCase() : 'ENGAGING',
-        generatedText: adaptAllPlatforms ? JSON.stringify(aiResult) : aiResult.content,
+        generatedText: JSON.stringify(aiResult.adaptedPosts || aiResult),
         modelUsed: aiResult.modelUsed || 'MockEngine',
         tokensUsed: aiResult.tokensUsed || 0,
       },
@@ -65,8 +95,9 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
     logger.warn(`[PostController] AI log db warning: ${logErr.message}`);
   }
 
-  // 4. Return success response detailing remaining credits
+  // 4. Return success response detailing remaining credits and top-level platform drafts
   return successResponse(res, HttpStatus.OK, 'AI post content generated successfully.', {
+    ...(aiResult.adaptedPosts || {}),
     ...aiResult,
     aiCreditsRemaining: updatedUser.aiCredits,
   });
@@ -77,7 +108,6 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
  */
 export const createPost = catchAsync(async (req, res) => {
   const {
-    userId = 'default-user-id',
     content,
     mediaUrls = [],
     mediaType,
@@ -87,6 +117,7 @@ export const createPost = catchAsync(async (req, res) => {
     aiGenerated = false,
     aiPrompt,
   } = req.body;
+  const userId = req.user.id;
 
   if (!content) {
     throw ApiError.badRequest('Field "content" is required.');
@@ -131,7 +162,7 @@ export const createPost = catchAsync(async (req, res) => {
     mediaUrls,
     mediaType: resolvedMediaType,
     targetPlatforms: formattedPlatforms,
-    status: publishNow ? POST_STATUS.SCHEDULED : initialStatus,
+    status: initialStatus,
     scheduledAt: parseScheduledDate,
     aiGenerated,
     aiPrompt,
@@ -170,13 +201,14 @@ export const createPost = catchAsync(async (req, res) => {
  * Controller: List posts with status filtering & pagination.
  */
 export const listPosts = catchAsync(async (req, res) => {
-  const { userId = 'default-user-id', status, platform, page = 1, limit = 10 } = req.query;
+  const { page = 1, limit = 10, status, platform } = req.query;
+  const userId = req.user.id;
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const take = parseInt(limit);
 
   const where = {
-    userId,
+    userId: targetUserId,
     ...(status && { status: status.toUpperCase() }),
     ...(platform && { targetPlatforms: { has: platform.toUpperCase() } }),
   };

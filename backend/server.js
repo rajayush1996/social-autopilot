@@ -8,15 +8,16 @@ import { errorConverter, globalErrorHandler } from './src/middlewares/errorHandl
 import authRoutes from './src/routes/authRoutes.js';
 import postRoutes from './src/routes/postRoutes.js';
 import uploadRoutes from './src/routes/uploadRoutes.js';
+import adminRoutes from './src/routes/adminRoutes.js';
+import scheduleRoutes from './src/routes/scheduleRoutes.js';
 import { initPostWorker } from './src/workers/postWorker.js';
 import { syncScheduledPostsToQueue } from './src/jobs/postScheduler.js';
 import logger from './src/utils/logger.js';
 
-
+// Standard Middlewares
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Standard Middlewares
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -62,21 +63,9 @@ app.get('/', (req, res) => {
       <div class="card">
         <h3>📍 Available API Modules</h3>
         <ul>
-          <li><strong>Authentication & Social Accounts:</strong> <code>/api/auth</code>
-            <ul>
-              <li><code>GET /api/auth/url?platform=LINKEDIN</code> - Generate OAuth link</li>
-              <li><code>POST /api/auth/connect</code> - Connect social media account</li>
-              <li><code>GET /api/auth/accounts</code> - List user's connected social accounts</li>
-            </ul>
-          </li>
-          <li><strong>Post Creation, AI Generation & BullMQ Queue:</strong> <code>/api/posts</code>
-            <ul>
-              <li><code>POST /api/posts/ai-generate</code> - Generate AI post using OpenAI</li>
-              <li><code>POST /api/posts</code> - Schedule post via BullMQ queue or publish immediately</li>
-              <li><code>GET /api/posts</code> - List scheduled and published posts</li>
-              <li><code>POST /api/posts/trigger-scheduler</code> - Sync overdue posts into BullMQ</li>
-            </ul>
-          </li>
+          <li><strong>Authentication & Social Accounts:</strong> <code>/api/auth</code></li>
+          <li><strong>Post Creation & BullMQ Queue:</strong> <code>/api/posts</code></li>
+          <li><strong>Automation Scheduling Dispatcher:</strong> <code>/api/schedules</code></li>
           <li><strong>Health Status:</strong> <a href="/health"><code>GET /health</code></a></li>
         </ul>
       </div>
@@ -89,14 +78,23 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 // Error Handling Middlewares (Must be last)
+import http from 'http';
+import { initSocket } from './src/services/socketService.js';
+
 app.use(errorConverter);
 app.use(globalErrorHandler);
 
+// Create HTTP Server & Initialize Socket.io WebSocket Server
+const server = http.createServer(app);
+initSocket(server);
+
 // Start Server & Initialize BullMQ Worker & Scheduler Sync
-app.listen(PORT, async () => {
-  logger.info(`🚀 Social Autopilot Server listening on http://localhost:${PORT}`);
+server.listen(PORT, async () => {
+  logger.info(`🚀 Social Autopilot Server & Socket.io listening on http://localhost:${PORT}`);
   
   // Database and Redis connection checks
   await checkDatabaseConnection();

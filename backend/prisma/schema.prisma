@@ -43,16 +43,34 @@ model User {
   id             String            @id @default(uuid())
   email          String            @unique
   name           String?
+  password       String?
   avatarUrl      String?
   aiCredits      Int               @default(15)
   plan           String            @default("FREE")
+  role           String            @default("USER")
+  emailVerified  Boolean           @default(false)
+  verificationToken String?
+  autopilotEnabled Boolean         @default(false)
+  brandContext   String?
+  contentSummary String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   socialAccounts SocialAccount[]
   posts          Post[]
   aiLogs         AIGenerationLog[]
+  automationSchedules AutomationSchedule[]
 
   @@map("users")
+}
+
+model FeatureConfig {
+  id        String   @id @default(uuid())
+  feature   String   @unique
+  isPremium Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("feature_configs")
 }
 
 model SocialAccount {
@@ -128,4 +146,26 @@ model AIGenerationLog {
   createdAt      DateTime        @default(now())
 
   @@map("ai_generation_logs")
+}
+
+model AutomationSchedule {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String           @default("Daily Auto-Post")
+  daysOfWeek      String[]         @default(["MON", "TUE", "WED", "THU", "FRI"])
+  timeOfDay       String           @default("09:00")
+  timezone        String           @default("UTC")
+  repeatType      String           @default("WEEKLY")
+  isActive        Boolean          @default(true)
+  targetPlatforms SocialPlatform[] @default([LINKEDIN, X])
+  tone            AITone?          @default(ENGAGING)
+  topicPrompt     String?
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId, isActive])
+  @@map("automation_schedules")
 }

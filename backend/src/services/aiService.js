@@ -45,24 +45,60 @@ Create concise, high-impact content:
 /**
  * Generate post content using OpenAI GPT models with fallback mock generation.
  */
-export async function generatePostContent({ prompt, platform = 'GENERAL', tone = 'ENGAGING', topic }) {
+export async function generatePostContent({ 
+  prompt, 
+  platform = 'GENERAL', 
+  tone = 'ENGAGING', 
+  topic, 
+  contentSummary,
+  brandContext,
+  emojiDensity = 'MEDIUM',
+  hashtagCount = 'MODERATE',
+  formatStyle = 'SINGLE',
+  articleUrl,
+}) {
   const openai = getOpenAIClient();
   const inputTopic = prompt || topic;
 
-  if (!inputTopic) {
-    throw new Error('A prompt or topic is required to generate AI content.');
+  if (!inputTopic && !articleUrl) {
+    throw new Error('A prompt, topic, or article URL is required to generate AI content.');
   }
 
   const model = config.openai.model;
 
   if (!openai) {
     logger.warn('⚠️ OPENAI_API_KEY not configured. Using intelligent template generator.');
-    return generateMockPostContent({ prompt: inputTopic, platform, tone, model: 'mock-template-engine' });
+    return generateMockPostContent({ 
+      prompt: inputTopic || articleUrl, 
+      platform, 
+      tone, 
+      emojiDensity, 
+      hashtagCount,
+      formatStyle,
+      model: 'mock-template-engine' 
+    });
   }
 
   try {
-    const systemPrompt = SYSTEM_PROMPTS[platform.toUpperCase()] || SYSTEM_PROMPTS.GENERAL;
-    const userPrompt = `Topic/Prompt: "${inputTopic}"\nTone of voice: ${tone}\nTarget Platform: ${platform}.\nPlease generate the ready-to-publish post content.`;
+    let systemPrompt = SYSTEM_PROMPTS[platform.toUpperCase()] || SYSTEM_PROMPTS.GENERAL;
+    
+    if (brandContext) {
+      systemPrompt += `\n\n[USER BRAND VOICE & CONTEXT]\n${brandContext}`;
+    }
+    if (contentSummary) {
+      systemPrompt += `\n\n[USER CONTENT MEMORY & CONSTRAINTS]\n${contentSummary}\n\nCRITICAL INSTRUCTION: Do NOT duplicate concepts, hooks, phrasing, or core angles`;
+    }
+
+    let formattingInstructions = `\n\nFormatting Controls:
+- Emoji Density: ${emojiDensity} (NONE = 0 emojis, LOW = 1-2 subtle emojis, MEDIUM = 3-5 emojis, HIGH = vibrant emoji layout)
+- Hashtag Strategy: ${hashtagCount} (NONE = 0 hashtags, MODERATE = 3-5 targeted hashtags, HEAVY = 8-12 niche hashtags)
+- Output Format Style: ${formatStyle} (SINGLE = standard single post, THREAD = numbered 1/ 2/ 3/ thread breakdown, CAROUSEL = structured slide-by-slide outline)`;
+
+    systemPrompt += formattingInstructions;
+
+    const userPrompt = articleUrl 
+      ? `Article URL to Repurpose: "${articleUrl}"\nAdditional Instructions: "${inputTopic || 'Summarize key takeaways for social media.'}"\nTone: ${tone}\nTarget Platform: ${platform}`
+      : `Topic/Prompt: "${inputTopic}"\nTone of voice: ${tone}\nTarget Platform: ${platform}.\nPlease generate the ready-to-publish post content.`;
 
     const completion = await openai.chat.completions.create({
       model: model,
@@ -71,7 +107,7 @@ export async function generatePostContent({ prompt, platform = 'GENERAL', tone =
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1200,
     });
 
     const generatedText = completion.choices[0]?.message?.content?.trim() || '';
@@ -87,11 +123,13 @@ export async function generatePostContent({ prompt, platform = 'GENERAL', tone =
     };
   } catch (error) {
     logger.error(`❌ Error during OpenAI content generation: ${error.message}`);
-    // Graceful fallback if API fails (e.g. quota, network error)
     return generateMockPostContent({
-      prompt: inputTopic,
+      prompt: inputTopic || articleUrl,
       platform,
       tone,
+      emojiDensity,
+      hashtagCount,
+      formatStyle,
       model: `${model} (fallback)`,
       errorNotice: error.message
     });
@@ -99,16 +137,32 @@ export async function generatePostContent({ prompt, platform = 'GENERAL', tone =
 }
 
 /**
- * Adapt a single master post content into optimized versions for Instagram, LinkedIn, and X.
+ * Adapt a single master post content into optimized versions for selected platforms.
  */
-export async function optimizePostForPlatforms({ content, platforms = ['INSTAGRAM', 'LINKEDIN', 'X'], tone = 'PROFESSIONAL' }) {
+export async function optimizePostForPlatforms({ 
+  content, 
+  platforms = ['INSTAGRAM', 'LINKEDIN', 'X'], 
+  tone = 'PROFESSIONAL', 
+  contentSummary,
+  brandContext,
+  emojiDensity,
+  hashtagCount,
+  formatStyle,
+  articleUrl,
+}) {
   const results = {};
   
   for (const platform of platforms) {
     const result = await generatePostContent({
-      prompt: `Adapt this core message for ${platform}: "${content}"`,
+      prompt: content ? `Adapt this core message for ${platform}: "${content}"` : '',
       platform: platform.toUpperCase(),
-      tone
+      tone,
+      contentSummary,
+      brandContext,
+      emojiDensity,
+      hashtagCount,
+      formatStyle,
+      articleUrl,
     });
     results[platform.toUpperCase()] = result.content;
   }
@@ -123,24 +177,38 @@ export async function optimizePostForPlatforms({ content, platforms = ['INSTAGRA
 /**
  * Fallback AI Generator when OpenAI key is missing or encounters errors.
  */
-function generateMockPostContent({ prompt, platform, tone, model, errorNotice }) {
+function generateMockPostContent({ prompt, platform, tone, emojiDensity, hashtagCount, formatStyle, model, errorNotice }) {
   let content = '';
-
   const uppercasePlatform = (platform || 'GENERAL').toUpperCase();
+  const cleanPrompt = prompt || 'Scaling workflow productivity with intelligent automation';
 
-  switch (uppercasePlatform) {
-    case 'INSTAGRAM':
-      content = `✨ ${prompt}\n\nHere is something game-changing you need to know today! 🚀\n\n💡 Key Insights:\n1. Execution > Ideas\n2. Consistency drives results\n3. Automation frees your time\n\n👇 Drop a comment below if you agree!\n\n#SocialAutopilot #AI #ContentCreation #Marketing #Automation #Productivity`;
-      break;
-    case 'LINKEDIN':
-      content = `Here is how to solve ${prompt} in 2026 💡\n\nMany professionals struggle with scaling their reach online. The secret isn't spending more hours—it's building smarter workflows.\n\n3 lessons learned:\n• Systemize content creation with AI\n• Schedule posts ahead of time\n• Focus on high-signal conversations\n\nWhat strategies are working best for your workflow? Let's discuss in the comments.\n\n#Innovation #Productivity #AI #SocialMedia #Growth`;
-      break;
-    case 'X':
-      content = `🚀 ${prompt}\n\n1/ Stop overthinking your content strategy.\n2/ Build repeatable systems.\n3/ Leverage AI & automation to stay consistent.\n\nSimplicity scales.`;
-      break;
-    default:
-      content = `🚀 ${prompt}\n\nAutomate your social growth with smart scheduling and AI-driven content tailored for your audience!`;
-      break;
+  let emojiHeader = emojiDensity === 'NONE' ? '' : emojiDensity === 'HIGH' ? '🚀🔥✨ ' : '💡 ';
+  let hashtags = '';
+  if (hashtagCount === 'MODERATE') {
+    hashtags = '\n\n#Growth #AI #Productivity #Workflow';
+  } else if (hashtagCount === 'HEAVY') {
+    hashtags = '\n\n#Growth #AI #Productivity #Workflow #TechTrends #Automation #SocialMedia #Strategy #DigitalTransformation';
+  }
+
+  if (formatStyle === 'THREAD') {
+    content = `🧵 ${cleanPrompt}\n\n1/ Stop spending hours manually drafting posts.\n\n2/ Decouple content creation into reusable AI templates.\n\n3/ Schedule recurring dispatches to stay top-of-mind.\n\n4/ Measure engagement and double down on top performers.${hashtags}`;
+  } else if (formatStyle === 'CAROUSEL') {
+    content = `📌 SLIDE 1: ${cleanPrompt}\n\n📌 SLIDE 2: Problem: Manual social media posting causes burnout.\n\n📌 SLIDE 3: Solution: Intelligent AI drafting + automated queueing.\n\n📌 SLIDE 4: Actionable Tip: Define 3 content pillars today.${hashtags}`;
+  } else {
+    switch (uppercasePlatform) {
+      case 'INSTAGRAM':
+        content = `${emojiHeader}${cleanPrompt}\n\nHere is something game-changing you need to know today!\n\nKey Insights:\n1. Execution > Ideas\n2. Consistency drives results\n3. Automation frees your time\n\n👇 Drop a comment below if you agree!${hashtags}`;
+        break;
+      case 'LINKEDIN':
+        content = `${emojiHeader}How to master ${cleanPrompt} in 2026\n\nMany professionals struggle with scaling their reach online. The secret isn't spending more hours—it's building smarter workflows.\n\n3 key takeaways:\n• Systemize content creation with AI\n• Schedule posts ahead of time\n• Focus on high-signal conversations\n\nWhat strategies are working best for your workflow? Let's discuss in the comments.${hashtags}`;
+        break;
+      case 'X':
+        content = `${emojiHeader}${cleanPrompt}\n\n1. Stop overthinking content strategy.\n2. Build repeatable systems.\n3. Leverage AI & automation to stay consistent.\n\nSimplicity scales.${hashtags}`;
+        break;
+      default:
+        content = `${emojiHeader}${cleanPrompt}\n\nAutomate your social growth with smart scheduling and AI-driven content tailored for your audience!${hashtags}`;
+        break;
+    }
   }
 
   return {

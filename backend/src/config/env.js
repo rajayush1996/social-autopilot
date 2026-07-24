@@ -47,6 +47,7 @@ export const config = {
       oauthBaseUrl: process.env.LINKEDIN_OAUTH_BASE_URL || 'https://www.linkedin.com/oauth/v2',
       clientId: process.env.LINKEDIN_CLIENT_ID,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+      scope: process.env.LINKEDIN_SCOPE || 'openid profile w_member_social',
     },
   },
   cloudinary: {
