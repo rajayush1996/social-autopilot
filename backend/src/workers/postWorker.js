@@ -6,7 +6,12 @@ import { POST_STATUS, SOCIAL_PLATFORM, SOCIAL_POST_STATUS } from '../config/cons
 import SocialAdapterFactory from '../services/social/socialAdapterFactory.js';
 import { getValidAccessToken } from '../services/auth/tokenManager.js';
 import socketManager from '../services/socketService.js';
+import NotificationService from '../services/notificationService.js';
 import logger from '../utils/logger.js';
+import { convertMarkdownToUnicode } from '../utils/textFormatter.js';
+import { updateUserMemory } from '../services/ai/memoryService.js';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Execute publishing logic for a specific post.
@@ -37,6 +42,22 @@ export async function processPostPublishing(postId) {
     return { status: 'SKIPPED', reason: 'Post cancelled' };
   }
 
+  // Atomic Lock: Prevent duplicate execution if another worker thread or controller process is already publishing
+  const lockResult = await prisma.post.updateMany({
+    where: {
+      id: postId,
+      status: { notIn: [POST_STATUS.PUBLISHED, 'PUBLISHING'] },
+    },
+    data: {
+      status: 'PUBLISHING',
+    },
+  });
+
+  if (lockResult.count === 0) {
+    logger.info(`[BullMQ Worker] ⚠️ Post ID ${postId} is already being published or was already published. Skipping duplicate execution.`);
+    return { status: 'SKIPPED', reason: 'Already published or publishing in progress' };
+  }
+
   const userAccounts = post.user?.socialAccounts || [];
   const targetPlatforms = post.targetPlatforms.length > 0
     ? post.targetPlatforms
@@ -64,6 +85,9 @@ export async function processPostPublishing(postId) {
       } catch (e) {
         // Fallback to original post.content string if not JSON
       }
+
+      // Convert any Markdown **bold** or *italic* text into native Unicode characters for LinkedIn/X/Instagram
+      platformCaption = convertMarkdownToUnicode(platformCaption);
 
       // Get valid access token (auto-refreshes if expired)
       const validAccessToken = await getValidAccessToken(post.userId, platform);
@@ -135,12 +159,50 @@ export async function processPostPublishing(postId) {
     details: { successCount, failureCount },
   });
 
-  socketManager.emitNotification({
+  const notificationType = finalStatus === POST_STATUS.PUBLISHED
+    ? 'success'
+    : finalStatus === POST_STATUS.FAILED
+      ? 'error'
+      : 'warning';
+
+  const notificationTitle = finalStatus === POST_STATUS.PUBLISHED
+    ? 'Post Published Successfully 🎉'
+    : finalStatus === POST_STATUS.FAILED
+      ? 'Post Publishing Failed ⚠️'
+      : 'Post Partially Published ⚠️';
+
+  const notificationMessage = finalStatus === POST_STATUS.FAILED
+    ? `Publishing failed for ${targetPlatforms.join(', ')}: ${executionLogs.map(l => l.errorMessage).filter(Boolean).join('; ') || 'Platform error'}.`
+    : finalStatus === POST_STATUS.PUBLISHED
+      ? `Your post was published to ${targetPlatforms.join(', ')} successfully.`
+      : `Published on ${successCount} platforms, failed on ${failureCount} platforms.`;
+
+  await NotificationService.createNotification({
     userId: post.userId,
-    title: 'Post Dispatch Status',
-    message: `Post ${post.id.slice(0, 8)} updated to ${finalStatus}`,
-    type: finalStatus === POST_STATUS.PUBLISHED ? 'success' : 'info',
+    title: notificationTitle,
+    message: notificationMessage,
+    type: notificationType,
   });
+
+  // Automatic Local File Storage Cleanup Hook
+  if (post.mediaUrls && post.mediaUrls.length > 0) {
+    for (const mediaUrl of post.mediaUrls) {
+      if (mediaUrl.includes('/uploads/')) {
+        try {
+          const filename = mediaUrl.split('/uploads/').pop();
+          if (filename) {
+            const localFilePath = path.join(process.cwd(), 'public/uploads', filename);
+            if (fs.existsSync(localFilePath)) {
+              await fs.promises.unlink(localFilePath);
+              logger.info(`[BullMQ Worker] 🧹 Cleaned up temporary local upload file: ${localFilePath}`);
+            }
+          }
+        } catch (cleanupErr) {
+          logger.warn(`[BullMQ Worker] File cleanup warning: ${cleanupErr.message}`);
+        }
+      }
+    }
+  }
 
   // Trigger Rolling Summary Memory Compaction Hook asynchronously (non-blocking)
   if (successCount > 0) {

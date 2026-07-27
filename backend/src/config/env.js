@@ -7,6 +7,7 @@ import 'dotenv/config';
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '5000', 10),
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
   logLevel: process.env.LOG_LEVEL || 'info',
 
   db: {
@@ -41,6 +42,7 @@ export const config = {
       apiBaseUrl: process.env.INSTAGRAM_API_BASE_URL || 'https://graph.instagram.com',
       appId: process.env.FACEBOOK_APP_ID,
       appSecret: process.env.FACEBOOK_APP_SECRET,
+      scope: process.env.INSTAGRAM_SCOPE || 'instagram_basic,instagram_content_publish,pages_show_list,public_profile',
     },
     linkedin: {
       apiBaseUrl: process.env.LINKEDIN_API_BASE_URL || 'https://api.linkedin.com/v2',
@@ -55,6 +57,13 @@ export const config = {
     apiKey: process.env.CLOUDINARY_API_KEY,
     apiSecret: process.env.CLOUDINARY_API_SECRET,
     simulationHostUrl: process.env.SIMULATION_UPLOAD_HOST_URL || 'https://res.cloudinary.com/simulated-cloud/image/upload',
+  },
+  r2: {
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY,
+    bucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME || process.env.R2_BUCKET_NAME,
+    endpoint: process.env.CLOUDFLARE_R2_ENDPOINT || process.env.R2_ENDPOINT,
+    publicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL || process.env.R2_PUBLIC_DOMAIN || process.env.R2_PUBLIC_URL,
   },
 };
 

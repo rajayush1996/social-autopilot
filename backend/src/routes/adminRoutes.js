@@ -3,9 +3,10 @@ import {
   updateAutopilotSettings,
   getFeatures,
   updateFeature,
-  triggerAutopilotNow
+  triggerAutopilotNow,
+  setUserCredits,
 } from '../controllers/adminController.js';
-import { restrictToAdmin } from '../middlewares/rbac.js';
+import { restrictToSuperAdmin } from '../middlewares/rbac.js';
 import { authenticateJwt } from '../middlewares/auth.js';
 
 const router = Router();
@@ -24,13 +25,19 @@ router.post('/settings', updateAutopilotSettings);
 router.get('/features', getFeatures);
 
 /**
- * PATCH /api/admin/features/:featureName - Toggle premium status of a feature
+ * PATCH /api/admin/features/:featureName - Toggle premium status (Super Admin only)
  */
-router.patch('/features/:featureName', restrictToAdmin, updateFeature);
+router.patch('/features/:featureName', restrictToSuperAdmin, updateFeature);
 
 /**
- * POST /api/admin/autopilot/trigger - Run daily Autopilot generation
+ * POST /api/admin/autopilot/trigger - Run daily Autopilot generation (Super Admin only)
  */
-router.post('/autopilot/trigger', restrictToAdmin, triggerAutopilotNow);
+router.post('/autopilot/trigger', restrictToSuperAdmin, triggerAutopilotNow);
+
+/**
+ * POST /api/admin/set-credits - Super Admin API to grant AI credits by User ID / Unique ID
+ */
+router.post('/set-credits', restrictToSuperAdmin, setUserCredits);
+router.post('/users/:id/credits', restrictToSuperAdmin, setUserCredits);
 
 export default router;

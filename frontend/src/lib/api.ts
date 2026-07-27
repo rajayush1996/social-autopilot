@@ -112,8 +112,12 @@ apiClient.interceptors.response.use(
 // TypeScript interfaces for type safety
 export interface User {
   id: string;
+  uniqueId?: string | null;
   email: string;
   name: string | null;
+  phoneNumber?: string | null;
+  bio?: string | null;
+  dateOfBirth?: string | null;
   avatarUrl: string | null;
   aiCredits: number;
   plan: string;
@@ -165,7 +169,7 @@ export interface Post {
   mediaUrls: string[];
   mediaType: 'IMAGE' | 'VIDEO' | null;
   targetPlatforms: ('INSTAGRAM' | 'LINKEDIN' | 'X')[];
-  status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED' | 'CANCELLED';
+  status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED' | 'PARTIALLY_PUBLISHED' | 'CANCELLED';
   scheduledAt: string | null;
   publishedAt: string | null;
   aiGenerated: boolean;

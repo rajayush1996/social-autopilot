@@ -171,17 +171,23 @@ export class SocketClientManager {
   }
 
   /**
-   * Subscribe to System Push Notifications.
+   * Subscribe to "notification:new" Push Notifications.
    * Returns cleanup unsubscribe function.
    */
-  public onNotification(callback: (data: SystemNotificationPayload) => void): () => void {
+  public onNewNotification(callback: (data: SystemNotificationPayload) => void): () => void {
     const socket = this.connect();
     if (!socket) return () => {};
 
+    socket.on('notification:new', callback);
     socket.on(SOCKET_EVENTS.SYSTEM_NOTIFICATION, callback);
     return () => {
+      socket.off('notification:new', callback);
       socket.off(SOCKET_EVENTS.SYSTEM_NOTIFICATION, callback);
     };
+  }
+
+  public onNotification(callback: (data: SystemNotificationPayload) => void): () => void {
+    return this.onNewNotification(callback);
   }
 
   /**
@@ -219,6 +225,29 @@ export class SocketClientManager {
 
   public onPlatformConnectionStatus(callback: (data: PlatformConnectionStatusPayload) => void): () => void {
     return this.onPlatformCheck(callback as any);
+  }
+
+  /**
+   * Listen to generic custom socket event from backend.
+   */
+  public on(eventName: string, callback: (...args: any[]) => void) {
+    const socket = this.connect();
+    if (socket) {
+      socket.on(eventName, callback);
+    }
+  }
+
+  /**
+   * Unsubscribe from generic custom socket event.
+   */
+  public off(eventName: string, callback?: (...args: any[]) => void) {
+    if (this.socket) {
+      if (callback) {
+        this.socket.off(eventName, callback);
+      } else {
+        this.socket.off(eventName);
+      }
+    }
   }
 
   /**

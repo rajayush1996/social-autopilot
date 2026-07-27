@@ -244,6 +244,16 @@ textarea:disabled,
 }
 
 /* Inputs, Textareas, Selects in Daylight mode */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  padding: 8px 12px;
+}
+
 .theme-light input:not([type="checkbox"]),
 .theme-light textarea,
 .theme-light select {
@@ -252,6 +262,12 @@ textarea:disabled,
   border-color: #cbd5e1 !important;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
   color-scheme: light !important;
+}
+
+.theme-light select option,
+html.light select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 .theme-light input:not([type="checkbox"]):focus,
@@ -330,3 +346,33 @@ input[type="checkbox"] {
 .animate-fadeIn {
   animation: fadeIn 0.35s ease-out forwards;
 }
+
+/* Liquid Water Progress Fill Animation */
+@keyframes liquidWave {
+  0% { transform: translateX(0) scaleY(1); }
+  50% { transform: translateX(-25%) scaleY(1.15); }
+  100% { transform: translateX(-50%) scaleY(1); }
+}
+
+@keyframes bubbleUp {
+  0% { transform: translateY(100%) scale(0.3); opacity: 0; }
+  50% { opacity: 0.8; }
+  100% { transform: translateY(-20%) scale(1); opacity: 0; }
+}
+
+.animate-liquid-wave {
+  animation: liquidWave 3s ease-in-out infinite;
+}
+
+.animate-bubble-1 {
+  animation: bubbleUp 2.2s ease-in infinite;
+}
+
+.animate-bubble-2 {
+  animation: bubbleUp 1.8s ease-in infinite 0.4s;
+}
+
+.animate-bubble-3 {
+  animation: bubbleUp 2.5s ease-in infinite 0.9s;
+}
+

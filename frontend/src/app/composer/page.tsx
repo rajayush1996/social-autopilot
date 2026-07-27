@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Sparkles, 
   Upload, 
@@ -21,12 +22,15 @@ import {
   Clock,
   Zap,
   SlidersHorizontal,
-  ChevronRight
+  ChevronRight,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
 import { useToast } from '@/context/ToastContext';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
+import LiquidUploadButton from '@/components/LiquidUploadButton';
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -40,6 +44,7 @@ import {
   setEmojiDensityAction,
   setHashtagCountAction,
   setFormatStyleAction,
+  setContentLengthAction,
   setDraftForPlatformAction,
   setAllDraftsAction,
   setComposerModeAction,
@@ -97,6 +102,7 @@ export default function ComposerPage() {
   const emojiDensity = reduxComposer.emojiDensity;
   const hashtagCount = reduxComposer.hashtagCount;
   const formatStyle = reduxComposer.formatStyle;
+  const contentLength = reduxComposer.contentLength || 'BALANCED';
   const generatedDrafts = reduxComposer.generatedDrafts;
 
   const setComposerMode = (mode: 'SINGLE' | 'RECURRING') => dispatch(setComposerModeAction(mode));
@@ -107,6 +113,7 @@ export default function ComposerPage() {
   const setEmojiDensity = (val: string) => dispatch(setEmojiDensityAction(val));
   const setHashtagCount = (val: string) => dispatch(setHashtagCountAction(val));
   const setFormatStyle = (val: string) => dispatch(setFormatStyleAction(val));
+  const setContentLength = (val: string) => dispatch(setContentLengthAction(val));
   const setGeneratedDrafts = (drafts: any) => {
     if (typeof drafts === 'function') {
       const next = drafts(reduxComposer.generatedDrafts);
@@ -124,6 +131,28 @@ export default function ComposerPage() {
   // AI Generation States
   const [generating, setGenerating] = useState(false);
   const [aiLimitReached, setAiLimitReached] = useState(false);
+
+  // Fullscreen Preview Popup State
+  const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
+  const [portalMounted, setPortalMounted] = useState(false);
+
+  useEffect(() => {
+    setPortalMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreenPreview(false);
+      }
+    };
+    if (isFullscreenPreview) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreenPreview]);
 
   // Connected Accounts State
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformKey[]>([]);
@@ -184,6 +213,7 @@ export default function ComposerPage() {
 
     const unsubscribeNotification = socketClient.onNotification((notif) => {
       if (notif.type === 'success') toast.success(notif.message);
+      else if (notif.type === 'error' || notif.type === 'warning') toast.error(notif.message);
       else toast.info(notif.message);
     });
 
@@ -250,6 +280,7 @@ export default function ComposerPage() {
           emojiDensity,
           hashtagCount,
           formatStyle,
+          contentLength,
           articleUrl: inputSource === 'URL' ? articleUrl : '',
         }
       );
@@ -303,14 +334,14 @@ export default function ComposerPage() {
       const payload = {
         content: JSON.stringify(platformDraftMap),
         mediaUrls: mediaFileUrl ? [mediaFileUrl] : [],
-        mediaType: mediaType,
+        mediaType: mediaType || null,
         targetPlatforms: platforms,
-        scheduledAt: publishNow ? null : new Date(scheduledDate).toISOString(),
+        scheduledAt: publishNow ? null : (scheduledDate ? new Date(scheduledDate).toISOString() : null),
         publishNow,
       };
 
       await ApiService.createPost(payload);
-      toast.success(publishNow ? 'Multi-platform post queued for immediate publishing!' : 'Multi-platform post scheduled successfully!');
+      toast.success(publishNow ? 'Post published successfully!' : 'Post scheduled successfully!');
       
       // Reset Form Inputs
       setTopic('');
@@ -330,7 +361,6 @@ export default function ComposerPage() {
     dispatch(togglePlatformAction(p));
 
     if (isSelecting) {
-      // Emit WebSocket event "check_platform" with payload { platform: "LINKEDIN" }
       socketClient.checkPlatform(p);
     }
   };
@@ -345,10 +375,10 @@ export default function ComposerPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-900">
         <div>
           <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-200 tracking-tight">
-            AI Post Composer & Dispatcher
+            AI Post Composer
           </h1>
           <p className="text-slate-400 text-xs mt-1">
-            Create single posts with AI copy generation or set up recurring alarm-style automation dispatches.
+            Create, optimize, and schedule social media content across platforms.
           </p>
         </div>
 
@@ -533,17 +563,17 @@ export default function ComposerPage() {
                       onChange={(e) => setTone(e.target.value)}
                       className="w-full bg-slate-955 border border-slate-850 rounded-xl px-3 py-2 text-slate-300 text-xs font-medium focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="ENGAGING">Engaging & Conversational</option>
-                      <option value="PROFESSIONAL">Professional Business</option>
-                      <option value="CASUAL">Casual & Friendly</option>
-                      <option value="HUMOROUS">Humorous & Witty</option>
-                      <option value="PROMOTIONAL">Promotional & Direct</option>
+                      <option value="ENGAGING" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Engaging & Conversational</option>
+                      <option value="PROFESSIONAL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Professional Business</option>
+                      <option value="CASUAL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Casual & Friendly</option>
+                      <option value="HUMOROUS" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Humorous & Witty</option>
+                      <option value="PROMOTIONAL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Promotional & Direct</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Advanced Formatting Controls (Emoji Density, Hashtag Strategy, Format Style) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-850/60">
+                {/* Advanced Formatting Controls (Emoji Density, Hashtag Strategy, Format Style, Character Length) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-850/60">
                   <div className="space-y-1">
                     <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Emoji Density</label>
                     <select
@@ -551,10 +581,10 @@ export default function ComposerPage() {
                       onChange={(e) => setEmojiDensity(e.target.value)}
                       className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="NONE">None (0 Emojis)</option>
-                      <option value="LOW">Subtle (1-2 Emojis)</option>
-                      <option value="MEDIUM">Balanced (3-5 Emojis)</option>
-                      <option value="HIGH">Vibrant (Heavy Emojis)</option>
+                      <option value="NONE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">None (0 Emojis)</option>
+                      <option value="LOW" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Subtle (1-2 Emojis)</option>
+                      <option value="MEDIUM" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Balanced (3-5 Emojis)</option>
+                      <option value="HIGH" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Vibrant (Heavy Emojis)</option>
                     </select>
                   </div>
 
@@ -565,9 +595,9 @@ export default function ComposerPage() {
                       onChange={(e) => setHashtagCount(e.target.value)}
                       className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="NONE">No Hashtags</option>
-                      <option value="MODERATE">Moderate (3-5 Hashtags)</option>
-                      <option value="HEAVY">Heavy (8-12 Hashtags)</option>
+                      <option value="NONE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">No Hashtags</option>
+                      <option value="MODERATE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Moderate (3-5 Hashtags)</option>
+                      <option value="HEAVY" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Heavy (8-12 Hashtags)</option>
                     </select>
                   </div>
 
@@ -578,17 +608,31 @@ export default function ComposerPage() {
                       onChange={(e) => setFormatStyle(e.target.value)}
                       className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="SINGLE">Standard Post</option>
-                      <option value="THREAD">Numbered Thread (1/ 2/)</option>
-                      <option value="CAROUSEL">Slide-by-Slide Outline</option>
+                      <option value="SINGLE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Standard Post</option>
+                      <option value="THREAD" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Numbered Thread (1/ 2/)</option>
+                      <option value="CAROUSEL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Slide-by-Slide Outline</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Char Length</label>
+                    <select
+                      value={contentLength}
+                      onChange={(e) => setContentLength(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="CONCISE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Concise (~100-250 chars)</option>
+                      <option value="BALANCED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Balanced (~250-600 chars)</option>
+                      <option value="DETAILED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Detailed (~600-1500 chars)</option>
                     </select>
                   </div>
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleAIGenerate}
-                  disabled={generating || (inputSource === 'PROMPT' ? !topic : !articleUrl)}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl font-bold text-xs transition-all duration-300 active:scale-95 disabled:opacity-50 shadow-md shadow-indigo-950/30"
+                  disabled={generating || (inputSource === 'PROMPT' ? !topic : !articleUrl) || platforms.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl font-bold text-xs transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-950/30 cursor-pointer"
                 >
                   {generating ? (
                     <>
@@ -602,6 +646,13 @@ export default function ComposerPage() {
                     </>
                   )}
                 </button>
+
+                {platforms.length === 0 && (
+                  <p className="text-[11px] text-amber-400 text-center font-bold mt-2 flex items-center justify-center gap-1.5 animate-fadeIn">
+                    <Info className="h-3.5 w-3.5 shrink-0" />
+                    Please select at least one social media channel above (LinkedIn, X, or Instagram) to generate content.
+                  </p>
+                )}
               </div>
 
               {/* Media Attachment Dropzone */}
@@ -614,43 +665,36 @@ export default function ComposerPage() {
                   <span className="text-[10px] text-slate-500 font-semibold">Step 2 of 3</span>
                 </div>
 
-                <div className="relative border border-dashed border-slate-800 hover:border-indigo-500/40 rounded-2xl p-5 transition-all group flex flex-col items-center justify-center text-center cursor-pointer bg-slate-955/60">
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={handleMediaUpload}
-                    disabled={uploading}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  
-                  {uploading ? (
-                    <div className="space-y-2 py-2">
-                      <div className="w-7 h-7 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                      <p className="text-[10px] text-slate-400 font-semibold">Uploading asset...</p>
+                {platforms.includes('INSTAGRAM') && (
+                  <div className="bg-pink-950/20 border border-pink-500/20 rounded-xl p-3 flex items-start gap-2.5">
+                    <InstagramPlatformIcon className="text-pink-400 shrink-0 mt-0.5" />
+                    <div className="text-[11px] leading-relaxed">
+                      <span className="font-bold text-pink-300">Instagram Media Requirement: </span>
+                      <span className="text-slate-400">
+                        {mediaFileUrl
+                          ? 'Media asset uploaded! Your image/video will be posted to Instagram feed, while LinkedIn & X receive optimized captions.'
+                          : 'Instagram requires a visual image or video asset. If left empty, our engine auto-generates a high-res graphic for Instagram, while LinkedIn & X receive clean text-only posts.'}
+                      </span>
                     </div>
-                  ) : mediaFileUrl ? (
-                    <div className="space-y-3 w-full">
-                      {mediaType === 'VIDEO' ? (
-                        <video src={mediaFileUrl} controls className="max-h-40 rounded-xl mx-auto border border-slate-800" />
-                      ) : (
-                        <img src={mediaFileUrl} alt="Preview" className="max-h-40 rounded-xl mx-auto border border-slate-800 object-cover" />
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setMediaFileUrl(''); setMediaType(null); }}
-                        className="text-[10px] text-rose-400 font-bold hover:underline flex items-center gap-1 mx-auto"
-                      >
-                        <X className="h-3 w-3" /> Remove File
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="py-2">
-                      <Upload className="h-6 w-6 text-slate-600 group-hover:text-indigo-400 transition-colors mx-auto mb-1.5" />
-                      <p className="text-xs text-slate-300 font-bold">Click or drag media file to upload</p>
-                      <span className="text-[9px] text-slate-500 block mt-0.5">Images or HD MP4 videos</span>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                <LiquidUploadButton
+                  currentMediaUrl={mediaFileUrl}
+                  currentMediaType={mediaType}
+                  onMediaSelect={(previewUrl, type) => {
+                    setMediaFileUrl(previewUrl);
+                    setMediaType(type);
+                  }}
+                  onUploadSuccess={(url, type) => {
+                    setMediaFileUrl(url);
+                    setMediaType(type);
+                  }}
+                  onRemove={() => {
+                    setMediaFileUrl('');
+                    setMediaType(null);
+                  }}
+                />
               </div>
 
               {/* Publish / Schedule Control Card */}
@@ -697,9 +741,10 @@ export default function ComposerPage() {
                 )}
 
                 <button
+                  type="button"
                   onClick={handleSchedulePost}
-                  disabled={submitting || (!publishNow && !scheduledDate)}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-all active:scale-95 disabled:opacity-50 shadow-md shadow-indigo-950/30"
+                  disabled={submitting || (!publishNow && !scheduledDate) || platforms.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-950/30 cursor-pointer"
                 >
                   {submitting ? (
                     <>
@@ -720,7 +765,18 @@ export default function ComposerPage() {
             {/* Right Column: Live Feed Previews */}
             <div className="lg:col-span-5 space-y-6">
               <div className="sticky top-6 space-y-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Feed Preview</h2>
+                <div className="flex items-center justify-between px-1">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Feed Preview</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreenPreview(true)}
+                    className="flex items-center gap-1.5 text-[10px] text-indigo-400 hover:text-indigo-300 font-bold bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 px-2.5 py-1 rounded-lg transition-all active:scale-95 shadow-sm"
+                    title="Expand preview to full screen popup"
+                  >
+                    <Maximize2 className="h-3 w-3" />
+                    Full Popup View
+                  </button>
+                </div>
 
                 {platforms.length === 0 ? (
                   <div className="bg-slate-900/30 border border-slate-850 border-dashed rounded-3xl p-8 text-center space-y-2">
@@ -774,11 +830,18 @@ export default function ComposerPage() {
                           />
 
                           {mediaFileUrl && (
-                            <div className="rounded-xl overflow-hidden border border-slate-850 max-h-40 bg-slate-900 flex items-center justify-center">
+                            <div className="rounded-xl overflow-hidden border border-slate-850 max-h-48 bg-slate-900 flex items-center justify-center p-1">
                               {mediaType === 'VIDEO' ? (
-                                <video src={mediaFileUrl} muted className="w-full max-h-40 object-contain" />
+                                <video src={mediaFileUrl} controls className="w-full max-h-44 object-contain rounded-lg" />
                               ) : (
-                                <img src={mediaFileUrl} alt="Attachment" className="w-full max-h-40 object-cover" />
+                                <img
+                                  src={mediaFileUrl}
+                                  alt="Media Attachment Preview"
+                                  className="w-full max-h-44 object-cover rounded-lg"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800';
+                                  }}
+                                />
                               )}
                             </div>
                           )}
@@ -790,8 +853,139 @@ export default function ComposerPage() {
               </div>
             </div>
           </div>
-        </div>
+         {/* FULL SCREEN POPUP PREVIEW OVERLAY MODAL (PORTAL TO DOCUMENT.BODY) */}
+      {isFullscreenPreview && portalMounted && createPortal(
+        <div className="fixed inset-0 z-[999999] bg-slate-955/85 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-5 md:p-8 overflow-hidden animate-fadeIn">
+          <div className="relative bg-slate-900 border border-slate-800 rounded-3xl w-[94vw] max-w-7xl h-[90vh] max-h-[880px] overflow-hidden flex flex-col shadow-2xl shadow-indigo-950/90 my-auto pointer-events-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-850 bg-slate-955/95 shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 bg-indigo-600/20 rounded-2xl border border-indigo-500/30 text-indigo-400">
+                  <Maximize2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-100 flex items-center gap-2.5">
+                    Live Feed Device Preview
+                    <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-0.5 rounded-full uppercase tracking-wider font-extrabold">Full Screen</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">Interactive full-resolution post editor & feed preview across all selected social channels</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreenPreview(false)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                  Close / Minimize View
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content Grid (Scrollable Container - Strictly Align Top) */}
+            <div className="p-6 md:p-8 overflow-y-auto flex-1 min-h-0 bg-slate-955/40 custom-scrollbar flex flex-col justify-start">
+              {platforms.length === 0 ? (
+                <div className="bg-slate-900/50 border border-slate-850 border-dashed rounded-3xl p-12 text-center space-y-3 max-w-lg mx-auto my-auto">
+                  <Info className="h-10 w-10 text-slate-600 mx-auto" />
+                  <p className="text-slate-300 text-base font-bold">No Social Channels Selected</p>
+                  <p className="text-slate-500 text-xs">Select Instagram, LinkedIn, or X above to edit posts in full view.</p>
+                </div>
+              ) : (
+                <div className={`grid gap-6 items-start w-full ${
+                  platforms.length === 1
+                    ? 'grid-cols-1 w-full max-w-5xl mx-auto'
+                    : platforms.length === 2
+                    ? 'grid-cols-1 lg:grid-cols-2 w-full'
+                    : 'grid-cols-1 lg:grid-cols-3 w-full'
+                }`}>
+                  {platforms.map((platform) => {
+                    const isX = platform === 'X';
+                    const isLinkedIn = platform === 'LINKEDIN';
+                    const isInstagram = platform === 'INSTAGRAM';
+                    const charCount = getCharCount(platform);
+
+                    return (
+                      <div key={platform} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col w-full h-full min-h-fit shrink-0">
+                        {/* Channel Badge Header */}
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-850 shrink-0">
+                          <div className="flex items-center gap-3">
+                            {isInstagram && <InstagramPlatformIcon className="h-7 w-7 text-pink-400" />}
+                            {isLinkedIn && <LinkedinPlatformIcon className="h-7 w-7 text-blue-400" />}
+                            {isX && <XPlatformIcon className="h-7 w-7 text-slate-300" />}
+                            <span className="text-lg font-extrabold uppercase tracking-wider text-slate-100">{platform} Post Draft</span>
+                          </div>
+
+                          {isX && (
+                            <span className={`text-xs font-mono font-extrabold px-3 py-1 rounded-xl ${
+                              charCount > 280 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-955 text-slate-400 border border-slate-850'
+                            }`}>
+                              {charCount} / 280
+                            </span>
+                          )}
+                        </div>
+
+                        {/* WIDE SPACIOUS TEXTAREA WITH LARGE FONT */}
+                        <div className="space-y-6 flex-1 flex flex-col w-full">
+                          <div className="space-y-2.5 flex-1 flex flex-col">
+                            <label className="text-xs text-indigo-400 font-extrabold uppercase tracking-wider block">
+                              Full Post Content & Caption Editor
+                            </label>
+                            <textarea
+                              value={generatedDrafts[platform]}
+                              onChange={(e) => handleTextChange(platform, e.target.value)}
+                              placeholder={`Type or edit complete content for ${platform} here...`}
+                              className="w-full bg-slate-955 border border-slate-800 rounded-2xl p-6 text-base md:text-xl text-slate-100 focus:outline-none focus:border-indigo-500/80 leading-relaxed font-sans min-h-[220px] md:min-h-[280px] max-h-[450px] overflow-y-auto resize-y shadow-inner placeholder:text-slate-600 transition-all font-normal custom-scrollbar"
+                            />
+                          </div>
+
+                          {/* ATTACHED MEDIA DISPLAY */}
+                          {mediaFileUrl && (
+                            <div className="space-y-2.5 pt-4 border-t border-slate-850/60 shrink-0">
+                              <label className="text-xs text-indigo-400 font-extrabold uppercase tracking-wider block">Attached Media Preview</label>
+                              <div className="rounded-2xl overflow-hidden border border-slate-850 bg-slate-955 max-h-[320px] flex items-center justify-center p-3 shadow-md">
+                                {mediaType === 'VIDEO' ? (
+                                  <video src={mediaFileUrl} controls className="w-full max-h-[290px] object-contain rounded-xl" />
+                                ) : (
+                                  <img
+                                    src={mediaFileUrl}
+                                    alt="Attached Media"
+                                    className="w-full max-h-[290px] object-contain rounded-xl"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800';
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-850 bg-slate-955/95 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-400 font-medium">Click Minimize or press ESC to return to the main dashboard</span>
+              <button
+                type="button"
+                onClick={() => setIsFullscreenPreview(false)}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                <Minimize2 className="h-4 w-4" />
+                Minimize / Close View
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
+    </div>
+  )}
 
       {/* MODE 2: RECURRING SCHEDULING DISPATCHER */}
       {composerMode === 'RECURRING' && (

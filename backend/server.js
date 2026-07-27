@@ -14,11 +14,43 @@ import { initPostWorker } from './src/workers/postWorker.js';
 import { syncScheduledPostsToQueue } from './src/jobs/postScheduler.js';
 import logger from './src/utils/logger.js';
 
-// Standard Middlewares
+import helmet from 'helmet';
+import { xssSanitizer } from './src/middlewares/xssSanitizer.js';
+import hpp from 'hpp';
+import { globalLimiter } from './src/middlewares/rateLimiter.js';
+
+// Standard Middlewares & Security Enhancements
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// VERY FIRST MIDDLEWARE: Universal CORS Handler (Must execute before Helmet & Rate Limiters)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, x-request-id');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+// Security & Protection Middlewares
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(xssSanitizer);
+app.use(hpp());
+app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -74,12 +106,24 @@ app.get('/', (req, res) => {
   `);
 });
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Static uploads directory serving
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+import notificationRoutes from './src/routes/notificationRoutes.js';
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error Handling Middlewares (Must be last)
 import http from 'http';

@@ -8,7 +8,8 @@ import {
   Info,
   CalendarDays,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -56,6 +57,7 @@ export default function PostsPage() {
   // Modal / Drawer state
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const toast = useToast();
 
   const fetchPosts = async () => {
@@ -87,6 +89,22 @@ export default function PostsPage() {
       toast.error('Failed to cancel post.');
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const handleRetryPost = async (e: React.MouseEvent, postId: string) => {
+    e.stopPropagation();
+    setRetryingId(postId);
+    try {
+      await ApiService.retryPost(postId);
+      toast.success('Post re-queued for publishing!');
+      fetchPosts();
+      if (selectedPost?.id === postId) setSelectedPost(null);
+    } catch (err: any) {
+      console.error('Retry Error:', err);
+      toast.error(err.response?.data?.message || 'Failed to retry post execution.');
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -206,6 +224,24 @@ export default function PostsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Quick action button for failed posts */}
+              {(post.status === 'FAILED' || post.status === 'PARTIALLY_PUBLISHED') && (
+                <div className="mt-4 pt-3.5 border-t border-slate-800/60 flex items-center justify-between">
+                  <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Publishing Failed
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => handleRetryPost(e, post.id)}
+                    disabled={retryingId === post.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-[10px] font-extrabold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${retryingId === post.id ? 'animate-spin' : ''}`} />
+                    {retryingId === post.id ? 'Re-queuing...' : 'Retry / Republish'}
+                  </button>
+                </div>
+              )}
 
               {/* Quick action button for scheduled posts */}
               {(post.status === 'SCHEDULED' || post.status === 'DRAFT') && (
@@ -327,6 +363,19 @@ export default function PostsPage() {
             {/* Bottom Actions */}
             <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
               <span className="text-xs text-slate-400">Created: {formatDate(selectedPost.createdAt)} UTC</span>
+
+              {(selectedPost.status === 'FAILED' || selectedPost.status === 'PARTIALLY_PUBLISHED') && (
+                <button
+                  type="button"
+                  onClick={(e) => handleRetryPost(e, selectedPost.id)}
+                  disabled={retryingId === selectedPost.id}
+                  className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-lg active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${retryingId === selectedPost.id ? 'animate-spin' : ''}`} />
+                  {retryingId === selectedPost.id ? 'Re-queuing Post...' : 'Retry / Republish Now'}
+                </button>
+              )}
+
               {selectedPost.status === 'SCHEDULED' && (
                 <button
                   onClick={(e) => handleCancelSchedule(e, selectedPost.id)}

@@ -10,6 +10,7 @@ import { syncScheduledPostsToQueue } from '../jobs/postScheduler.js';
 import { processPostPublishing } from '../workers/postWorker.js';
 import UserService from '../services/userService.js';
 import PostService from '../services/postService.js';
+import NotificationService from '../services/notificationService.js';
 import { decrypt } from '../utils/encryption.js';
 
 /**
@@ -27,6 +28,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
     emojiDensity = 'MEDIUM',
     hashtagCount = 'MODERATE',
     formatStyle = 'SINGLE',
+    contentLength = 'BALANCED',
     articleUrl,
   } = req.body;
   const userId = req.user.id;
@@ -59,6 +61,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
       emojiDensity,
       hashtagCount,
       formatStyle,
+      contentLength,
       articleUrl,
     });
   } else {
@@ -71,6 +74,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
       emojiDensity,
       hashtagCount,
       formatStyle,
+      contentLength,
       articleUrl,
     });
   }
@@ -171,19 +175,23 @@ export const createPost = catchAsync(async (req, res) => {
   // 2. Enqueue in BullMQ (Immediate or Delayed Job)
   let queueResult = null;
   if (publishNow) {
-    queueResult = await enqueuePostJob({ postId: post.id, publishNow: true });
-    // Execute worker directly in case Redis server is not running locally
     try {
       const immediateExecution = await processPostPublishing(post.id);
       return successResponse(res, HttpStatus.OK, 'Post created and published immediately.', {
-        post: immediateExecution,
-        queueResult,
+        post: immediateExecution || post,
       });
     } catch (err) {
-      logger.warn(`Worker direct execution warning: ${err.message}`);
+      logger.error(`[PostController] Immediate post execution error: ${err.message}`);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, `Post publishing failed: ${err.message}`);
     }
   } else if (parseScheduledDate) {
     queueResult = await enqueuePostJob({ postId: post.id, scheduledAt: parseScheduledDate });
+    await NotificationService.createNotification({
+      userId,
+      title: 'Post Scheduled 📅',
+      message: `Your post is scheduled for ${parseScheduledDate.toLocaleDateString()} at ${parseScheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+      type: 'info',
+    });
   }
 
   return successResponse(
@@ -275,6 +283,13 @@ export const cancelScheduledPost = catchAsync(async (req, res) => {
 
   const updatedPost = await PostService.updatePostStatus(id, POST_STATUS.CANCELLED);
 
+  await NotificationService.createNotification({
+    userId: post.userId,
+    title: 'Post Schedule Cancelled 🚫',
+    message: 'Scheduled publication was cancelled.',
+    type: 'warning',
+  });
+
   return successResponse(res, HttpStatus.OK, 'Scheduled post cancelled and removed from queue.', { post: updatedPost });
 });
 
@@ -284,4 +299,44 @@ export const cancelScheduledPost = catchAsync(async (req, res) => {
 export const triggerScheduledPostsNow = catchAsync(async (req, res) => {
   const result = await syncScheduledPostsToQueue();
   return successResponse(res, HttpStatus.OK, 'Scheduled posts synchronized with BullMQ queue.', result);
+});
+
+/**
+ * Controller: Retry or Republish a failed post.
+ */
+export const retryFailedPost = catchAsync(async (req, res) => {
+  const { id } = req.params;
+
+  const post = await PostService.findPostById(id);
+  if (!post) {
+    throw ApiError.notFound(`Post with ID "${id}" not found.`);
+  }
+
+  logger.info(`[PostController] Retrying failed post execution for Post ID: ${id}`);
+
+  // Clean up previous failed logs
+  await prisma.socialPostLog.deleteMany({
+    where: { postId: id, status: 'FAILED' },
+  });
+
+  // Reset post status to DRAFT
+  await PostService.updatePostStatus(id, POST_STATUS.DRAFT);
+
+  // Enqueue job into BullMQ for immediate re-publishing
+  const queueResult = await enqueuePostJob({ postId: id, publishNow: true });
+
+  // Execute worker directly to guarantee immediate publishing
+  let executionResult = null;
+  try {
+    executionResult = await processPostPublishing(id);
+  } catch (err) {
+    logger.warn(`[PostController] Direct worker execution warning during retry: ${err.message}`);
+  }
+
+  const updatedPost = await PostService.findPostById(id);
+
+  return successResponse(res, HttpStatus.OK, 'Post retry executed successfully.', {
+    post: executionResult || updatedPost,
+    jobId: queueResult.jobId,
+  });
 });

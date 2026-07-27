@@ -18,6 +18,7 @@ enum SocialPlatform {
 enum PostStatus {
   DRAFT
   SCHEDULED
+  PUBLISHING
   PUBLISHED
   FAILED
   PARTIALLY_PUBLISHED
@@ -40,21 +41,26 @@ enum AITone {
 }
 
 model User {
-  id             String            @id @default(uuid())
-  email          String            @unique
-  name           String?
-  password       String?
-  avatarUrl      String?
-  aiCredits      Int               @default(15)
-  plan           String            @default("FREE")
-  role           String            @default("USER")
-  emailVerified  Boolean           @default(false)
+  id                String            @id @default(uuid())
+  uniqueId          String?           @unique
+  email             String            @unique
+  name              String?
+  phoneNumber       String?
+  bio               String?
+  dateOfBirth       DateTime?
+  password          String?
+  avatarUrl         String?
+  aiCredits         Int               @default(15)
+  plan              String            @default("FREE")
+  role              String            @default("USER")
+  emailVerified     Boolean           @default(false)
   verificationToken String?
-  autopilotEnabled Boolean         @default(false)
-  brandContext   String?
-  contentSummary String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  autopilotEnabled  Boolean           @default(false)
+  brandContext      String?
+  contentSummary    String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  notifications     Notification[]
   socialAccounts SocialAccount[]
   posts          Post[]
   aiLogs         AIGenerationLog[]
@@ -168,4 +174,18 @@ model AutomationSchedule {
 
   @@index([userId, isActive])
   @@map("automation_schedules")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@map("notifications")
 }

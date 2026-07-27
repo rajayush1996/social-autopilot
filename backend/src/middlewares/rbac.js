@@ -7,23 +7,22 @@ import { catchAsync } from '../utils/responseHandler.js';
  * Restricts endpoint consumption strictly to users with the 'ADMIN' role.
  * Can consume from active JWT auth session (req.user) or fallback to manual ID parameters.
  */
-export const restrictToAdmin = catchAsync(async (req, res, next) => {
+export const restrictToSuperAdmin = catchAsync(async (req, res, next) => {
   let role = req.user?.role;
 
-  if (!role) {
-    const userId = req.headers['x-user-id'] || req.query.userId || req.body.userId;
-    if (userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true },
-      });
-      role = user?.role;
-    }
+  if (!role && req.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { role: true },
+    });
+    role = user?.role;
   }
 
-  if (!role || role.toUpperCase() !== 'ADMIN') {
-    throw ApiError.forbidden('Access Denied: Only application owners or administrators can perform this action.');
+  if (!role || (role.toUpperCase() !== 'SUPER_ADMIN' && role.toUpperCase() !== 'ADMIN')) {
+    throw ApiError.forbidden('Access Denied: Only Super Admin can perform this action.');
   }
 
   next();
 });
+
+export const restrictToAdmin = restrictToSuperAdmin;

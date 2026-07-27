@@ -1,8 +1,19 @@
 import config from '../config/env.js';
 
 /**
- * Structured Logger utility for development & production environments.
+ * ANSI Color codes for terminal logging
  */
+const COLORS = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  error: '\x1b[31m',   // Red
+  warn: '\x1b[33m',    // Yellow
+  info: '\x1b[36m',    // Cyan
+  debug: '\x1b[35m',   // Magenta
+  gray: '\x1b[90m',    // Dark Gray
+};
+
 const LOG_LEVELS = {
   error: 0,
   warn: 1,
@@ -18,8 +29,14 @@ function shouldLog(level) {
 
 function formatMessage(level, message, meta = null) {
   const timestamp = new Date().toISOString();
-  const metaStr = meta ? ` | Meta: ${JSON.stringify(meta)}` : '';
-  return `[${timestamp}] [${level.toUpperCase()}]: ${message}${metaStr}`;
+  const levelUpper = level.toUpperCase();
+  const color = COLORS[level] || COLORS.reset;
+  
+  const metaStr = meta ? ` ${COLORS.gray}| Meta: ${JSON.stringify(meta)}${COLORS.reset}` : '';
+  const timestampFormatted = `${COLORS.gray}[${timestamp}]${COLORS.reset}`;
+  const levelFormatted = `${color}${COLORS.bold}[${levelUpper}]${COLORS.reset}`;
+
+  return `${timestampFormatted} ${levelFormatted}: ${color}${message}${COLORS.reset}${metaStr}`;
 }
 
 export const logger = {

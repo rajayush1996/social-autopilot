@@ -13,7 +13,10 @@ import {
   AlertCircle, 
   Building,
   Zap,
-  Radio
+  Radio,
+  Coins,
+  Search,
+  Gift
 } from 'lucide-react';
 import Link from 'next/link';
 import CONFIG from '@/config';
@@ -38,18 +41,25 @@ export default function AdminPage() {
   const [togglingMaster, setTogglingMaster] = useState(false);
   const [reports, setReports] = useState<DispatcherReport[]>([]);
   const [updatingFeature, setUpdatingFeature] = useState<string | null>(null);
+
+  // Super Admin AI Credit Granting State
+  const [targetUniqueId, setTargetUniqueId] = useState('');
+  const [freeCreditValue, setFreeCreditValue] = useState<number>(100);
+  const [grantingCredits, setGrantingCredits] = useState(false);
+
   const toast = useToast();
 
   const fetchAdminData = async () => {
     try {
       const [profile, list, statusRes] = await Promise.all([
-        ApiService.getUserProfile(),
+        ApiService.getMe(),
         ApiService.getFeatures(),
         ApiService.getDispatcherStatus(),
       ]);
       setFeatures(list);
       setDispatcherEnabled(statusRes.dispatcherEnabled);
-      setIsAuthorized(profile.role.toUpperCase() === 'ADMIN');
+      const roleUpper = profile.role?.toUpperCase();
+      setIsAuthorized(roleUpper === 'SUPER_ADMIN' || roleUpper === 'ADMIN');
     } catch (err: any) {
       console.error('Failed to load admin configurations:', err);
       if (err.response?.status === 403) {
@@ -108,11 +118,34 @@ export default function AdminPage() {
     }
   };
 
+  const handleGrantCredits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetUniqueId.trim()) {
+      toast.error('Please enter a User ID or Unique Tag ID.');
+      return;
+    }
+
+    setGrantingCredits(true);
+    try {
+      const result = await ApiService.grantUserCredits({
+        uniqueId: targetUniqueId.trim(),
+        freeCreditValue: Number(freeCreditValue),
+      });
+      toast.success(`Granted ${freeCreditValue} AI Credits to user "${result.user.name || result.user.email}"!`);
+      setTargetUniqueId('');
+    } catch (err: any) {
+      console.error('Failed to grant AI credits:', err);
+      toast.error(err.response?.data?.message || 'Failed to grant AI credits to user.');
+    } finally {
+      setGrantingCredits(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Querying admin control center...</p>
+        <p className="text-slate-400 text-sm">Querying Super Admin control center...</p>
       </div>
     );
   }
@@ -123,9 +156,9 @@ export default function AdminPage() {
         <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl">
           <ShieldAlert className="h-9 w-9" />
         </div>
-        <h2 className="text-lg font-bold text-slate-100">Access Restricted</h2>
+        <h2 className="text-lg font-bold text-slate-100">Super Admin Access Required</h2>
         <p className="text-xs text-slate-400 leading-relaxed">
-          The Admin Control Center is restricted to system administrators only.
+          The Admin Control Center and Credit Granting API are strictly restricted to Super Administrators.
         </p>
         <Link href="/" className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-200 text-xs font-semibold transition-all">
           Return to Dashboard
@@ -139,15 +172,71 @@ export default function AdminPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300">
-          Admin Control Center
+          Super Admin Control Center
         </h1>
         <p className="text-slate-400 mt-1">
-          Manage system-wide feature flags, master automation toggles, and execution dispatchers.
+          Manage system-wide feature flags, grant user AI credits by Unique ID, and trigger dispatchers.
         </p>
       </div>
 
+      {/* Super Admin AI Credit Granting Banner */}
+      <div className="bg-gradient-to-r from-indigo-950/60 via-slate-900/80 to-slate-900/60 border border-indigo-500/40 rounded-3xl p-6 backdrop-blur-md shadow-2xl space-y-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-indigo-600/30 border border-indigo-500/40 rounded-xl text-indigo-300">
+            <Coins className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-slate-100">Super Admin AI Credit Granting API</h2>
+            <p className="text-xs text-slate-400">Set or grant free AI credits to any user directly by their Unique User ID or UUID.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleGrantCredits} className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end pt-2">
+          <div className="sm:col-span-6 space-y-1">
+            <label className="text-xs font-bold text-slate-300 flex items-center gap-1">
+              <Search className="h-3.5 w-3.5 text-indigo-400" /> User Unique ID / UUID
+            </label>
+            <input
+              type="text"
+              value={targetUniqueId}
+              onChange={(e) => setTargetUniqueId(e.target.value)}
+              placeholder="e.g. USR-108273 or 9907302c-a65e-4cc1-a102-d5444f1c44c4"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+            />
+          </div>
+
+          <div className="sm:col-span-3 space-y-1">
+            <label className="text-xs font-bold text-slate-300">Free Credit Value</label>
+            <input
+              type="number"
+              min="0"
+              value={freeCreditValue}
+              onChange={(e) => setFreeCreditValue(Number(e.target.value))}
+              placeholder="100"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold"
+            />
+          </div>
+
+          <div className="sm:col-span-3">
+            <button
+              type="submit"
+              disabled={grantingCredits}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-extrabold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {grantingCredits ? (
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Gift className="h-4 w-4" /> Grant AI Credits
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+
       {/* Master Scheduling Dispatcher Banner */}
-      <div className="bg-gradient-to-r from-indigo-950/40 via-slate-900/60 to-slate-900/40 border border-indigo-500/30 rounded-3xl p-6 backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
         <div className="space-y-2 max-w-2xl">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-indigo-600/30 border border-indigo-500/40 rounded-xl text-indigo-300">
@@ -176,7 +265,7 @@ export default function AdminPage() {
           <button
             onClick={handleToggleMasterDispatcher}
             disabled={togglingMaster}
-            className="focus:outline-none transition-transform active:scale-95 text-indigo-400 disabled:opacity-50"
+            className="focus:outline-none transition-transform active:scale-95 text-indigo-400 disabled:opacity-50 cursor-pointer"
           >
             {dispatcherEnabled ? (
               <ToggleRight className="h-11 w-11 text-indigo-500" />
@@ -190,8 +279,8 @@ export default function AdminPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Dynamic Feature Flags */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-6">
-            <h2 className="text-md font-bold flex items-center gap-2 pb-3 border-b border-slate-850">
+          <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-6 shadow-xl">
+            <h2 className="text-md font-bold flex items-center gap-2 pb-3 border-b border-slate-850 text-slate-100">
               <Settings className="h-4.5 w-4.5 text-indigo-400" />
               Dynamic Feature Flags & Access Controls
             </h2>
@@ -214,7 +303,7 @@ export default function AdminPage() {
                     <button
                       onClick={() => handleTogglePremium(feat.feature, feat.isPremium)}
                       disabled={isUpdating}
-                      className="focus:outline-none transition-transform active:scale-95 text-indigo-400 disabled:opacity-50"
+                      className="focus:outline-none transition-transform active:scale-95 text-indigo-400 disabled:opacity-50 cursor-pointer"
                     >
                       {feat.isPremium ? (
                         <ToggleRight className="h-10 w-10 text-indigo-500" />
@@ -231,8 +320,8 @@ export default function AdminPage() {
 
         {/* Right Column: Dispatcher Cycle Trigger */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-5">
-            <h2 className="text-md font-bold flex items-center gap-2 pb-3 border-b border-slate-850">
+          <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-5 shadow-xl">
+            <h2 className="text-md font-bold flex items-center gap-2 pb-3 border-b border-slate-850 text-slate-100">
               <Radio className="h-4.5 w-4.5 text-indigo-400" />
               Scheduling Dispatcher Runner
             </h2>
@@ -244,7 +333,7 @@ export default function AdminPage() {
             <button
               onClick={handleTriggerDispatcherNow}
               disabled={runningDispatcher || !dispatcherEnabled}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl font-bold text-sm transition-all duration-300 shadow-md shadow-indigo-950/20 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl font-bold text-xs transition-all duration-300 shadow-md disabled:opacity-50 cursor-pointer"
             >
               {runningDispatcher ? (
                 <>
@@ -253,19 +342,11 @@ export default function AdminPage() {
                 </>
               ) : (
                 <>
-                  <Zap className="h-4 w-4" />
-                  Run Scheduling Dispatcher Engine
+                  <Zap className="h-4 w-4" /> Run Scheduling Dispatcher Engine
                 </>
               )}
             </button>
 
-            {!dispatcherEnabled && (
-              <p className="text-[10px] text-amber-400 text-center font-semibold">
-                * Master switch is OFF. Enable above to allow dispatch execution.
-              </p>
-            )}
-
-            {/* Cycle Reports output */}
             {reports.length > 0 && (
               <div className="space-y-3 mt-6 pt-5 border-t border-slate-800/60">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Execution Log Reports</span>
@@ -276,14 +357,11 @@ export default function AdminPage() {
                         <p className="font-semibold text-slate-300">{rep.name || 'Schedule Dispatch'}</p>
                         {rep.userId && <p className="text-slate-500 font-mono">User: {rep.userId}</p>}
                         {rep.postId && <p className="text-indigo-400 font-mono">Post ID: {rep.postId}</p>}
-                        {rep.reason && <p className="text-rose-400/90 leading-relaxed">Reason: {rep.reason}</p>}
                       </div>
                       <span className={`font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         rep.status === 'SUCCESS'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : rep.status === 'SKIPPED'
-                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                       }`}>
                         {rep.status}
                       </span>
@@ -292,7 +370,6 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-
           </div>
         </div>
 

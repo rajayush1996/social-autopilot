@@ -11,6 +11,13 @@ export const generateAiSchema = {
     tone: z.string().optional(),
     adaptAllPlatforms: z.boolean().optional(),
     userId: z.string().optional(),
+    emojiDensity: z.string().optional(),
+    hashtagCount: z.string().optional(),
+    formatStyle: z.string().optional(),
+    contentLength: z.string().optional(),
+    articleUrl: z.string().optional(),
+    platforms: z.array(z.string()).optional(),
+    targetPlatforms: z.array(z.string()).optional(),
   }),
 };
 
@@ -18,15 +25,37 @@ export const generateAiSchema = {
  * Validation schema for POST /api/posts
  */
 export const createPostSchema = {
-  body: z.object({
-    userId: z.string().optional(),
-    content: z.string().min(1, 'Post content cannot be empty.'),
-    mediaUrls: z.array(z.string().url('Each mediaUrl must be a valid URL')).optional(),
-    mediaType: z.string().optional(),
-    targetPlatforms: z.array(z.string()).optional(),
-    scheduledAt: z.string().datetime({ offset: true }).or(z.string()).optional(),
-    publishNow: z.boolean().optional(),
-    aiGenerated: z.boolean().optional(),
-    aiPrompt: z.string().optional(),
-  }),
+  body: z
+    .object({
+      userId: z.string().optional(),
+      content: z.string().min(1, 'Post content cannot be empty.'),
+      mediaUrls: z.array(z.string()).optional(),
+      mediaType: z.string().nullable().optional(),
+      targetPlatforms: z.array(z.string()).optional(),
+      scheduledAt: z.union([z.string(), z.null()]).optional(),
+      publishNow: z.boolean().optional(),
+      aiGenerated: z.boolean().optional(),
+      aiPrompt: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      const isPublishNow = Boolean(data.publishNow);
+      if (!isPublishNow) {
+        if (!data.scheduledAt || typeof data.scheduledAt !== 'string' || data.scheduledAt.trim() === '') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'scheduledAt date string is required when publishNow is false.',
+            path: ['scheduledAt'],
+          });
+        } else {
+          const parsedDate = new Date(data.scheduledAt);
+          if (isNaN(parsedDate.getTime())) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'scheduledAt must be a valid date string.',
+              path: ['scheduledAt'],
+            });
+          }
+        }
+      }
+    }),
 };

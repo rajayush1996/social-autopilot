@@ -1,4 +1,6 @@
+import R2UploadStrategy from './r2Strategy.js';
 import CloudinaryUploadStrategy from './cloudinaryStrategy.js';
+import LocalStorageUploadStrategy from './localStorageStrategy.js';
 import LocalSimulationUploadStrategy from './simulationStrategy.js';
 import logger from '../../utils/logger.js';
 
@@ -14,7 +16,9 @@ export class ResilientUploader {
    */
   constructor(strategies = null) {
     this.strategies = strategies || [
+      new R2UploadStrategy(),
       new CloudinaryUploadStrategy(),
+      new LocalStorageUploadStrategy(),
       new LocalSimulationUploadStrategy(),
     ];
   }
@@ -27,8 +31,8 @@ export class ResilientUploader {
    * @param {String} mimeType 
    * @returns {Promise<Object>} Strategy upload result containing fileUrl
    */
-  async upload(fileBuffer, fileName, mimeType) {
-    logger.info(`[ResilientUploader] Starting resilient upload process for: ${fileName}`);
+  async upload(fileBuffer, fileName, mimeType, targetPlatform = 'instagram_feed') {
+    logger.info(`[ResilientUploader] Starting resilient upload process for: ${fileName} (Target Platform: ${targetPlatform})`);
 
     let lastError = null;
 
@@ -41,7 +45,7 @@ export class ResilientUploader {
       logger.info(`[ResilientUploader] Attempting upload using strategy: "${strategy.name}"...`);
 
       try {
-        const result = await strategy.upload(fileBuffer, fileName, mimeType);
+        const result = await strategy.upload(fileBuffer, fileName, mimeType, targetPlatform);
         if (result && result.success) {
           logger.info(`[ResilientUploader] Upload succeeded using strategy: "${strategy.name}"`);
           return result;

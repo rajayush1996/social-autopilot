@@ -4,6 +4,9 @@ import { ApiError } from '../utils/ApiError.js';
 import UserService from '../services/userService.js';
 import FeatureConfigService from '../services/featureConfigService.js';
 import AutopilotService from '../services/autopilotService.js';
+import { prisma } from '../config/db.js';
+import socketManager from '../services/socketService.js';
+import NotificationService from '../services/notificationService.js';
 
 /**
  * Controller: Update autopilot configurations for a user.
@@ -61,4 +64,63 @@ export const updateFeature = catchAsync(async (req, res) => {
 export const triggerAutopilotNow = catchAsync(async (req, res) => {
   const reports = await AutopilotService.runAutopilotCycle();
   return successResponse(res, HttpStatus.OK, 'Autopilot cycle finished execution.', { reports });
+});
+
+/**
+ * Controller: Super Admin endpoint to set/grant AI credits by Unique User ID or User ID.
+ */
+export const setUserCredits = catchAsync(async (req, res) => {
+  const { targetUserId, uniqueId, email, freeCreditValue } = req.body;
+
+  if (freeCreditValue === undefined || isNaN(Number(freeCreditValue))) {
+    throw ApiError.badRequest('Field "freeCreditValue" must be a valid number.');
+  }
+
+  const creditAmount = Math.max(0, parseInt(freeCreditValue, 10));
+
+  let user = null;
+  if (targetUserId) {
+    user = await prisma.user.findUnique({ where: { id: targetUserId } });
+  }
+  if (!user && uniqueId) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [{ uniqueId }, { id: uniqueId }],
+      },
+    });
+  }
+  if (!user && email) {
+    user = await prisma.user.findUnique({ where: { email } });
+  }
+
+  if (!user) {
+    throw ApiError.notFound('Target user not found with provided User ID or Unique ID.');
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: { aiCredits: creditAmount },
+  });
+
+  socketManager.emitAiCreditsUpdate({
+    userId: updatedUser.id,
+    aiCreditsRemaining: updatedUser.aiCredits,
+  });
+
+  await NotificationService.createNotification({
+    userId: updatedUser.id,
+    title: 'AI Credits Granted 🎁',
+    message: `Super Admin granted you ${creditAmount} AI Credits!`,
+    type: 'success',
+  });
+
+  return successResponse(res, HttpStatus.OK, `Granted ${creditAmount} AI credits to user "${updatedUser.name || updatedUser.email}".`, {
+    user: {
+      id: updatedUser.id,
+      uniqueId: updatedUser.uniqueId,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      aiCredits: updatedUser.aiCredits,
+    },
+  });
 });

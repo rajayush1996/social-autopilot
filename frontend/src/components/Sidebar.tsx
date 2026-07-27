@@ -60,7 +60,8 @@ export function Sidebar() {
     { name: 'AI Post Composer', href: '/composer', icon: PenTool },
     { name: 'Queue & History', href: '/posts', icon: Calendar },
     { name: 'Autopilot Settings', href: '/settings', icon: Settings },
-    ...(role.toUpperCase() === 'ADMIN' ? [{ name: 'Admin Control', href: '/admin', icon: Sliders }] : []),
+    { name: 'Profile & Settings', href: '/profile', icon: UserIcon },
+    ...(role.toUpperCase() === 'SUPER_ADMIN' || role.toUpperCase() === 'ADMIN' ? [{ name: 'Admin Control', href: '/admin', icon: Sliders }] : []),
   ];
 
   return (

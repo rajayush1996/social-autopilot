@@ -169,13 +169,24 @@ export class ApiService {
   }
 
   /**
-   * Upload image or video to Cloudinary with fallback failover
+   * Upload image or video with real-time upload progress tracking and target platform compression
    */
-  static async uploadMedia(file: File): Promise<UploadResponse> {
+  static async uploadMedia(
+    file: File,
+    onProgress?: (percent: number) => void,
+    targetPlatform: string = 'instagram_feed'
+  ): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('targetPlatform', targetPlatform);
     const response = await apiClient.post(API_ENDPOINTS.UPLOAD_MEDIA, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          if (onProgress) onProgress(percent);
+        }
+      },
     });
     return response.data?.data;
   }
@@ -191,6 +202,7 @@ export class ApiService {
       emojiDensity?: string;
       hashtagCount?: string;
       formatStyle?: string;
+      contentLength?: string;
       articleUrl?: string;
     }
   ): Promise<AIGeneratedResult> {
@@ -203,6 +215,7 @@ export class ApiService {
       emojiDensity: options?.emojiDensity || 'MEDIUM',
       hashtagCount: options?.hashtagCount || 'MODERATE',
       formatStyle: options?.formatStyle || 'SINGLE',
+      contentLength: options?.contentLength || 'BALANCED',
       articleUrl: options?.articleUrl || '',
     };
     const response = await apiClient.post(API_ENDPOINTS.AI_GENERATE, payload);
@@ -224,10 +237,10 @@ export class ApiService {
   static async createPost(payload: {
     userId?: string;
     content: string;
-    mediaUrls: string[];
-    mediaType: 'IMAGE' | 'VIDEO' | null;
+    mediaUrls?: string[];
+    mediaType?: 'IMAGE' | 'VIDEO' | null;
     targetPlatforms: ('INSTAGRAM' | 'LINKEDIN' | 'X')[];
-    scheduledAt: string | null;
+    scheduledAt?: string | null;
     publishNow: boolean;
   }): Promise<Post> {
     const response = await apiClient.post(API_ENDPOINTS.POSTS, payload);
@@ -240,6 +253,14 @@ export class ApiService {
   static async cancelPost(postId: string): Promise<Post> {
     const response = await apiClient.patch(API_ENDPOINTS.CANCEL_POST(postId));
     return response.data?.data?.post;
+  }
+
+  /**
+   * Retry / Republish a failed post
+   */
+  static async retryPost(postId: string): Promise<any> {
+    const response = await apiClient.post(`/api/posts/${postId}/retry`);
+    return response.data?.data;
   }
 
   /**
@@ -307,11 +328,73 @@ export class ApiService {
   }
 
   /**
+   * Fetch persistent user notifications & unread count
+   */
+  static async getNotifications(): Promise<{ notifications: any[]; unreadCount: number }> {
+    try {
+      const response = await apiClient.get('/api/notifications');
+      return response.data?.data || { notifications: [], unreadCount: 0 };
+    } catch (e) {
+      return { notifications: [], unreadCount: 0 };
+    }
+  }
+
+  /**
+   * Mark a notification as read
+   */
+  static async markNotificationRead(id: string): Promise<boolean> {
+    try {
+      await apiClient.patch(`/api/notifications/${id}/read`);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Mark all notifications as read
+   */
+  static async markAllNotificationsRead(): Promise<boolean> {
+    try {
+      await apiClient.patch('/api/notifications/read-all');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
    * Fetch currently authenticated user session details
    */
   static async getMe(): Promise<User> {
     const response = await apiClient.get(API_ENDPOINTS.ME);
     return response.data?.data?.user;
+  }
+
+  /**
+   * Update Profile Details (Avatar, Phone, Bio, Date of Birth)
+   */
+  static async updateUserProfile(payload: {
+    name?: string;
+    phoneNumber?: string;
+    bio?: string;
+    dateOfBirth?: string;
+    avatarUrl?: string;
+  }): Promise<User> {
+    const response = await apiClient.patch('/api/auth/me', payload);
+    return response.data?.data?.user;
+  }
+
+  /**
+   * Super Admin: Grant / set AI credits by User ID or Unique Tag ID
+   */
+  static async grantUserCredits(payload: {
+    uniqueId?: string;
+    targetUserId?: string;
+    freeCreditValue: number;
+  }): Promise<any> {
+    const response = await apiClient.post('/api/admin/set-credits', payload);
+    return response.data?.data;
   }
 }
 

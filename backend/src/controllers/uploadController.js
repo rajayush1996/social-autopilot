@@ -18,17 +18,19 @@ export const uploadFile = catchAsync(async (req, res) => {
   logger.info(`[UploadController] Initiating resilient upload sequence for: ${file.originalname}`);
 
   try {
-    // Run the upload via Strategy and Fallback/Failover Pattern
-    const uploadResult = await defaultUploader.upload(file.buffer, file.originalname, file.mimetype);
+    const targetPlatform = req.body.targetPlatform || req.body.platform || 'instagram_feed';
+    // Run the upload via Strategy and Fallback/Failover Pattern with compression
+    const uploadResult = await defaultUploader.upload(file.buffer, file.originalname, file.mimetype, targetPlatform);
 
-    logger.info(`[UploadController] Successful upload result using strategy: "${uploadResult.strategyUsed}"`);
+    logger.info(`[UploadController] Successful upload using strategy: "${uploadResult.strategyUsed}" (Compressed Size: ${uploadResult.size || file.size} bytes)`);
 
     return successResponse(res, HttpStatus.OK, 'File upload process completed.', {
       fileUrl: uploadResult.fileUrl,
       mediaType: uploadResult.mediaType,
       publicId: uploadResult.publicId,
       originalname: file.originalname,
-      size: file.size,
+      size: uploadResult.size || file.size,
+      originalSize: uploadResult.originalSize || file.size,
       mimetype: file.mimetype,
       isMock: uploadResult.isMock,
       strategyUsed: uploadResult.strategyUsed,

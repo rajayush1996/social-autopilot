@@ -10,6 +10,7 @@ export const SOCKET_EVENTS = Object.freeze({
   POST_STATUS_CHANGED: 'post_status_changed',
   AI_CREDITS_UPDATED: 'ai_credits_updated',
   SYSTEM_NOTIFICATION: 'system_notification',
+  NOTIFICATION_NEW: 'notification:new',
   CHECK_PLATFORM_CONNECTION: 'check_platform_connection',
   PLATFORM_CONNECTION_STATUS: 'platform_connection_status',
 });
@@ -226,22 +227,28 @@ export class SocketServerManager {
   }
 
   /**
-   * Broadcast System Toast / Push Notification
+   * Broadcast System Push Notification ("notification:new")
    */
-  emitNotification({ userId, title, message, type = 'info' }) {
+  emitNotification({ userId, title, message, type = 'info', id }) {
     if (!this.io) return;
 
     const payload = {
-      id: `notif_${Date.now()}`,
+      id: id || `notif_${Date.now()}`,
       title,
       message,
       type,
+      read: false,
       timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     };
 
+    logger.info(`⚡ [SocketServerManager] Emitting "notification:new" event: ${title}`);
+
     if (userId) {
+      this.io.to(`user_${userId}`).emit('notification:new', payload);
       this.io.to(`user_${userId}`).emit(SOCKET_EVENTS.SYSTEM_NOTIFICATION, payload);
     } else {
+      this.io.emit('notification:new', payload);
       this.io.emit(SOCKET_EVENTS.SYSTEM_NOTIFICATION, payload);
     }
   }

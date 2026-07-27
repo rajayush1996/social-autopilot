@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
+import { convertMarkdownToUnicode } from '../utils/textFormatter.js';
 
 // Initialize OpenAI client
 const getOpenAIClient = () => {
@@ -55,6 +56,7 @@ export async function generatePostContent({
   emojiDensity = 'MEDIUM',
   hashtagCount = 'MODERATE',
   formatStyle = 'SINGLE',
+  contentLength = 'BALANCED',
   articleUrl,
 }) {
   const openai = getOpenAIClient();
@@ -92,7 +94,8 @@ export async function generatePostContent({
     let formattingInstructions = `\n\nFormatting Controls:
 - Emoji Density: ${emojiDensity} (NONE = 0 emojis, LOW = 1-2 subtle emojis, MEDIUM = 3-5 emojis, HIGH = vibrant emoji layout)
 - Hashtag Strategy: ${hashtagCount} (NONE = 0 hashtags, MODERATE = 3-5 targeted hashtags, HEAVY = 8-12 niche hashtags)
-- Output Format Style: ${formatStyle} (SINGLE = standard single post, THREAD = numbered 1/ 2/ 3/ thread breakdown, CAROUSEL = structured slide-by-slide outline)`;
+- Output Format Style: ${formatStyle} (SINGLE = standard single post, THREAD = numbered 1/ 2/ 3/ thread breakdown, CAROUSEL = structured slide-by-slide outline)
+- Character Length Target: ${contentLength} (CONCISE = ~100-250 characters, BALANCED = ~250-600 characters, DETAILED = ~600-1500 characters)`;
 
     systemPrompt += formattingInstructions;
 
@@ -111,10 +114,11 @@ export async function generatePostContent({
     });
 
     const generatedText = completion.choices[0]?.message?.content?.trim() || '';
+    const formattedContent = convertMarkdownToUnicode(generatedText);
 
     return {
       success: true,
-      content: generatedText,
+      content: formattedContent,
       platform,
       tone,
       modelUsed: model,
@@ -148,6 +152,7 @@ export async function optimizePostForPlatforms({
   emojiDensity,
   hashtagCount,
   formatStyle,
+  contentLength,
   articleUrl,
 }) {
   const results = {};
@@ -162,6 +167,7 @@ export async function optimizePostForPlatforms({
       emojiDensity,
       hashtagCount,
       formatStyle,
+      contentLength,
       articleUrl,
     });
     results[platform.toUpperCase()] = result.content;
@@ -213,7 +219,7 @@ function generateMockPostContent({ prompt, platform, tone, emojiDensity, hashtag
 
   return {
     success: true,
-    content,
+    content: convertMarkdownToUnicode(content),
     platform: uppercasePlatform,
     tone,
     modelUsed: model || 'mock-ai-engine',

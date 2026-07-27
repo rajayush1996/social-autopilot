@@ -57,7 +57,8 @@ export const getOAuthUrl = catchAsync(async (req, res) => {
 
     case 'INSTAGRAM':
       const fbAppId = config.social.instagram.appId || 'mock_fb_app_id';
-      url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_basic,instagram_content_publish,pages_show_list&state=${state}`;
+      const instagramScope = config.social.instagram.scope || 'public_profile,instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement';
+      url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(instagramScope)}&state=${state}&response_type=code&auth_type=rerequest`;
       break;
 
     default:
@@ -127,6 +128,17 @@ export const handleOAuthCallbackGet = catchAsync(async (req, res) => {
         redirectUri,
         clientId: config.social.linkedin.clientId,
         clientSecret: config.social.linkedin.clientSecret,
+      });
+      tokenData.accessToken = exchanged.accessToken;
+      tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+      if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
+      if (exchanged.username) tokenData.username = exchanged.username;
+    } else if (platform === 'INSTAGRAM') {
+      const exchanged = await adapter.exchangeToken({
+        code,
+        redirectUri,
+        appId: config.social.instagram.appId,
+        appSecret: config.social.instagram.appSecret,
       });
       tokenData.accessToken = exchanged.accessToken;
       tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
@@ -346,23 +358,28 @@ export const updateUserPlan = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: Update User role (USER vs ADMIN mock switches)
+ * Controller: Update User role (Strictly Super Admin guarded)
  */
 export const updateUserRole = catchAsync(async (req, res) => {
-  const id = req.params.id === 'me' ? (req.user?.id || 'default-user-id') : req.params.id;
-  const { role } = req.body;
-
-  if (!role || !['USER', 'ADMIN'].includes(role.toUpperCase())) {
-    throw ApiError.badRequest('Field "role" must be USER or ADMIN.');
+  const currentRole = req.user?.role?.toUpperCase();
+  if (currentRole !== 'SUPER_ADMIN') {
+    throw ApiError.forbidden('Access Denied: Only Super Admin can modify user roles.');
   }
 
-  const updatedUser = await UserService.updateUserRole(id, role);
+  const id = req.params.id === 'me' ? req.user?.id : req.params.id;
+  const { role } = req.body;
+
+  if (!role || !['USER', 'ADMIN', 'SUPER_ADMIN'].includes(role.toUpperCase())) {
+    throw ApiError.badRequest('Field "role" must be USER, ADMIN, or SUPER_ADMIN.');
+  }
+
+  const updatedUser = await UserService.updateUserRole(id, role.toUpperCase());
 
   return successResponse(res, HttpStatus.OK, `User role updated to ${role.toUpperCase()} successfully.`, { user: updatedUser });
 });
 
 /**
- * Controller: Register a new user profile.
+ * Controller: Register a new user (All new sign-ups strictly default to 'USER').
  */
 export const register = catchAsync(async (req, res) => {
   const { email, password, name } = req.body;
@@ -381,15 +398,21 @@ export const register = catchAsync(async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const verificationToken = crypto.randomBytes(32).toString('hex');
+  const uniqueId = `USR-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  // Super Admin role is strictly reserved for the owner email (ayushraj8571@gmail.com).
+  // All other accounts strictly default to 'USER'.
+  const assignedRole = email.toLowerCase() === 'ayushraj8571@gmail.com' ? 'SUPER_ADMIN' : 'USER';
 
   const user = await prisma.user.create({
     data: {
       email: email.toLowerCase(),
+      uniqueId,
       name,
       password: hashedPassword,
       aiCredits: 15,
       plan: 'FREE',
-      role: 'USER',
+      role: assignedRole,
       emailVerified: false,
       verificationToken,
     },
@@ -508,7 +531,7 @@ export const refreshAccessToken = catchAsync(async (req, res) => {
 export const getMe = catchAsync(async (req, res) => {
   const userId = req.user.id;
 
-  const user = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { id: userId },
   });
 
@@ -516,9 +539,56 @@ export const getMe = catchAsync(async (req, res) => {
     throw ApiError.notFound('User profile not found.');
   }
 
+  // Auto-assign unique public ID if not present
+  if (!user.uniqueId) {
+    const generatedTag = `USR-${Math.floor(100000 + Math.random() * 900000)}`;
+    user = await prisma.user.update({
+      where: { id: userId },
+      data: { uniqueId: generatedTag },
+    });
+  }
+
   delete user.password;
 
   return successResponse(res, HttpStatus.OK, 'Profile retrieved successfully.', { user });
+});
+
+/**
+ * Controller: Update user profile details (avatar, bio, phone number, date of birth).
+ */
+export const updateUserProfile = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { name, phoneNumber, bio, dateOfBirth, avatarUrl } = req.body;
+
+  let parsedDob = undefined;
+  if (dateOfBirth) {
+    parsedDob = new Date(dateOfBirth);
+    if (isNaN(parsedDob.getTime())) {
+      parsedDob = undefined;
+    }
+  }
+
+  let user = await prisma.user.findUnique({ where: { id: userId } });
+  let uniqueId = user?.uniqueId;
+  if (!uniqueId) {
+    uniqueId = `USR-${Math.floor(100000 + Math.random() * 900000)}`;
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(name !== undefined && { name }),
+      ...(phoneNumber !== undefined && { phoneNumber }),
+      ...(bio !== undefined && { bio }),
+      ...(parsedDob && { dateOfBirth: parsedDob }),
+      ...(avatarUrl !== undefined && { avatarUrl }),
+      uniqueId,
+    },
+  });
+
+  delete updatedUser.password;
+
+  return successResponse(res, HttpStatus.OK, 'Profile updated successfully.', { user: updatedUser });
 });
 
 /**

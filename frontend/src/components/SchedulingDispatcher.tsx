@@ -507,9 +507,9 @@ export function SchedulingDispatcher() {
                     onChange={(e) => setFormRepeat(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all"
                   >
-                    <option value="WEEKLY">Weekly Recurring</option>
-                    <option value="DAILY">Daily (All 7 Days)</option>
-                    <option value="WEEKDAYS">Weekdays Only (Mon-Fri)</option>
+                    <option value="WEEKLY" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Weekly Recurring</option>
+                    <option value="DAILY" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Daily (All 7 Days)</option>
+                    <option value="WEEKDAYS" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Weekdays Only (Mon-Fri)</option>
                   </select>
                 </div>
               </div>
@@ -556,7 +556,7 @@ export function SchedulingDispatcher() {
                         className={`py-2 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border ${
                           isSelected
                             ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500 shadow-md'
-                            : 'bg-slate-950 text-slate-500 border border-slate-800'
+                            : 'bg-slate-955 text-slate-500 border border-slate-800'
                         }`}
                       >
                         {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
@@ -579,7 +579,7 @@ export function SchedulingDispatcher() {
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all"
                   >
                     {TONES.map((t) => (
-                      <option key={t.id} value={t.id}>{t.label}</option>
+                      <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">{t.label}</option>
                     ))}
                   </select>
                 </div>

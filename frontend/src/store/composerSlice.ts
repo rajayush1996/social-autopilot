@@ -11,6 +11,7 @@ export interface ComposerState {
   emojiDensity: string;
   hashtagCount: string;
   formatStyle: string;
+  contentLength: string;
   generatedDrafts: Record<PlatformKey, string>;
   composerMode: 'SINGLE' | 'RECURRING';
 }
@@ -39,6 +40,7 @@ const initialState: ComposerState = {
   emojiDensity: initialPersisted.emojiDensity || 'MEDIUM',
   hashtagCount: initialPersisted.hashtagCount || 'MODERATE',
   formatStyle: initialPersisted.formatStyle || 'SINGLE',
+  contentLength: initialPersisted.contentLength || 'BALANCED',
   generatedDrafts: initialPersisted.generatedDrafts || {
     INSTAGRAM: '',
     LINKEDIN: '',
@@ -101,6 +103,10 @@ export const composerSlice = createSlice({
       state.formatStyle = action.payload;
       saveToLocalStorage(state);
     },
+    setContentLengthAction: (state, action: PayloadAction<string>) => {
+      state.contentLength = action.payload;
+      saveToLocalStorage(state);
+    },
     setDraftForPlatformAction: (state, action: PayloadAction<{ platform: PlatformKey; content: string }>) => {
       state.generatedDrafts[action.payload.platform] = action.payload.content;
       saveToLocalStorage(state);
@@ -132,6 +138,7 @@ export const {
   setEmojiDensityAction,
   setHashtagCountAction,
   setFormatStyleAction,
+  setContentLengthAction,
   setDraftForPlatformAction,
   setAllDraftsAction,
   setComposerModeAction,

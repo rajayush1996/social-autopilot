@@ -13,11 +13,13 @@ import {
   login,
   refreshAccessToken,
   getMe,
+  updateUserProfile,
   verifyEmail,
 } from '../controllers/authController.js';
 import { validate } from '../middlewares/validate.js';
 import { connectAccountSchema } from '../validations/authValidation.js';
 import { authenticateJwt } from '../middlewares/auth.js';
+import { authLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
 
@@ -74,17 +76,23 @@ router.patch('/user/:id/role', authenticateJwt, updateUserRole);
 /**
  * POST /api/auth/register - Register a new user
  */
-router.post('/register', register);
+router.post('/register', authLimiter, register);
 
 /**
  * POST /api/auth/login - User login authentication
  */
-router.post('/login', login);
+router.post('/login', authLimiter, login);
 
 /**
  * GET /api/auth/me - Get active logged-in user profile details
  */
 router.get('/me', authenticateJwt, getMe);
+
+/**
+ * PATCH /api/auth/me - Update profile (Avatar, Phone, Bio, Date of Birth)
+ */
+router.patch('/me', authenticateJwt, updateUserProfile);
+router.patch('/profile', authenticateJwt, updateUserProfile);
 
 /**
  * GET /api/auth/verify-email - User email verification handler
