@@ -5,7 +5,8 @@ import {
   Link2, 
   Unlink, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -24,10 +25,18 @@ function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
+
 // Custom Linkedin icon component
 function LinkedinIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
       <rect x="2" y="9" width="4" height="12" />
       <circle cx="4" cy="4" r="2" />
@@ -53,16 +62,44 @@ export default function SocialAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [simulateMode, setSimulateMode] = useState(false);
+  const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([]);
   const toast = useToast();
+
+  useEffect(() => {
+    const fetchPermissionsAndAccounts = async () => {
+      try {
+        const [meRes, activeAccounts] = await Promise.all([
+          ApiService.getMe(),
+          ApiService.getConnectedAccounts(),
+        ]);
+
+        if (meRes && Array.isArray(meRes.allowedPlatforms)) {
+          setAllowedPlatforms(meRes.allowedPlatforms.map((p) => p.toUpperCase()));
+        } else {
+          setAllowedPlatforms(['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK']);
+        }
+
+        if (Array.isArray(activeAccounts)) {
+          setAccounts(activeAccounts);
+        }
+      } catch (err) {
+        console.warn('Failed to load accounts permissions:', err);
+        setAllowedPlatforms(['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK']);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPermissionsAndAccounts();
+  }, []);
 
   const fetchAccounts = async () => {
     try {
       const activeAccounts = await ApiService.getConnectedAccounts();
-      setAccounts(activeAccounts);
+      if (Array.isArray(activeAccounts)) {
+        setAccounts(activeAccounts);
+      }
     } catch (err) {
-      console.error('Failed to fetch accounts:', err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to query connected accounts:', err);
     }
   };
 
@@ -88,7 +125,7 @@ export default function SocialAccountsPage() {
     }
   }, [toast]);
 
-  const handleConnect = async (platform: 'INSTAGRAM' | 'LINKEDIN' | 'X') => {
+  const handleConnect = async (platform: 'INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK') => {
     setActionLoading(platform);
 
     if (simulateMode) {
@@ -179,6 +216,14 @@ export default function SocialAccountsPage() {
       textColor: 'text-slate-400 border-slate-700 bg-slate-800/50',
       desc: 'Broadcast real-time concise thoughts, trends, and hashtags under 280-character guidelines.',
     },
+    {
+      id: 'FACEBOOK' as const,
+      name: 'Facebook Page',
+      icon: FacebookIcon,
+      color: 'from-blue-600 to-blue-800 shadow-blue-900/30',
+      textColor: 'text-blue-400 border-blue-500/20 bg-blue-500/10',
+      desc: 'Publish posts, photos, and video updates directly to your managed Facebook Business Pages.',
+    },
   ];
 
   return (
@@ -190,7 +235,7 @@ export default function SocialAccountsPage() {
             Social Platforms Connection
           </h1>
           <p className="text-slate-400 mt-1">
-            Link and manage your credentials for Instagram, LinkedIn, and X/Twitter.
+            Link and manage your credentials for Instagram, Facebook Pages, LinkedIn, and X/Twitter.
           </p>
         </div>
 
@@ -210,8 +255,10 @@ export default function SocialAccountsPage() {
       </div>
 
       {/* Cards list */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {platforms.map((plt) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {platforms
+          .filter((plt) => allowedPlatforms.includes(plt.id))
+          .map((plt) => {
           const Icon = plt.icon;
           const linkedAccount = findAccount(plt.id);
           const isLinked = !!linkedAccount;
@@ -265,6 +312,20 @@ export default function SocialAccountsPage() {
                         )}
                       </div>
                     </div>
+
+                    {plt.id === 'X' && (
+                      <div className="flex items-center justify-between bg-cyan-950/20 border border-cyan-500/20 rounded-xl px-3 py-2 text-[10px]">
+                        <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                          X Premium (25,000 Chars Limit)
+                        </span>
+                        <span className={`font-extrabold px-2 py-0.5 rounded-full uppercase ${
+                          linkedAccount.isPremium ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {linkedAccount.isPremium ? 'ACTIVE' : 'STANDARD'}
+                        </span>
+                      </div>
+                    )}
 
                     <button
                       onClick={() => handleDisconnect(linkedAccount.id, plt.name)}

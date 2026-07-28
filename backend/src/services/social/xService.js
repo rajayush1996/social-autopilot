@@ -18,8 +18,12 @@ export class XAdapter extends SocialAdapter {
   async publishPost({ accessToken, platformAccountId, caption, mediaUrls = [], mediaType }) {
     logger.info(`[XAdapter] Attempting to publish tweet for account: ${platformAccountId || 'default'}`);
 
-    // Text formatting for 280 char limit
-    const tweetText = caption.length > 280 ? caption.substring(0, 277) + '...' : caption;
+    // Text formatting for 280 char limit with rich media link inclusion
+    let tweetText = caption;
+    if (mediaUrls && mediaUrls.length > 0 && !tweetText.includes(mediaUrls[0])) {
+      tweetText = `${tweetText}\n\n${mediaUrls[0]}`;
+    }
+    tweetText = tweetText.length > 280 ? tweetText.substring(0, 277) + '...' : tweetText;
 
     if (accessToken && !accessToken.startsWith('mock_')) {
       try {
@@ -96,14 +100,55 @@ export class XAdapter extends SocialAdapter {
         },
       });
 
+      const accessToken = response.data.access_token;
+      const profileData = await this.getUserProfile(accessToken);
+
       return {
-        accessToken: response.data.access_token,
+        accessToken,
         refreshToken: response.data.refresh_token,
         expiresIn: response.data.expires_in,
+        platformAccountId: profileData.id || `x_${Date.now()}`,
+        username: profileData.username || `x_user_${Date.now()}`,
+        isPremium: profileData.isPremium,
       };
     } catch (error) {
       logger.error(`[XAdapter] OAuth Token Exchange Error: ${error.response?.data?.detail || error.message}`);
       throw error;
+    }
+  }
+
+  /**
+   * Fetch authenticated X user profile & detect X Premium / Twitter Blue verification status
+   */
+  async getUserProfile(accessToken) {
+    if (!accessToken || accessToken.startsWith('mock_')) {
+      return {
+        id: 'mock_x_user',
+        username: 'mock_x_creator',
+        name: 'Mock Creator',
+        isPremium: false,
+      };
+    }
+
+    try {
+      const response = await axios.get(`${config.social.x.baseUrl}/users/me?user.fields=verified,verified_type`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const userData = response.data?.data;
+      const isPremium = Boolean(userData?.verified || userData?.verified_type === 'blue');
+
+      return {
+        id: userData?.id,
+        username: userData?.username,
+        name: userData?.name,
+        isPremium,
+      };
+    } catch (error) {
+      logger.warn(`[XAdapter] Get user profile warning: ${error.message}`);
+      return { isPremium: false };
     }
   }
 

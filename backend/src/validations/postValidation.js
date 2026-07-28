@@ -15,7 +15,17 @@ export const generateAiSchema = {
     hashtagCount: z.string().optional(),
     formatStyle: z.string().optional(),
     contentLength: z.string().optional(),
-    articleUrl: z.string().optional(),
+    articleUrl: z
+      .union([
+        z.literal(''),
+        z
+          .string()
+          .url('Article URL must be a valid absolute http(s) URL.')
+          .refine((value) => /^https?:\/\//i.test(value), {
+            message: 'Article URL must start with http:// or https://',
+          }),
+      ])
+      .optional(),
     platforms: z.array(z.string()).optional(),
     targetPlatforms: z.array(z.string()).optional(),
   }),

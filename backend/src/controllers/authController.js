@@ -52,7 +52,22 @@ export const getOAuthUrl = catchAsync(async (req, res) => {
     case 'X':
     case 'TWITTER':
       const xClientId = config.social.x.clientId || 'mock_x_client_id';
-      url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${xClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`;
+      const xCodeVerifier = crypto.randomBytes(32).toString('base64url');
+      const xCodeChallenge = crypto
+        .createHash('sha256')
+        .update(xCodeVerifier)
+        .digest('base64url');
+
+      const xStatePayload = JSON.stringify({
+        platform: 'X',
+        userId,
+        codeVerifier: xCodeVerifier,
+        timestamp: Date.now(),
+      });
+      const xState = Buffer.from(xStatePayload).toString('base64url');
+
+      const xScope = 'tweet.read%20tweet.write%20users.read%20offline.access';
+      url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${xClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${xScope}&state=${xState}&code_challenge=${xCodeChallenge}&code_challenge_method=S256`;
       break;
 
     case 'INSTAGRAM':
@@ -61,8 +76,14 @@ export const getOAuthUrl = catchAsync(async (req, res) => {
       url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(instagramScope)}&state=${state}&response_type=code&auth_type=rerequest`;
       break;
 
+    case 'FACEBOOK':
+      const facebookAppId = config.social.facebook.appId || 'mock_fb_app_id';
+      const facebookScope = config.social.facebook.scope || 'pages_manage_posts,pages_read_engagement,pages_show_list,public_profile';
+      url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${facebookAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(facebookScope)}&state=${state}&response_type=code&auth_type=rerequest`;
+      break;
+
     default:
-      throw ApiError.badRequest('Unsupported platform. Allowed values: INSTAGRAM, LINKEDIN, X');
+      throw ApiError.badRequest('Unsupported platform. Allowed values: INSTAGRAM, LINKEDIN, X, FACEBOOK');
   }
 
   return successResponse(res, HttpStatus.OK, `OAuth URL generated for ${platform.toUpperCase()}`, {
@@ -90,12 +111,20 @@ export const handleOAuthCallbackGet = catchAsync(async (req, res) => {
 
   let platform = 'LINKEDIN';
   let userId = req.user?.id;
+  let codeVerifier = 'challenge';
 
   if (state) {
     try {
-      const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
+      let decodedStr = '';
+      try {
+        decodedStr = Buffer.from(state, 'base64url').toString('utf8');
+      } catch (e) {
+        decodedStr = Buffer.from(state, 'base64').toString('utf8');
+      }
+      const decoded = JSON.parse(decodedStr);
       if (decoded.platform) platform = decoded.platform.toUpperCase();
       if (decoded.userId && decoded.userId !== 'default-user-id') userId = decoded.userId;
+      if (decoded.codeVerifier) codeVerifier = decoded.codeVerifier;
     } catch (e) {
       logger.warn(`[OAuth Callback GET] State parse warning: ${e.message}`);
     }
@@ -144,6 +173,32 @@ export const handleOAuthCallbackGet = catchAsync(async (req, res) => {
       tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
       if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
       if (exchanged.username) tokenData.username = exchanged.username;
+    } else if (platform === 'X' && config.social.x.clientId) {
+      const exchanged = await adapter.exchangeToken({
+        code,
+        codeVerifier: codeVerifier || 'challenge',
+        redirectUri,
+        clientId: config.social.x.clientId,
+        clientSecret: config.social.x.clientSecret,
+      });
+      tokenData.accessToken = exchanged.accessToken;
+      if (exchanged.refreshToken) tokenData.refreshToken = exchanged.refreshToken;
+      tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+      if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
+      if (exchanged.username) tokenData.username = exchanged.username;
+      tokenData.isPremium = Boolean(exchanged.isPremium);
+    } else if (platform === 'FACEBOOK') {
+      const exchanged = await adapter.exchangeToken({
+        code,
+        redirectUri,
+        appId: config.social.facebook.appId,
+        appSecret: config.social.facebook.appSecret,
+      });
+      tokenData.accessToken = exchanged.accessToken;
+      if (exchanged.refreshToken) tokenData.refreshToken = exchanged.refreshToken;
+      tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+      if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
+      if (exchanged.username) tokenData.username = exchanged.username;
     }
   } catch (err) {
     logger.error(`[OAuth Callback GET] Token exchange error: ${err.message}`);
@@ -160,6 +215,7 @@ export const handleOAuthCallbackGet = catchAsync(async (req, res) => {
     accessToken: encrypt(tokenData.accessToken),
     refreshToken: tokenData.refreshToken ? encrypt(tokenData.refreshToken) : null,
     expiresAt: tokenData.expiresAt,
+    isPremium: tokenData.isPremium || false,
   });
 
   emitAccountStatusChange({ userId, platform, action: 'CONNECTED' });
@@ -550,7 +606,37 @@ export const getMe = catchAsync(async (req, res) => {
 
   delete user.password;
 
-  return successResponse(res, HttpStatus.OK, 'Profile retrieved successfully.', { user });
+  // Determine allowed social platforms for this user based on plan & role
+  const isSuperAdmin = user.role?.toUpperCase() === 'SUPER_ADMIN';
+  let allowedPlatforms = ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+
+  if (!isSuperAdmin) {
+    try {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: 'PLAN_FEATURES_MATRIX' },
+      });
+
+      const userPlan = (user.plan || 'FREE').toUpperCase();
+      const matrix = setting?.value || {
+        FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'] },
+        PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
+        ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
+      };
+
+      if (matrix[userPlan]?.allowedPlatforms) {
+        allowedPlatforms = matrix[userPlan].allowedPlatforms;
+      }
+    } catch (e) {
+      allowedPlatforms = ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+    }
+  }
+
+  return successResponse(res, HttpStatus.OK, 'Profile retrieved successfully.', {
+    user: {
+      ...user,
+      allowedPlatforms,
+    },
+  });
 });
 
 /**

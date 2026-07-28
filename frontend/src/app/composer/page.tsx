@@ -31,6 +31,13 @@ import CONFIG from '@/config';
 import { useToast } from '@/context/ToastContext';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import LiquidUploadButton from '@/components/LiquidUploadButton';
+import PlatformIcon from '@/components/PlatformIcon';
+import {
+  getPlatformDefinition,
+  getPlatformDefinitions,
+  PLATFORM_REGISTRY,
+  type PlatformId,
+} from '@/config/platforms';
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -51,42 +58,21 @@ import {
   resetDraftsAndInputsAction,
 } from '@/store/composerSlice';
 
-type PlatformKey = 'INSTAGRAM' | 'LINKEDIN' | 'X';
-
-function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-    </svg>
-  );
-}
-
-function LinkedinPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-      <rect x="2" y="9" width="4" height="12" />
-      <circle cx="4" cy="4" r="2" />
-    </svg>
-  );
-}
-
-function XPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M4 4l11.733 16h4.267l-11.733 -16z" />
-      <path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" />
-    </svg>
-  );
-}
+type PlatformKey = PlatformId;
 
 const PRESET_PROMPTS = [
   { label: '🚀 Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
   { label: '💡 Tech Tip', text: 'Share a weekly tip explaining the benefits of decoupling API queries into structured client services.' },
   { label: '💬 Client Review', text: 'Draft a thank-you note highlighting a recent client success story and expressing appreciation for their feedback.' },
   { label: '📈 Progress Update', text: 'Summarize our engineering progress this week, detailing backend performance improvements.' },
+];
+
+const TONE_OPTIONS = [
+  { value: 'ENGAGING', label: 'Engaging', hint: 'Engaging & Conversational' },
+  { value: 'PROFESSIONAL', label: 'Professional', hint: 'Professional Business' },
+  { value: 'CASUAL', label: 'Casual', hint: 'Casual & Friendly' },
+  { value: 'HUMOROUS', label: 'Humorous', hint: 'Humorous & Witty' },
+  { value: 'PROMOTIONAL', label: 'Promotional', hint: 'Promotional & Direct' },
 ];
 
 export default function ComposerPage() {
@@ -156,6 +142,9 @@ export default function ComposerPage() {
 
   // Connected Accounts State
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformKey[]>([]);
+  const [allowedPlatforms, setAllowedPlatforms] = useState<PlatformKey[]>(
+    () => PLATFORM_REGISTRY.map((platform) => platform.id)
+  );
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [initialChecked, setInitialChecked] = useState(false);
 
@@ -169,12 +158,18 @@ export default function ComposerPage() {
 
     const fetchAccounts = async () => {
       try {
-        const accounts = await ApiService.getConnectedAccounts();
+        const [accounts, user] = await Promise.all([
+          ApiService.getConnectedAccounts(),
+          ApiService.getMe(),
+        ]);
         if (Array.isArray(accounts)) {
           const activePlatforms = accounts
             .filter((acc: any) => acc.isActive !== false)
             .map((acc: any) => acc.platform.toUpperCase() as PlatformKey);
           setConnectedPlatforms(activePlatforms);
+        }
+        if (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0) {
+          setAllowedPlatforms(user.allowedPlatforms.map((platform) => platform.toUpperCase()));
         }
       } catch (err) {
         console.error('Failed to load connected accounts:', err);
@@ -186,8 +181,8 @@ export default function ComposerPage() {
     fetchAccounts();
 
     // Verify channel statuses via WebSocket immediately on mount
-    ['LINKEDIN', 'X', 'INSTAGRAM'].forEach((p) => {
-      socketClient.checkPlatform(p);
+    PLATFORM_REGISTRY.forEach((platform) => {
+      socketClient.checkPlatform(platform.id);
     });
 
     window.addEventListener('focus', fetchAccounts);
@@ -286,11 +281,12 @@ export default function ComposerPage() {
       );
       if (generated) {
         const draftMap = generated.adaptedPosts || generated;
-        setGeneratedDrafts({
-          INSTAGRAM: draftMap.INSTAGRAM || generated.INSTAGRAM || generated.content || '',
-          LINKEDIN: draftMap.LINKEDIN || generated.LINKEDIN || generated.content || '',
-          X: draftMap.X || generated.X || generated.content || '',
-        });
+        setGeneratedDrafts(
+          platforms.reduce<Record<string, string>>((drafts, platform) => {
+            drafts[platform] = draftMap[platform] || generated[platform] || generated.content || '';
+            return drafts;
+          }, {})
+        );
         toast.success('AI content generated for selected platforms!');
       }
     } catch (err: any) {
@@ -345,7 +341,7 @@ export default function ComposerPage() {
       
       // Reset Form Inputs
       setTopic('');
-      setGeneratedDrafts({ INSTAGRAM: '', LINKEDIN: '', X: '' });
+      setGeneratedDrafts({});
       setMediaFileUrl('');
       setMediaType(null);
     } catch (err: any) {
@@ -369,13 +365,18 @@ export default function ComposerPage() {
     dispatch(setDraftForPlatformAction({ platform: plt, content: val }));
   };
 
+  const selectablePlatforms = getPlatformDefinitions(allowedPlatforms);
+  const mediaRequiredPlatforms = platforms.filter(
+    (platform) => getPlatformDefinition(platform).requiresMedia
+  );
+
   return (
     <div className="space-y-8 pb-12 animate-fadeIn">
       {/* Header with Mode Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-900">
         <div>
           <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-200 tracking-tight">
-            AI Post Composer
+            Post Composer
           </h1>
           <p className="text-slate-400 text-xs mt-1">
             Create, optimize, and schedule social media content across platforms.
@@ -405,7 +406,7 @@ export default function ComposerPage() {
             }`}
           >
             <AlarmClock className="h-4 w-4 text-indigo-300" />
-            Scheduling Dispatcher
+            Auto-Pilot Schedule
           </button>
         </div>
       </div>
@@ -510,65 +511,94 @@ export default function ComposerPage() {
                 )}
 
                 {/* Platform & Tone Selectors */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-850/60">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
+                <div className="space-y-4 pt-2 border-t border-slate-850/60">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
                       <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Target Channels</label>
-                      <a href="/accounts" className="text-[10px] text-indigo-400 hover:underline font-semibold flex items-center gap-1">
-                        Connect Accounts <ChevronRight className="h-3 w-3" />
-                      </a>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-slate-500">
+                          {platforms.length} of {selectablePlatforms.length}
+                        </span>
+                        <span className="text-slate-700">·</span>
+                        <a href="/accounts" className="text-[10px] text-indigo-400 hover:underline font-semibold flex items-center gap-1">
+                          Connect Accounts <ChevronRight className="h-3 w-3" />
+                        </a>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {(['LINKEDIN', 'X', 'INSTAGRAM'] as PlatformKey[]).map((p) => {
-                        const active = platforms.includes(p);
-                        const isConnected = connectedPlatforms.includes(p);
+                    <div className="flex flex-wrap gap-2">
+                      {selectablePlatforms.map((platform) => {
+                        const active = platforms.includes(platform.id);
+                        const isConnected = connectedPlatforms.includes(platform.id);
                         const isVerifying = !initialChecked;
 
                         return (
                           <button
-                            key={p}
+                            key={platform.id}
                             type="button"
-                            onClick={() => togglePlatform(p)}
-                            className={`flex-1 py-2 rounded-xl border text-[10px] font-extrabold tracking-wider transition-all duration-300 flex items-center justify-center gap-1.5 ${
+                            onClick={() => togglePlatform(platform.id)}
+                            aria-pressed={active}
+                            className={`inline-flex items-center gap-2 py-1.5 pl-2.5 pr-3.5 rounded-full border text-[11px] font-extrabold tracking-wide transition-all duration-300 ${
                               active
                                 ? isVerifying
                                   ? 'bg-slate-900 text-slate-300 border-slate-800'
                                   : isConnected
                                   ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
                                   : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                                : 'bg-slate-955 text-slate-500 border-slate-850'
+                                : 'bg-slate-955 text-slate-500 border-slate-850 hover:border-slate-750 hover:text-slate-300'
                             }`}
-                            title={isVerifying ? `Verifying ${p}...` : isConnected ? `${p} Connected` : `${p} Not Connected - Click to connect in Social Accounts`}
+                            title={
+                              isVerifying
+                                ? `Verifying ${platform.label}...`
+                                : isConnected
+                                ? `${platform.label} Connected`
+                                : `${platform.label} Not Connected - Click to connect in Social Accounts`
+                            }
                           >
-                            {active && isVerifying && (
-                              <span className="w-2.5 h-2.5 rounded-full bg-slate-600 shrink-0 animate-pulse" />
-                            )}
-                            {active && !isVerifying && isConnected && (
-                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0 animate-pulse shadow-sm shadow-emerald-400/60" />
-                            )}
-                            {active && !isVerifying && !isConnected && (
-                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 animate-pulse shadow-sm shadow-rose-500/50" />
-                            )}
-                            {p}
+                            <span
+                              className={`w-2 h-2 rounded-full shrink-0 ${
+                                active
+                                  ? isVerifying
+                                    ? 'bg-slate-600 animate-pulse'
+                                    : isConnected
+                                    ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/60'
+                                    : 'bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50'
+                                  : 'bg-slate-700'
+                              }`}
+                            />
+                            {platform.label}
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Tone</label>
-                    <select
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-3 py-2 text-slate-300 text-xs font-medium focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="ENGAGING" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Engaging & Conversational</option>
-                      <option value="PROFESSIONAL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Professional Business</option>
-                      <option value="CASUAL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Casual & Friendly</option>
-                      <option value="HUMOROUS" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Humorous & Witty</option>
-                      <option value="PROMOTIONAL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Promotional & Direct</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Tone</label>
+                      <span className="text-[10px] text-slate-500 font-semibold shrink-0">Applied to every selected channel</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {TONE_OPTIONS.map((toneOption) => {
+                        const active = tone === toneOption.value;
+
+                        return (
+                          <button
+                            key={toneOption.value}
+                            type="button"
+                            onClick={() => setTone(toneOption.value)}
+                            aria-pressed={active}
+                            title={toneOption.hint}
+                            className={`py-1.5 px-3.5 rounded-full border text-[11px] font-extrabold tracking-wide transition-all duration-300 ${
+                              active
+                                ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
+                                : 'bg-slate-955 text-slate-500 border-slate-850 hover:border-slate-750 hover:text-slate-300'
+                            }`}
+                          >
+                            {toneOption.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -650,7 +680,7 @@ export default function ComposerPage() {
                 {platforms.length === 0 && (
                   <p className="text-[11px] text-amber-400 text-center font-bold mt-2 flex items-center justify-center gap-1.5 animate-fadeIn">
                     <Info className="h-3.5 w-3.5 shrink-0" />
-                    Please select at least one social media channel above (LinkedIn, X, or Instagram) to generate content.
+                    Please select at least one target channel to generate content.
                   </p>
                 )}
               </div>
@@ -665,15 +695,15 @@ export default function ComposerPage() {
                   <span className="text-[10px] text-slate-500 font-semibold">Step 2 of 3</span>
                 </div>
 
-                {platforms.includes('INSTAGRAM') && (
+                {mediaRequiredPlatforms.length > 0 && (
                   <div className="bg-pink-950/20 border border-pink-500/20 rounded-xl p-3 flex items-start gap-2.5">
-                    <InstagramPlatformIcon className="text-pink-400 shrink-0 mt-0.5" />
+                    <PlatformIcon platform={mediaRequiredPlatforms[0]} className="h-[18px] w-[18px] text-pink-400 shrink-0 mt-0.5" />
                     <div className="text-[11px] leading-relaxed">
-                      <span className="font-bold text-pink-300">Instagram Media Requirement: </span>
+                      <span className="font-bold text-pink-300">Media recommended for {mediaRequiredPlatforms.map((platform) => getPlatformDefinition(platform).label).join(', ')}: </span>
                       <span className="text-slate-400">
                         {mediaFileUrl
-                          ? 'Media asset uploaded! Your image/video will be posted to Instagram feed, while LinkedIn & X receive optimized captions.'
-                          : 'Instagram requires a visual image or video asset. If left empty, our engine auto-generates a high-res graphic for Instagram, while LinkedIn & X receive clean text-only posts.'}
+                          ? 'Media asset uploaded and ready for every selected channel that supports it.'
+                          : 'Add an image or video to improve visual-first channel performance.'}
                       </span>
                     </div>
                   </div>
@@ -774,7 +804,7 @@ export default function ComposerPage() {
                     title="Expand preview to full screen popup"
                   >
                     <Maximize2 className="h-3 w-3" />
-                    Full Popup View
+                    Full View
                   </button>
                 </div>
 
@@ -785,26 +815,22 @@ export default function ComposerPage() {
                   </div>
                 ) : (
                   platforms.map((platform) => {
-                    const isX = platform === 'X';
-                    const isLinkedIn = platform === 'LINKEDIN';
-                    const isInstagram = platform === 'INSTAGRAM';
+                    const platformDefinition = getPlatformDefinition(platform);
                     const charCount = getCharCount(platform);
 
                     return (
                       <div key={platform} className="bg-slate-900/50 border border-slate-800/80 rounded-3xl p-5 shadow-xl space-y-3 backdrop-blur-md">
                         <div className="flex items-center justify-between pb-2.5 border-b border-slate-850">
                           <div className="flex items-center gap-2">
-                            {isInstagram && <InstagramPlatformIcon className="text-pink-400" />}
-                            {isLinkedIn && <LinkedinPlatformIcon className="text-blue-400" />}
-                            {isX && <XPlatformIcon className="text-slate-300" />}
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-300">{platform} Preview</span>
+                            <PlatformIcon platform={platform} className={`h-[18px] w-[18px] ${platformDefinition.accentClass}`} />
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-300">{platformDefinition.label} Preview</span>
                           </div>
 
-                          {isX && (
+                          {platformDefinition.characterLimit && (
                             <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded ${
-                              charCount > 280 ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-955 text-slate-500'
+                              charCount > platformDefinition.characterLimit ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-955 text-slate-500'
                             }`}>
-                              {charCount} / 280
+                              {charCount} / {platformDefinition.characterLimit}
                             </span>
                           )}
                         </div>
@@ -853,7 +879,10 @@ export default function ComposerPage() {
               </div>
             </div>
           </div>
-         {/* FULL SCREEN POPUP PREVIEW OVERLAY MODAL (PORTAL TO DOCUMENT.BODY) */}
+        </div>
+      )}
+
+      {/* FULL SCREEN POPUP PREVIEW OVERLAY MODAL (PORTAL TO DOCUMENT.BODY) */}
       {isFullscreenPreview && portalMounted && createPortal(
         <div className="fixed inset-0 z-[999999] bg-slate-955/85 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-5 md:p-8 overflow-hidden animate-fadeIn">
           <div className="relative bg-slate-900 border border-slate-800 rounded-3xl w-[94vw] max-w-7xl h-[90vh] max-h-[880px] overflow-hidden flex flex-col shadow-2xl shadow-indigo-950/90 my-auto pointer-events-auto">
@@ -890,7 +919,7 @@ export default function ComposerPage() {
                 <div className="bg-slate-900/50 border border-slate-850 border-dashed rounded-3xl p-12 text-center space-y-3 max-w-lg mx-auto my-auto">
                   <Info className="h-10 w-10 text-slate-600 mx-auto" />
                   <p className="text-slate-300 text-base font-bold">No Social Channels Selected</p>
-                  <p className="text-slate-500 text-xs">Select Instagram, LinkedIn, or X above to edit posts in full view.</p>
+                  <p className="text-slate-500 text-xs">Select one or more target channels above to edit posts in full view.</p>
                 </div>
               ) : (
                 <div className={`grid gap-6 items-start w-full ${
@@ -901,9 +930,7 @@ export default function ComposerPage() {
                     : 'grid-cols-1 lg:grid-cols-3 w-full'
                 }`}>
                   {platforms.map((platform) => {
-                    const isX = platform === 'X';
-                    const isLinkedIn = platform === 'LINKEDIN';
-                    const isInstagram = platform === 'INSTAGRAM';
+                    const platformDefinition = getPlatformDefinition(platform);
                     const charCount = getCharCount(platform);
 
                     return (
@@ -911,17 +938,15 @@ export default function ComposerPage() {
                         {/* Channel Badge Header */}
                         <div className="flex items-center justify-between pb-4 border-b border-slate-850 shrink-0">
                           <div className="flex items-center gap-3">
-                            {isInstagram && <InstagramPlatformIcon className="h-7 w-7 text-pink-400" />}
-                            {isLinkedIn && <LinkedinPlatformIcon className="h-7 w-7 text-blue-400" />}
-                            {isX && <XPlatformIcon className="h-7 w-7 text-slate-300" />}
-                            <span className="text-lg font-extrabold uppercase tracking-wider text-slate-100">{platform} Post Draft</span>
+                            <PlatformIcon platform={platform} className={`h-7 w-7 ${platformDefinition.accentClass}`} />
+                            <span className="text-lg font-extrabold uppercase tracking-wider text-slate-100">{platformDefinition.label} Post Draft</span>
                           </div>
 
-                          {isX && (
+                          {platformDefinition.characterLimit && (
                             <span className={`text-xs font-mono font-extrabold px-3 py-1 rounded-xl ${
-                              charCount > 280 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-955 text-slate-400 border border-slate-850'
+                              charCount > platformDefinition.characterLimit ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-955 text-slate-400 border border-slate-850'
                             }`}>
-                              {charCount} / 280
+                              {charCount} / {platformDefinition.characterLimit}
                             </span>
                           )}
                         </div>
@@ -984,8 +1009,6 @@ export default function ComposerPage() {
         </div>,
         document.body
       )}
-    </div>
-  )}
 
       {/* MODE 2: RECURRING SCHEDULING DISPATCHER */}
       {composerMode === 'RECURRING' && (

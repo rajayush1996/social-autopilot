@@ -44,6 +44,12 @@ export const config = {
       appSecret: process.env.FACEBOOK_APP_SECRET,
       scope: process.env.INSTAGRAM_SCOPE || 'instagram_basic,instagram_content_publish,pages_show_list,public_profile',
     },
+    facebook: {
+      graphBaseUrl: process.env.GRAPH_API_BASE_URL || 'https://graph.facebook.com/v19.0',
+      appId: process.env.FACEBOOK_APP_ID,
+      appSecret: process.env.FACEBOOK_APP_SECRET,
+      scope: process.env.FACEBOOK_SCOPE || 'pages_manage_posts,pages_read_engagement,pages_show_list,public_profile',
+    },
     linkedin: {
       apiBaseUrl: process.env.LINKEDIN_API_BASE_URL || 'https://api.linkedin.com/v2',
       oauthBaseUrl: process.env.LINKEDIN_OAUTH_BASE_URL || 'https://www.linkedin.com/oauth/v2',

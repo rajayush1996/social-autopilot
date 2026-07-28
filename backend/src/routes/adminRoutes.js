@@ -5,6 +5,8 @@ import {
   updateFeature,
   triggerAutopilotNow,
   setUserCredits,
+  getPlanFeatures,
+  setPlanFeatures,
 } from '../controllers/adminController.js';
 import { restrictToSuperAdmin } from '../middlewares/rbac.js';
 import { authenticateJwt } from '../middlewares/auth.js';
@@ -39,5 +41,15 @@ router.post('/autopilot/trigger', restrictToSuperAdmin, triggerAutopilotNow);
  */
 router.post('/set-credits', restrictToSuperAdmin, setUserCredits);
 router.post('/users/:id/credits', restrictToSuperAdmin, setUserCredits);
+
+/**
+ * GET /api/admin/plan-features - Get plan feature matrix
+ */
+router.get('/plan-features', getPlanFeatures);
+
+/**
+ * POST /api/admin/plan-features - Super Admin update plan feature matrix
+ */
+router.post('/plan-features', restrictToSuperAdmin, setPlanFeatures);
 
 export default router;

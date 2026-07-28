@@ -25,6 +25,10 @@ export class LinkedinAdapter extends SocialAdapter {
           ? platformAccountId
           : `urn:li:person:${platformAccountId}`;
 
+        const firstMediaUrl = mediaUrls[0] || '';
+        const isVideo = mediaType === 'VIDEO' || firstMediaUrl.endsWith('.mp4') || firstMediaUrl.endsWith('.mov') || firstMediaUrl.includes('/uploads/videos/');
+        const shareCategory = mediaUrls.length > 0 ? (isVideo ? 'VIDEO' : 'IMAGE') : 'NONE';
+
         const postBody = {
           author: authorUrn,
           lifecycleState: 'PUBLISHED',
@@ -33,12 +37,12 @@ export class LinkedinAdapter extends SocialAdapter {
               shareCommentary: {
                 text: caption,
               },
-              shareMediaCategory: mediaUrls.length > 0 ? 'ARTICLE' : 'NONE',
+              shareMediaCategory: shareCategory,
               ...(mediaUrls.length > 0 && {
                 media: [
                   {
                     status: 'READY',
-                    originalUrl: mediaUrls[0],
+                    originalUrl: firstMediaUrl,
                   },
                 ],
               }),

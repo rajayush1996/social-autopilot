@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { DEFAULT_COMPOSER_PLATFORMS, type PlatformId } from '@/config/platforms';
 
-export type PlatformKey = 'INSTAGRAM' | 'LINKEDIN' | 'X';
+export type PlatformKey = PlatformId;
 
 export interface ComposerState {
   selectedPlatforms: PlatformKey[];
@@ -12,7 +13,7 @@ export interface ComposerState {
   hashtagCount: string;
   formatStyle: string;
   contentLength: string;
-  generatedDrafts: Record<PlatformKey, string>;
+  generatedDrafts: Record<string, string>;
   composerMode: 'SINGLE' | 'RECURRING';
 }
 
@@ -32,7 +33,7 @@ const loadPersistedState = (): Partial<ComposerState> => {
 const initialPersisted = loadPersistedState();
 
 const initialState: ComposerState = {
-  selectedPlatforms: initialPersisted.selectedPlatforms || ['LINKEDIN', 'X'],
+  selectedPlatforms: initialPersisted.selectedPlatforms || DEFAULT_COMPOSER_PLATFORMS,
   topic: initialPersisted.topic || '',
   tone: initialPersisted.tone || 'ENGAGING',
   inputSource: initialPersisted.inputSource || 'PROMPT',
@@ -41,11 +42,7 @@ const initialState: ComposerState = {
   hashtagCount: initialPersisted.hashtagCount || 'MODERATE',
   formatStyle: initialPersisted.formatStyle || 'SINGLE',
   contentLength: initialPersisted.contentLength || 'BALANCED',
-  generatedDrafts: initialPersisted.generatedDrafts || {
-    INSTAGRAM: '',
-    LINKEDIN: '',
-    X: '',
-  },
+  generatedDrafts: initialPersisted.generatedDrafts || {},
   composerMode: initialPersisted.composerMode || 'SINGLE',
 };
 
@@ -111,7 +108,7 @@ export const composerSlice = createSlice({
       state.generatedDrafts[action.payload.platform] = action.payload.content;
       saveToLocalStorage(state);
     },
-    setAllDraftsAction: (state, action: PayloadAction<Record<PlatformKey, string>>) => {
+    setAllDraftsAction: (state, action: PayloadAction<Record<string, string>>) => {
       state.generatedDrafts = action.payload;
       saveToLocalStorage(state);
     },
@@ -122,7 +119,7 @@ export const composerSlice = createSlice({
     resetDraftsAndInputsAction: (state) => {
       state.topic = '';
       state.articleUrl = '';
-      state.generatedDrafts = { INSTAGRAM: '', LINKEDIN: '', X: '' };
+      state.generatedDrafts = {};
       saveToLocalStorage(state);
     },
   },

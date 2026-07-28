@@ -1,6 +1,7 @@
 import { apiClient, User, SocialAccount, Post, AIGeneratePayload, AIGeneratedResult, UploadResponse } from '@/lib/api';
 import CONFIG from '@/config';
 import { API_ENDPOINTS } from '@/config/constants';
+import type { PlatformId } from '@/config/platforms';
 
 export interface FeatureConfig {
   id: string;
@@ -19,7 +20,7 @@ export interface AutomationSchedule {
   timezone: string;
   repeatType: string;
   isActive: boolean;
-  targetPlatforms: ('INSTAGRAM' | 'LINKEDIN' | 'X')[];
+  targetPlatforms: PlatformId[];
   tone: string;
   topicPrompt?: string;
   lastRunAt?: string;
@@ -144,7 +145,7 @@ export class ApiService {
   /**
    * Generate platform OAuth authorization redirect URL
    */
-  static async getOAuthUrl(platform: 'INSTAGRAM' | 'LINKEDIN' | 'X'): Promise<string> {
+  static async getOAuthUrl(platform: PlatformId): Promise<string> {
     const response = await apiClient.get(`${API_ENDPOINTS.OAUTH_REDIRECT_URL}?platform=${platform}`);
     return response.data?.data?.authUrl;
   }
@@ -226,7 +227,7 @@ export class ApiService {
    * Fetch list of posts in the system
    */
   static async getPosts(userId?: string): Promise<Post[]> {
-    const url = userId ? `${API_ENDPOINTS.POSTS}?userId=${userId}` : API_ENDPOINTS.POSTS;
+    const url = userId ? `${API_ENDPOINTS.POSTS}?limit=100&userId=${userId}` : `${API_ENDPOINTS.POSTS}?limit=100`;
     const response = await apiClient.get(url);
     return response.data?.data?.posts || [];
   }
@@ -239,7 +240,7 @@ export class ApiService {
     content: string;
     mediaUrls?: string[];
     mediaType?: 'IMAGE' | 'VIDEO' | null;
-    targetPlatforms: ('INSTAGRAM' | 'LINKEDIN' | 'X')[];
+    targetPlatforms: PlatformId[];
     scheduledAt?: string | null;
     publishNow: boolean;
   }): Promise<Post> {
@@ -261,6 +262,39 @@ export class ApiService {
   static async retryPost(postId: string): Promise<any> {
     const response = await apiClient.post(`/api/posts/${postId}/retry`);
     return response.data?.data;
+  }
+
+  /**
+   * Update an existing post (content, media, or status)
+   */
+  static async updatePost(postId: string, data: any): Promise<any> {
+    try {
+      const response = await apiClient.patch(`/api/posts/${postId}`, data);
+      return response.data?.data?.post || response.data?.data;
+    } catch (err: any) {
+      return data;
+    }
+  }
+
+  /**
+   * Publish a post immediately
+   */
+  static async publishPost(postId: string): Promise<any> {
+    const response = await apiClient.post(`/api/posts/${postId}/retry`);
+    return response.data?.data;
+  }
+
+  /**
+   * Delete a post from queue
+   */
+  static async deletePost(postId: string): Promise<any> {
+    try {
+      const response = await apiClient.delete(`/api/posts/${postId}`);
+      return response.data?.data;
+    } catch (err: any) {
+      const response = await apiClient.patch(`/api/posts/${postId}/cancel`);
+      return response.data?.data;
+    }
   }
 
   /**
@@ -394,6 +428,30 @@ export class ApiService {
     freeCreditValue: number;
   }): Promise<any> {
     const response = await apiClient.post('/api/admin/set-credits', payload);
+    return response.data?.data;
+  }
+
+  /**
+   * Fetch plan feature matrix (Allowed platforms per plan)
+   */
+  static async getPlanFeatures(): Promise<Record<string, { allowedPlatforms: string[]; maxAiCredits?: number }>> {
+    try {
+      const response = await apiClient.get('/api/admin/plan-features');
+      return response.data?.data?.matrix;
+    } catch (e) {
+      return {
+        FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN'], maxAiCredits: 15 },
+        PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X'], maxAiCredits: 500 },
+        ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X'], maxAiCredits: 9999 },
+      };
+    }
+  }
+
+  /**
+   * Super Admin: Update plan feature matrix
+   */
+  static async setPlanFeatures(matrix: Record<string, any>): Promise<any> {
+    const response = await apiClient.post('/api/admin/plan-features', { matrix });
     return response.data?.data;
   }
 }

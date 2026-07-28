@@ -7,6 +7,7 @@ export const SOCIAL_PLATFORM = Object.freeze({
   INSTAGRAM: 'INSTAGRAM',
   LINKEDIN: 'LINKEDIN',
   X: 'X',
+  FACEBOOK: 'FACEBOOK',
 });
 
 export const POST_STATUS = Object.freeze({

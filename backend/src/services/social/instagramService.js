@@ -29,12 +29,14 @@ export class InstagramAdapter extends SocialAdapter {
     if (isRealIgAccount) {
       try {
         let mediaUrl = mediaUrls[0];
-        if (!mediaUrl || mediaUrl.includes('localhost') || mediaUrl.includes('127.0.0.1')) {
-          logger.warn(`[InstagramAdapter] Localhost URL detected ("${mediaUrl || 'none'}"). Meta cloud API cannot reach localhost directly. Using public web URL for Meta Graph API.`);
-          mediaUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe';
-        }
+        const isVideoMedia = mediaType === 'VIDEO' || (mediaUrl && (mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.mov') || mediaUrl.includes('/uploads/videos/')));
 
-        const isVideoMedia = mediaType === 'VIDEO' || (mediaUrl && (mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.mov')));
+        if (!mediaUrl || mediaUrl.includes('localhost') || mediaUrl.includes('127.0.0.1')) {
+          logger.warn(`[InstagramAdapter] Localhost URL detected ("${mediaUrl || 'none'}"). Using public web URL fallback for Meta Graph API.`);
+          mediaUrl = isVideoMedia
+            ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+            : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe';
+        }
 
         // Step 1: Create Media Container (Image or Video/Reel)
         const containerPayload = isVideoMedia

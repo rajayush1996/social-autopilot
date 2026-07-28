@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { PlatformId } from '@/config/platforms';
 
 // Get API base URL from env or default to localhost
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -122,6 +123,7 @@ export interface User {
   aiCredits: number;
   plan: string;
   role: string;
+  allowedPlatforms?: string[];
   autopilotEnabled: boolean;
   brandContext: string | null;
   contentSummary: string | null;
@@ -132,13 +134,14 @@ export interface User {
 export interface SocialAccount {
   id: string;
   userId: string;
-  platform: 'INSTAGRAM' | 'LINKEDIN' | 'X';
+  platform: PlatformId;
   platformAccountId: string;
   username: string;
   accountName: string | null;
   accessToken: string;
   refreshToken: string | null;
   expiresAt: string | null;
+  isPremium?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -148,7 +151,7 @@ export interface SocialPostLog {
   id: string;
   postId: string;
   socialAccountId: string | null;
-  platform: 'INSTAGRAM' | 'LINKEDIN' | 'X';
+  platform: PlatformId;
   status: 'PENDING' | 'SUCCESS' | 'FAILED';
   externalPostId: string | null;
   externalPostUrl: string | null;
@@ -168,8 +171,8 @@ export interface Post {
   content: string;
   mediaUrls: string[];
   mediaType: 'IMAGE' | 'VIDEO' | null;
-  targetPlatforms: ('INSTAGRAM' | 'LINKEDIN' | 'X')[];
-  status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED' | 'PARTIALLY_PUBLISHED' | 'CANCELLED';
+  targetPlatforms: PlatformId[];
+  status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED' | 'PARTIALLY_PUBLISHED' | 'CANCELLED';
   scheduledAt: string | null;
   publishedAt: string | null;
   aiGenerated: boolean;

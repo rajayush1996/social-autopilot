@@ -2,7 +2,7 @@ import { prisma } from '../config/db.js';
 import { catchAsync, successResponse } from '../utils/responseHandler.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
-import { POST_STATUS } from '../config/constants.js';
+import { POST_STATUS, SOCIAL_PLATFORM } from '../config/constants.js';
 import logger from '../utils/logger.js';
 import { generatePostContent, optimizePostForPlatforms } from '../services/aiService.js';
 import { enqueuePostJob, removePostJob } from '../queues/postQueue.js';
@@ -12,6 +12,30 @@ import UserService from '../services/userService.js';
 import PostService from '../services/postService.js';
 import NotificationService from '../services/notificationService.js';
 import { decrypt } from '../utils/encryption.js';
+import { fetchArticleContext } from '../services/ai/articleFetcher.js';
+
+/**
+ * Helper: Retrieve allowed platforms for a user based on role and plan matrix.
+ */
+async function getUserAllowedPlatforms(user) {
+  if (user.role?.toUpperCase() === 'SUPER_ADMIN') {
+    return ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+  }
+  try {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: 'PLAN_FEATURES_MATRIX' },
+    });
+    const userPlan = (user.plan || 'FREE').toUpperCase();
+    const matrix = setting?.value || {
+      FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'] },
+      PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
+      ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
+    };
+    return matrix[userPlan]?.allowedPlatforms || ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+  } catch (e) {
+    return ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+  }
+}
 
 /**
  * Controller: Generate post content using OpenAI / AI service.
@@ -40,11 +64,35 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
 
   const selectedPlatforms = targetPlatforms || platforms || ['INSTAGRAM', 'LINKEDIN', 'X'];
 
-  // 1. Retrieve User and Validate AI Credits (Service layer)
+  // 1. Retrieve User and Validate AI Credits & Plan Platform Limits
   const user = await UserService.ensureUserExists(userId);
 
   if (user.aiCredits <= 0) {
     throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'AI generation limit reached. Please upgrade your plan.');
+  }
+
+  const allowedPlatforms = await getUserAllowedPlatforms(user);
+  const forbiddenPlatform = selectedPlatforms.map(p => p.toUpperCase()).find(p => !allowedPlatforms.includes(p));
+  if (forbiddenPlatform) {
+    throw ApiError.forbidden(`Platform "${forbiddenPlatform}" is not allowed on your current "${user.plan || 'FREE'}" plan. Upgrade your subscription to unlock it.`);
+  }
+
+  // 2. Fetch the source article (if any) before spending a credit, so an unreadable
+  //    URL fails fast instead of producing a hallucinated summary.
+  let articleContext = null;
+  if (articleUrl) {
+    try {
+      articleContext = await fetchArticleContext(articleUrl);
+      logger.info(`[PostController] Article context resolved for "${articleUrl}" (${articleContext.text.length} chars).`);
+    } catch (fetchErr) {
+      if (!inputTopic) {
+        throw ApiError.badRequest(
+          `Could not read the article at "${articleUrl}": ${fetchErr.message} Add a prompt or topic to generate without it.`
+        );
+      }
+      logger.warn(`[PostController] Article fetch failed, continuing with prompt only: ${fetchErr.message}`);
+      articleContext = { url: articleUrl, error: fetchErr.message, code: fetchErr.code };
+    }
   }
 
   let aiResult = null;
@@ -63,6 +111,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
       formatStyle,
       contentLength,
       articleUrl,
+      articleContext,
     });
   } else {
     aiResult = await generatePostContent({
@@ -76,6 +125,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
       formatStyle,
       contentLength,
       articleUrl,
+      articleContext,
     });
   }
 
@@ -140,13 +190,18 @@ export const createPost = catchAsync(async (req, res) => {
 
   // Normalize target platforms
   const formattedPlatforms = targetPlatforms.map((p) => p.toUpperCase());
-  const invalidPlatform = formattedPlatforms.find((p) => !['INSTAGRAM', 'LINKEDIN', 'X'].includes(p));
+  const invalidPlatform = formattedPlatforms.find((platform) => !Object.values(SOCIAL_PLATFORM).includes(platform));
   if (invalidPlatform) {
-    throw ApiError.badRequest(`Invalid platform "${invalidPlatform}". Must be INSTAGRAM, LINKEDIN, or X.`);
+    throw ApiError.badRequest(`Invalid platform "${invalidPlatform}". Must be one of: ${Object.values(SOCIAL_PLATFORM).join(', ')}.`);
   }
 
-  // Ensure user profile exists
-  await UserService.ensureUserExists(userId);
+  // Ensure user profile exists & validate plan permissions against Postman/API bypass
+  const user = await UserService.ensureUserExists(userId);
+  const allowedPlatforms = await getUserAllowedPlatforms(user);
+  const forbiddenPlatform = formattedPlatforms.find((p) => !allowedPlatforms.includes(p));
+  if (forbiddenPlatform) {
+    throw ApiError.forbidden(`Platform "${forbiddenPlatform}" is not allowed on your current "${user.plan || 'FREE'}" plan. Upgrade your subscription to unlock it.`);
+  }
 
   let initialStatus = POST_STATUS.DRAFT;
   let parseScheduledDate = null;
@@ -312,31 +367,25 @@ export const retryFailedPost = catchAsync(async (req, res) => {
     throw ApiError.notFound(`Post with ID "${id}" not found.`);
   }
 
-  logger.info(`[PostController] Retrying failed post execution for Post ID: ${id}`);
+  logger.info(`[PostController] Retrying post execution for Post ID: ${id}`);
 
   // Clean up previous failed logs
   await prisma.socialPostLog.deleteMany({
     where: { postId: id, status: 'FAILED' },
   });
 
-  // Reset post status to DRAFT
+  // Reset post status to DRAFT so atomic lock allows re-publishing
   await PostService.updatePostStatus(id, POST_STATUS.DRAFT);
 
-  // Enqueue job into BullMQ for immediate re-publishing
-  const queueResult = await enqueuePostJob({ postId: id, publishNow: true });
-
-  // Execute worker directly to guarantee immediate publishing
   let executionResult = null;
   try {
     executionResult = await processPostPublishing(id);
   } catch (err) {
-    logger.warn(`[PostController] Direct worker execution warning during retry: ${err.message}`);
+    logger.error(`[PostController] Direct worker execution error during retry: ${err.message}`);
+    throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, `Retry publishing failed: ${err.message}`);
   }
 
-  const updatedPost = await PostService.findPostById(id);
-
   return successResponse(res, HttpStatus.OK, 'Post retry executed successfully.', {
-    post: executionResult || updatedPost,
-    jobId: queueResult.jobId,
+    post: executionResult || post,
   });
 });

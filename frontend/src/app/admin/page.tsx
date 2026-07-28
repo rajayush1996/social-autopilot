@@ -42,22 +42,29 @@ export default function AdminPage() {
   const [reports, setReports] = useState<DispatcherReport[]>([]);
   const [updatingFeature, setUpdatingFeature] = useState<string | null>(null);
 
-  // Super Admin AI Credit Granting State
-  const [targetUniqueId, setTargetUniqueId] = useState('');
-  const [freeCreditValue, setFreeCreditValue] = useState<number>(100);
-  const [grantingCredits, setGrantingCredits] = useState(false);
+  // Super Admin Plan Feature Matrix State
+  const [planMatrix, setPlanMatrix] = useState<Record<string, { allowedPlatforms: string[]; maxAiCredits?: number }>>({
+    FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN'], maxAiCredits: 15 },
+    PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X'], maxAiCredits: 500 },
+    ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X'], maxAiCredits: 9999 },
+  });
+  const [savingMatrix, setSavingMatrix] = useState(false);
 
   const toast = useToast();
 
   const fetchAdminData = async () => {
     try {
-      const [profile, list, statusRes] = await Promise.all([
+      const [profile, list, statusRes, matrixRes] = await Promise.all([
         ApiService.getMe(),
         ApiService.getFeatures(),
         ApiService.getDispatcherStatus(),
+        ApiService.getPlanFeatures(),
       ]);
       setFeatures(list);
       setDispatcherEnabled(statusRes.dispatcherEnabled);
+      if (matrixRes) {
+        setPlanMatrix(matrixRes);
+      }
       const roleUpper = profile.role?.toUpperCase();
       setIsAuthorized(roleUpper === 'SUPER_ADMIN' || roleUpper === 'ADMIN');
     } catch (err: any) {
@@ -115,6 +122,42 @@ export default function AdminPage() {
       toast.error(err.response?.data?.message || 'Failed to trigger dispatcher cycle.');
     } finally {
       setRunningDispatcher(false);
+    }
+  };
+
+  // Super Admin AI Credit Granting State
+  const [targetUniqueId, setTargetUniqueId] = useState('');
+  const [freeCreditValue, setFreeCreditValue] = useState<number>(100);
+  const [grantingCredits, setGrantingCredits] = useState(false);
+
+  const handleTogglePlatformInPlan = (plan: string, platform: string) => {
+    setPlanMatrix((prev) => {
+      const currentAllowed = prev[plan]?.allowedPlatforms || [];
+      const exists = currentAllowed.includes(platform);
+      const nextAllowed = exists
+        ? currentAllowed.filter((p) => p !== platform)
+        : [...currentAllowed, platform];
+
+      return {
+        ...prev,
+        [plan]: {
+          ...(prev[plan] || {}),
+          allowedPlatforms: nextAllowed,
+        },
+      };
+    });
+  };
+
+  const handleSavePlanMatrix = async () => {
+    setSavingMatrix(true);
+    try {
+      await ApiService.setPlanFeatures(planMatrix);
+      toast.success('Plan Feature Access Matrix saved! Features will show/hide for users dynamically.');
+    } catch (err: any) {
+      console.error('Failed to save plan matrix:', err);
+      toast.error(err.response?.data?.message || 'Failed to update plan feature matrix.');
+    } finally {
+      setSavingMatrix(false);
     }
   };
 
@@ -233,6 +276,76 @@ export default function AdminPage() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Plan Feature Access Matrix Setup Card */}
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-850">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-indigo-600/30 border border-indigo-500/40 rounded-xl text-indigo-300">
+              <Building className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-100">Subscription Plan Feature Access Matrix</h2>
+              <p className="text-xs text-slate-400">Configure which social channels are enabled or hidden for Free, Pro, and Enterprise creator plans.</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSavePlanMatrix}
+            disabled={savingMatrix}
+            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-xs font-black transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {savingMatrix ? 'Saving Matrix...' : 'Save Plan Matrix'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+          {(['FREE', 'PRO', 'ENTERPRISE'] as const).map((plan) => {
+            const allowed = planMatrix[plan]?.allowedPlatforms || [];
+
+            return (
+              <div key={plan} className="bg-slate-955 border border-slate-850 rounded-2xl p-5 space-y-4 shadow-inner">
+                <div className="flex items-center justify-between border-b border-slate-850 pb-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-200">{plan} PLAN</span>
+                  <span className="text-[10px] text-indigo-400 font-bold font-mono">
+                    {allowed.length} Channels Allowed
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Allowed Social Channels</label>
+                  <div className="flex flex-col gap-2">
+                    {(['INSTAGRAM', 'FACEBOOK', 'LINKEDIN', 'X'] as const).map((plt) => {
+                      const isEnabled = allowed.includes(plt);
+
+                      return (
+                        <button
+                          key={plt}
+                          type="button"
+                          onClick={() => handleTogglePlatformInPlan(plan, plt)}
+                          className={`w-full py-2.5 px-3 rounded-xl border text-xs font-extrabold transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                            isEnabled
+                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                              : 'bg-slate-900 text-slate-500 border-slate-800 hover:border-slate-750'
+                          }`}
+                        >
+                          <span>{plt}</span>
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            isEnabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'
+                          }`}>
+                            {isEnabled ? 'ENABLED' : 'HIDDEN'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Master Scheduling Dispatcher Banner */}

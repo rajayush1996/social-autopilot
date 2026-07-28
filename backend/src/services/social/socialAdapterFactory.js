@@ -1,6 +1,7 @@
 import InstagramAdapter from './instagramService.js';
 import LinkedinAdapter from './linkedinService.js';
 import XAdapter from './xService.js';
+import FacebookAdapter from './facebookService.js';
 
 /**
  * SocialAdapterFactory (Creational Design Pattern)
@@ -10,7 +11,7 @@ export class SocialAdapterFactory {
   /**
    * Get the social adapter strategy instance for the target platform.
    * 
-   * @param {String} platform - Target platform (e.g. INSTAGRAM, LINKEDIN, X, TWITTER)
+   * @param {String} platform - Target platform (e.g. INSTAGRAM, LINKEDIN, X, TWITTER, FACEBOOK)
    * @returns {SocialAdapter} The platform strategy adapter
    */
   static getAdapter(platform) {
@@ -30,6 +31,9 @@ export class SocialAdapterFactory {
       case 'X':
       case 'TWITTER':
         return XAdapter; // Using singleton default export
+
+      case 'FACEBOOK':
+        return new FacebookAdapter();
 
       default:
         throw new Error(`Unsupported platform adapter strategy: "${platformUpper}"`);

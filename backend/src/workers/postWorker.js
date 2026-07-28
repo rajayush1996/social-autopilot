@@ -147,7 +147,7 @@ export async function processPostPublishing(postId) {
     where: { id: post.id },
     data: {
       status: finalStatus,
-      publishedAt: new Date(),
+      publishedAt: successCount > 0 ? new Date() : null,
     },
   });
 

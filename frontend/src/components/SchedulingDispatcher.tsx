@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   AlarmClock, 
   Calendar, 
@@ -19,11 +20,25 @@ import {
   ChevronRight,
   X,
   Zap,
-  Info
+  Info,
+  Upload,
+  FileText,
+  Send,
+  ListFilter
 } from 'lucide-react';
 import ApiService, { AutomationSchedule } from '@/services/apiService';
+import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { formatDateTime } from '@/utils/date';
+import LiquidUploadButton from '@/components/LiquidUploadButton';
+
+export interface MediaAssetItem {
+  id: string;
+  url: string;
+  type: 'IMAGE' | 'VIDEO';
+  assignedDay: string; // 'ANY', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'
+  assignedPlatform: string; // 'ALL', 'LINKEDIN', 'FACEBOOK', 'INSTAGRAM', 'X'
+}
 
 const DAYS_OF_WEEK = [
   { key: 'MON', label: 'M', full: 'Monday' },
@@ -37,8 +52,9 @@ const DAYS_OF_WEEK = [
 
 const PLATFORMS = [
   { id: 'LINKEDIN', label: 'LinkedIn', color: 'bg-blue-600/20 text-blue-400 border-blue-500/30' },
-  { id: 'X', label: 'X (Twitter)', color: 'bg-slate-700/30 text-slate-300 border-slate-600/40' },
+  { id: 'FACEBOOK', label: 'Facebook Page', color: 'bg-blue-600/20 text-blue-400 border-blue-500/30' },
   { id: 'INSTAGRAM', label: 'Instagram', color: 'bg-pink-600/20 text-pink-400 border-pink-500/30' },
+  { id: 'X', label: 'X (Twitter)', color: 'bg-slate-700/30 text-slate-300 border-slate-600/40' },
 ];
 
 const TONES = [
@@ -65,12 +81,129 @@ export function SchedulingDispatcher() {
   const [formTime, setFormTime] = useState<string>('09:00');
   const [formDays, setFormDays] = useState<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI']);
   const [formRepeat, setFormRepeat] = useState<string>('WEEKLY');
-  const [formPlatforms, setFormPlatforms] = useState<('INSTAGRAM' | 'LINKEDIN' | 'X')[]>(['LINKEDIN', 'X']);
+  const [formPlatforms, setFormPlatforms] = useState<('INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK')[]>(['LINKEDIN', 'X', 'FACEBOOK']);
   const [formTone, setFormTone] = useState<string>('ENGAGING');
   const [formTopic, setFormTopic] = useState<string>('');
+  const [formEmojiDensity, setFormEmojiDensity] = useState<string>('MEDIUM');
+  const [formHashtagCount, setFormHashtagCount] = useState<string>('MODERATE');
+  const [formFormatStyle, setFormFormatStyle] = useState<string>('SINGLE');
+  const [formContentLength, setFormContentLength] = useState<string>('BALANCED');
+  const [mediaFileUrl, setMediaFileUrl] = useState<string>('');
+  const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO' | null>(null);
+  const [mediaAssets, setMediaAssets] = useState<MediaAssetItem[]>([]);
   const [saving, setSaving] = useState<boolean>(false);
+  const [sampleDrafts, setSampleDrafts] = useState<Record<string, string> | null>(null);
+  const [generatingSample, setGeneratingSample] = useState<boolean>(false);
 
   const toast = useToast();
+
+  const handlePreviewSampleAi = async () => {
+    if (formPlatforms.length === 0) {
+      toast.error('Please select at least one target platform.');
+      return;
+    }
+
+    setGeneratingSample(true);
+    try {
+      const res: any = await ApiService.generateAiContent(
+        formTopic || 'Daily business growth updates & AI productivity workflows',
+        formTone,
+        formPlatforms,
+        {
+          emojiDensity: formEmojiDensity,
+          hashtagCount: formHashtagCount,
+          formatStyle: formFormatStyle,
+          contentLength: formContentLength,
+        }
+      );
+      if (res) {
+        const draftMap = res.adaptedPosts || res;
+        setSampleDrafts({
+          INSTAGRAM: draftMap.INSTAGRAM || res.INSTAGRAM || res.content || '',
+          LINKEDIN: draftMap.LINKEDIN || res.LINKEDIN || res.content || '',
+          X: draftMap.X || res.X || res.content || '',
+          FACEBOOK: draftMap.FACEBOOK || res.FACEBOOK || res.content || '',
+        });
+        toast.success('Generated live sample AI post preview!');
+      }
+    } catch (err: any) {
+      console.error('Failed to generate sample preview:', err);
+      toast.error('Could not generate sample preview.');
+    } finally {
+      setGeneratingSample(false);
+    }
+  };
+
+  // Posts Queue & Manager State
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsFilter, setPostsFilter] = useState<'ALL' | 'SCHEDULED' | 'DRAFT' | 'PUBLISHED'>('ALL');
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingPostContent, setEditingPostContent] = useState<string>('');
+  const [updatingPostId, setUpdatingPostId] = useState<string | null>(null);
+
+  const fetchPostsData = async () => {
+    try {
+      const res = await ApiService.getPosts();
+      setPosts(res || []);
+    } catch (err: any) {
+      console.error('Failed to load posts queue:', err);
+    }
+  };
+
+  const handleTogglePostStatus = async (post: Post, newStatus: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED') => {
+    setUpdatingPostId(post.id);
+    try {
+      await ApiService.updatePost(post.id, { status: newStatus as any });
+      toast.success(`Post status changed to ${newStatus}`);
+      await fetchPostsData();
+    } catch (err: any) {
+      console.error('Failed to update post status:', err);
+      toast.error('Could not update post status.');
+    } finally {
+      setUpdatingPostId(null);
+    }
+  };
+
+  const handleSavePostContent = async (postId: string) => {
+    setUpdatingPostId(postId);
+    try {
+      await ApiService.updatePost(postId, { content: editingPostContent });
+      toast.success('Post content saved!');
+      setEditingPostId(null);
+      await fetchPostsData();
+    } catch (err: any) {
+      console.error('Failed to save post content:', err);
+      toast.error('Could not save post content.');
+    } finally {
+      setUpdatingPostId(null);
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Are you sure you want to delete this post from the queue?')) return;
+    try {
+      await ApiService.deletePost(postId);
+      toast.success('Post removed from queue.');
+      await fetchPostsData();
+    } catch (err: any) {
+      console.error('Failed to delete post:', err);
+      toast.error('Failed to delete post.');
+    }
+  };
+
+  const handlePublishPostNow = async (postId: string) => {
+    setUpdatingPostId(postId);
+    try {
+      await ApiService.publishPost(postId);
+      toast.success('Post published successfully to social channels!');
+      await fetchPostsData();
+    } catch (err: any) {
+      console.error('Failed to publish post:', err);
+      toast.error('Failed to publish post.');
+    } finally {
+      setUpdatingPostId(null);
+    }
+  };
 
   const fetchSchedulesData = async () => {
     try {
@@ -85,8 +218,27 @@ export function SchedulingDispatcher() {
     }
   };
 
+  const [portalMounted, setPortalMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setPortalMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsModalOpen(false);
+      }
+    };
+    if (isModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen]);
+
   useEffect(() => {
     fetchSchedulesData();
+    fetchPostsData();
   }, []);
 
   const handleOpenAddModal = () => {
@@ -95,9 +247,15 @@ export function SchedulingDispatcher() {
     setFormTime('09:00');
     setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI']);
     setFormRepeat('WEEKLY');
-    setFormPlatforms(['LINKEDIN', 'X']);
+    setFormPlatforms(['LINKEDIN', 'X', 'FACEBOOK', 'INSTAGRAM']);
     setFormTone('ENGAGING');
     setFormTopic('');
+    setFormEmojiDensity('MEDIUM');
+    setFormHashtagCount('MODERATE');
+    setFormFormatStyle('SINGLE');
+    setFormContentLength('BALANCED');
+    setMediaFileUrl('');
+    setMediaType(null);
     setIsModalOpen(true);
   };
 
@@ -107,9 +265,15 @@ export function SchedulingDispatcher() {
     setFormTime(sched.timeOfDay || '09:00');
     setFormDays(sched.daysOfWeek || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
     setFormRepeat(sched.repeatType || 'WEEKLY');
-    setFormPlatforms(sched.targetPlatforms || ['LINKEDIN', 'X']);
+    setFormPlatforms((sched.targetPlatforms as ('INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK')[]) || ['LINKEDIN', 'X', 'FACEBOOK', 'INSTAGRAM']);
     setFormTone(sched.tone || 'ENGAGING');
     setFormTopic(sched.topicPrompt || '');
+    setFormEmojiDensity('MEDIUM');
+    setFormHashtagCount('MODERATE');
+    setFormFormatStyle('SINGLE');
+    setFormContentLength('BALANCED');
+    setMediaFileUrl('');
+    setMediaType(null);
     setIsModalOpen(true);
   };
 
@@ -125,7 +289,7 @@ export function SchedulingDispatcher() {
     }
   };
 
-  const handleTogglePlatform = (platId: 'INSTAGRAM' | 'LINKEDIN' | 'X') => {
+  const handleTogglePlatform = (platId: 'INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK') => {
     if (formPlatforms.includes(platId)) {
       if (formPlatforms.length === 1) {
         toast.error('Select at least one target platform.');
@@ -168,8 +332,8 @@ export function SchedulingDispatcher() {
 
       if (editingSchedule) {
         const updated = await ApiService.updateSchedule(editingSchedule.id, payload);
-        setSchedules(prev => prev.map(s => s.id === editingSchedule.id ? updated : s));
-        toast.success('Schedule updated successfully!');
+        setSchedules(prev => prev.map(s => s.id === editingSchedule.id ? { ...updated, lastRunAt: undefined } : s));
+        toast.success('Schedule updated successfully! Ready for test run.');
       } else {
         const created = await ApiService.createSchedule(payload);
         setSchedules(prev => [created, ...prev]);
@@ -199,8 +363,9 @@ export function SchedulingDispatcher() {
   const handleRunNow = async (sched: AutomationSchedule) => {
     setRunningId(sched.id);
     try {
-      const result = await ApiService.runScheduleNow(sched.id);
-      toast.success(`Dispatched schedule "${sched.name}"! Post queued.`);
+      await ApiService.runScheduleNow(sched.id);
+      setSchedules(prev => prev.map(s => s.id === sched.id ? { ...s, lastRunAt: new Date().toISOString() } : s));
+      toast.success(`Dispatched schedule "${sched.name}"! Post queued in Posts page.`);
       fetchSchedulesData();
     } catch (err: any) {
       console.error('Failed to trigger schedule:', err);
@@ -236,9 +401,9 @@ export function SchedulingDispatcher() {
         <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto">
           <Info className="h-6 w-6" />
         </div>
-        <h3 className="text-lg font-bold text-slate-100">Scheduling Dispatcher Disabled</h3>
+        <h3 className="text-lg font-bold text-slate-100">Auto-Pilot Schedule Disabled</h3>
         <p className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
-          The Full Automation Scheduling Dispatcher feature is currently turned OFF by system administration. Please contact your admin or check the Admin Control Center to enable master dispatching.
+          The Recurring Auto-Pilot feature is currently turned OFF by system administration. Please contact your admin or check the Admin Control Center to enable master dispatching.
         </p>
       </div>
     );
@@ -246,29 +411,20 @@ export function SchedulingDispatcher() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-indigo-400">
-              <AlarmClock className="h-5 w-5" />
-            </div>
-            <h2 className="text-xl font-black text-slate-100">Scheduling Dispatcher</h2>
-            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              System Enabled
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 pl-1">
-            Configure automated recurring post schedules with custom days, times, and AI tone presets.
-          </p>
+      {/* Top Action Toolbar */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">
+            Active Automation Rules ({schedules.length})
+          </span>
         </div>
 
         <button
           onClick={handleOpenAddModal}
-          className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-2xl shadow-lg shadow-indigo-950/40 transition-all hover:scale-105 active:scale-95 shrink-0"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
         >
           <Plus className="h-4 w-4" />
-          Add Schedule
+          <span>Add Schedule</span>
         </button>
       </div>
 
@@ -279,20 +435,20 @@ export function SchedulingDispatcher() {
             <AlarmClock className="h-7 w-7" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-slate-200">No Recurring Schedules Found</h3>
+            <h3 className="text-sm font-bold text-slate-200">No Auto-Pilot Schedules Created</h3>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
               Create your first schedule to automatically generate and queue AI social media posts on selected days.
             </p>
           </div>
           <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
           >
-            Create Schedule
+            + Create Auto-Pilot Schedule
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-3">
           {schedules.map((sched) => {
             const isToggling = togglingId === sched.id;
             const isRunning = runningId === sched.id;
@@ -300,334 +456,621 @@ export function SchedulingDispatcher() {
             return (
               <div
                 key={sched.id}
-                className={`group relative bg-slate-900/50 border rounded-3xl p-6 backdrop-blur-md transition-all duration-300 hover:border-slate-750 ${
+                className={`group bg-slate-900/70 border rounded-2xl p-4 backdrop-blur-md transition-all duration-300 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:border-indigo-500/40 shadow-lg ${
                   sched.isActive
-                    ? 'border-indigo-500/30 shadow-lg shadow-indigo-950/20'
-                    : 'border-slate-800/80 opacity-70 hover:opacity-100'
+                    ? 'border-indigo-500/30 shadow-indigo-955/20'
+                    : 'border-slate-800 opacity-75 hover:opacity-100'
                 }`}
               >
-                {/* Top Row: Title & Active Toggle */}
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="space-y-1">
+                {/* Left Column: Schedule Name & Topic */}
+                <div className="flex items-center gap-3.5 min-w-[240px]">
+                  <div className={`p-2.5 rounded-xl border shrink-0 ${
+                    sched.isActive ? 'bg-indigo-600/20 border-indigo-500/30 text-indigo-400' : 'bg-slate-800 text-slate-500 border-slate-700'
+                  }`}>
+                    <AlarmClock className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-base text-slate-100 group-hover:text-indigo-300 transition-colors">
+                      <h3 className="font-bold text-sm text-slate-100 group-hover:text-indigo-300 transition-colors">
                         {sched.name}
                       </h3>
-                      <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                      <span className={`text-[9px] font-extrabold uppercase px-2 py-0.2 rounded-full border ${
                         sched.isActive
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                       }`}>
-                        {sched.isActive ? 'Active' : 'Paused'}
+                        {sched.isActive ? '🚀 Active' : '📝 Paused'}
                       </span>
                     </div>
-                    {sched.topicPrompt && (
-                      <p className="text-[11px] text-slate-400 line-clamp-1 italic">
+                    {sched.topicPrompt ? (
+                      <p className="text-[11px] text-slate-400 line-clamp-1 italic max-w-xs">
                         "{sched.topicPrompt}"
                       </p>
+                    ) : (
+                      <p className="text-[10px] text-slate-400 font-mono">No specific topic prompt</p>
                     )}
                   </div>
+                </div>
 
-                  {/* Quick Toggle Switch */}
+                {/* Center-Left Column: Dispatch Time */}
+                <div className="flex items-center gap-2 bg-slate-955 border border-slate-800 px-3 py-1.5 rounded-xl shrink-0">
+                  <Clock className="h-3.5 w-3.5 text-indigo-400" />
+                  <span className="font-mono text-xs font-black text-slate-200">
+                    {formatTimeDisplay(sched.timeOfDay)}
+                  </span>
+                  <span className="text-[9px] text-slate-400 uppercase font-bold px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800">
+                    {sched.repeatType || 'WEEKLY'}
+                  </span>
+                </div>
+
+                {/* Center Column: Dispatch Days Pills */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {DAYS_OF_WEEK.map((d) => {
+                    const isActiveDay = sched.daysOfWeek?.includes(d.key);
+                    return (
+                      <span
+                        key={d.key}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
+                          isActiveDay
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-955 text-slate-400 border border-slate-850'
+                        }`}
+                        title={d.full}
+                      >
+                        {d.label}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* Center-Right Column: Target Platforms */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {sched.targetPlatforms?.map((p) => (
+                    <span
+                      key={p}
+                      className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-slate-955 text-slate-300 border border-slate-800"
+                    >
+                      {p}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Last Execution Status Badge */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {sched.lastRunAt ? (
+                    <a
+                      href="/posts"
+                      className="text-[10px] font-extrabold px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 hover:bg-emerald-500/20 transition-all cursor-pointer"
+                      title="Click to view queued post on Posts page"
+                    >
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      <span>Dispatched ({formatDateTime(sched.lastRunAt)})</span>
+                    </a>
+                  ) : (
+                    <span className="text-[10px] font-bold text-slate-400 px-2.5 py-1 rounded-xl bg-slate-955 border border-slate-800">
+                      Ready for Dispatch
+                    </span>
+                  )}
+                </div>
+
+                {/* Right Column: Actions & Toggle */}
+                <div className="flex items-center gap-2 shrink-0 border-t lg:border-t-0 border-slate-800 pt-2 lg:pt-0">
                   <button
                     onClick={() => handleToggleActiveSwitch(sched)}
                     disabled={isToggling}
                     title={sched.isActive ? 'Pause Schedule' : 'Activate Schedule'}
-                    className="focus:outline-none transition-transform active:scale-95 text-indigo-400 disabled:opacity-50"
+                    className="focus:outline-none transition-transform active:scale-95 text-indigo-400 disabled:opacity-50 cursor-pointer mr-1"
                   >
                     {sched.isActive ? (
-                      <ToggleRight className="h-9 w-9 text-indigo-500" />
+                      <ToggleRight className="h-7 w-7 text-indigo-500" />
                     ) : (
-                      <ToggleLeft className="h-9 w-9 text-slate-600" />
+                      <ToggleLeft className="h-7 w-7 text-slate-600" />
                     )}
                   </button>
-                </div>
 
-                {/* Digital Clock Display */}
-                <div className="bg-slate-955/90 border border-slate-850 rounded-2xl p-4 my-3 flex items-center justify-between">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-mono text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300">
-                      {formatTimeDisplay(sched.timeOfDay)}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                      {sched.repeatType} REPEAT
-                    </span>
-                  </div>
-
-                  <div className="p-2 bg-indigo-950/40 rounded-xl border border-indigo-850/60 text-indigo-400">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                </div>
-
-                {/* Day of Week Selector Badges */}
-                <div className="my-4 space-y-1.5">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Active Dispatch Days</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {DAYS_OF_WEEK.map((d) => {
-                      const isActiveDay = sched.daysOfWeek?.includes(d.key);
-                      return (
-                        <div
-                          key={d.key}
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
-                            isActiveDay
-                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/30'
-                              : 'bg-slate-800/40 text-slate-600 border border-slate-800'
-                          }`}
-                          title={d.full}
-                        >
-                          {d.label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Target Platforms & Tone Presets */}
-                <div className="flex items-center justify-between border-t border-slate-800/60 pt-4 mt-4">
-                  <div className="flex items-center gap-1.5">
-                    {sched.targetPlatforms?.map((p) => {
-                      const found = PLATFORMS.find(plat => plat.id === p);
-                      return (
-                        <span
-                          key={p}
-                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-lg border ${
-                            found ? found.color : 'bg-slate-800 text-slate-300 border-slate-700'
-                          }`}
-                        >
-                          {p}
-                        </span>
-                      );
-                    })}
-                  </div>
-
-                  {/* Actions: Run Now, Edit, Delete */}
-                  <div className="flex items-center gap-2">
+                  {/* Run button - Hidden once published/dispatched until edited */}
+                  {!sched.lastRunAt && (
                     <button
                       onClick={() => handleRunNow(sched)}
                       disabled={isRunning}
-                      title="Test Run Schedule Dispatcher Now"
-                      className="p-2 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50"
+                      title="Run Schedule Dispatcher Now"
+                      className="px-2.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer animate-fadeIn"
                     >
                       {isRunning ? (
                         <span className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <Play className="h-3.5 w-3.5" />
                       )}
+                      <span className="hidden sm:inline text-[11px]">Run</span>
                     </button>
+                  )}
 
-                    <button
-                      onClick={() => handleOpenEditModal(sched)}
-                      title="Edit Schedule Settings"
-                      className="p-2 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 rounded-xl text-xs transition-all"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                    </button>
+                  <button
+                    onClick={() => handleOpenEditModal(sched)}
+                    title="Edit Schedule Settings"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 rounded-xl text-xs transition-all cursor-pointer"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </button>
 
-                    <button
-                      onClick={() => handleDeleteSchedule(sched.id, sched.name)}
-                      title="Delete Schedule"
-                      className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs transition-all"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleDeleteSchedule(sched.id, sched.name)}
+                    title="Delete Schedule"
+                    className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs transition-all cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-
-                {/* Footer status line */}
-                {sched.lastRunAt && (
-                  <div className="mt-3 pt-2 border-t border-slate-850 flex items-center justify-between text-[10px] text-slate-400">
-                    <span>Last run: {formatDateTime(sched.lastRunAt)} UTC</span>
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* CREATE / EDIT SCHEDULE MODAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-955/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
+      {/* CREATE / EDIT SCHEDULE MODAL (PORTAL TO DOCUMENT.BODY) */}
+      {isModalOpen && portalMounted && createPortal(
+        <div className="fixed inset-0 z-[999999] bg-slate-955/85 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn pointer-events-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-[96vw] xl:max-w-[1550px] w-full p-6 sm:p-8 md:p-10 shadow-2xl space-y-6 relative my-auto border-indigo-500/20 max-h-[94vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-indigo-400">
-                  <AlarmClock className="h-5 w-5" />
+            <div className="flex items-center justify-between border-b border-slate-850 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl text-indigo-400">
+                  <AlarmClock className="h-6 w-6" />
                 </div>
-                <h3 className="font-bold text-lg text-slate-100">
-                  {editingSchedule ? 'Edit Automation Schedule' : 'New Automation Schedule'}
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition-all"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveSchedule} className="space-y-5">
-              {/* Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Schedule Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder="e.g. Morning Growth Pulse"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all"
-                />
-              </div>
-
-              {/* Time of Day */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                    Execution Time (HH:MM)
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={formTime}
-                    onChange={(e) => setFormTime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                    Repeat Cycle
-                  </label>
-                  <select
-                    value={formRepeat}
-                    onChange={(e) => setFormRepeat(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all"
-                  >
-                    <option value="WEEKLY" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Weekly Recurring</option>
-                    <option value="DAILY" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Daily (All 7 Days)</option>
-                    <option value="WEEKDAYS" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Weekdays Only (Mon-Fri)</option>
-                  </select>
+                <div>
+                  <h3 className="font-extrabold text-lg text-slate-100">
+                    {editingSchedule ? 'Edit Auto-Pilot Schedule' : 'New Auto-Pilot Schedule Studio'}
+                  </h3>
+                  <p className="text-xs text-slate-400">Configure recurring days, dispatch times, target channels, and live AI feed previews</p>
                 </div>
               </div>
 
-              {/* Day Selector Pills */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Custom Dispatch Days
-                </label>
-                <div className="grid grid-cols-7 gap-2">
-                  {DAYS_OF_WEEK.map((d) => {
-                    const isSelected = formDays.includes(d.key);
-                    return (
-                      <button
-                        type="button"
-                        key={d.key}
-                        onClick={() => handleToggleDay(d.key)}
-                        className={`py-2.5 rounded-xl font-bold text-xs transition-all ${
-                          isSelected
-                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/40 border border-indigo-400'
-                            : 'bg-slate-950 text-slate-500 border border-slate-800 hover:text-slate-300'
-                        }`}
-                      >
-                        {d.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Target Platforms */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                  Target Social Platforms
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {PLATFORMS.map((p) => {
-                    const isSelected = formPlatforms.includes(p.id as any);
-                    return (
-                      <button
-                        type="button"
-                        key={p.id}
-                        onClick={() => handleTogglePlatform(p.id as any)}
-                        className={`py-2 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border ${
-                          isSelected
-                            ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500 shadow-md'
-                            : 'bg-slate-955 text-slate-500 border border-slate-800'
-                        }`}
-                      >
-                        {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* AI Tone & Prompt */}
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                    AI Writing Tone
-                  </label>
-                  <select
-                    value={formTone}
-                    onChange={(e) => setFormTone(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all"
-                  >
-                    {TONES.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                    Custom Topic / Brand Instructions (Optional)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={formTopic}
-                    onChange={(e) => setFormTopic(e.target.value)}
-                    placeholder="e.g. Focus on AI software updates, SaaS tips, and startup growth strategy."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all resize-none"
-                  />
-                </div>
-              </div>
-
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-xl text-xs font-semibold transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
+                  onClick={handleSaveSchedule}
                   disabled={saving}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
                   {saving ? (
                     <>
                       <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
+                      Saving Schedule...
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="h-4 w-4" />
-                      {editingSchedule ? 'Save Changes' : 'Create Schedule'}
+                      {editingSchedule ? 'Save Schedule' : 'Create Auto-Pilot'}
                     </>
                   )}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2.5 bg-slate-800/80 hover:bg-slate-750 text-slate-400 hover:text-white rounded-2xl transition-all border border-slate-700 cursor-pointer"
+                  title="Close modal"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </form>
+            </div>
+
+            {/* ULTRA-WIDE 2-COLUMN STUDIO GRID */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-10 items-start overflow-y-auto pr-1.5 custom-scrollbar shrink">
+              {/* LEFT COLUMN: Clean Controls (5 cols) */}
+              <div className="lg:col-span-5 space-y-5">
+                {/* Schedule Title */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                    Schedule Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="e.g. Daily Growth Autopilot"
+                    className="w-full bg-slate-955 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-semibold"
+                  />
+                </div>
+
+                {/* Timing & Repeat Mode */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Execution Time (HH:MM)
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={formTime}
+                      onChange={(e) => setFormTime(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Schedule Mode
+                    </label>
+                    <select
+                      value={formRepeat}
+                      onChange={(e) => setFormRepeat(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="WEEKLY" className="bg-slate-900 text-slate-100">Repeat Weekly (Recurring)</option>
+                      <option value="ONCE" className="bg-slate-900 text-slate-100">Run Once (Single Batch)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Dispatch Days with Quick Presets */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Dispatch Days
+                    </label>
+
+                    {/* Presets */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])}
+                        className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20 cursor-pointer"
+                      >
+                        All Days
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI'])}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-200 bg-slate-850 px-2 py-0.5 rounded-lg cursor-pointer"
+                      >
+                        Weekdays
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormDays(['SAT', 'SUN'])}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-200 bg-slate-850 px-2 py-0.5 rounded-lg cursor-pointer"
+                      >
+                        Weekends
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {DAYS_OF_WEEK.map((d) => {
+                      const isSelected = formDays.includes(d.key);
+                      return (
+                        <button
+                          type="button"
+                          key={d.key}
+                          onClick={() => handleToggleDay(d.key)}
+                          className={`py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/40 border border-indigo-400'
+                              : 'bg-slate-955 text-slate-500 border border-slate-850 hover:text-slate-300'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Target Channels */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                    Target Channels
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {PLATFORMS.map((p) => {
+                      const isSelected = formPlatforms.includes(p.id as any);
+                      return (
+                        <button
+                          type="button"
+                          key={p.id}
+                          onClick={() => handleTogglePlatform(p.id as any)}
+                          className={`py-2 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500 shadow-md'
+                              : 'bg-slate-955 text-slate-500 border border-slate-850 hover:border-slate-750'
+                          }`}
+                        >
+                          {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Multi-Media Asset Attachment Matrix */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider block flex items-center gap-1.5">
+                      <Upload className="h-3.5 w-3.5" />
+                      Multi-Media Asset Matrix ({mediaAssets.length} Uploaded)
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium">Map specific media to Days or Platforms</span>
+                  </div>
+
+                  <LiquidUploadButton
+                    multiMode={true}
+                    currentMediaUrl=""
+                    currentMediaType={null}
+                    onMediaSelect={(previewUrl, type) => {
+                      setMediaAssets((prev) => {
+                        if (prev.some((m) => m.url === previewUrl)) return prev;
+                        return [
+                          ...prev,
+                          {
+                            id: `media_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                            url: previewUrl,
+                            type: type || 'IMAGE',
+                            assignedDay: 'ANY',
+                            assignedPlatform: 'ALL',
+                          },
+                        ];
+                      });
+                    }}
+                    onUploadSuccess={(url, type) => {
+                      setMediaAssets((prev) => {
+                        // Upgrade temporary blob preview URL to final server URL or prevent duplicate
+                        const blobIndex = prev.findIndex((m) => m.url.startsWith('blob:'));
+                        if (blobIndex >= 0) {
+                          const updated = [...prev];
+                          updated[blobIndex] = { ...updated[blobIndex], url, type: type || 'IMAGE' };
+                          return updated;
+                        }
+                        if (prev.some((m) => m.url === url)) return prev;
+                        return [
+                          ...prev,
+                          {
+                            id: `media_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                            url: url,
+                            type: type || 'IMAGE',
+                            assignedDay: 'ANY',
+                            assignedPlatform: 'ALL',
+                          },
+                        ];
+                      });
+                    }}
+                    onRemove={() => {}}
+                  />
+
+                  {/* Multi-Media Mapping List */}
+                  {mediaAssets.length > 0 && (
+                    <div className="space-y-2 pt-2 animate-fadeIn max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                      {mediaAssets.map((asset) => (
+                        <div key={asset.id} className="bg-slate-955 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-md transition-all hover:border-slate-750">
+                          {/* Left: Thumbnail */}
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shrink-0 flex items-center justify-center">
+                            {asset.type === 'VIDEO' ? (
+                              <video src={asset.url} className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={asset.url} alt="Media thumbnail" className="w-full h-full object-cover" />
+                            )}
+                          </div>
+
+                          {/* Middle: 2 Clean, Distinct Dropdown Controls */}
+                          <div className="grid grid-cols-2 gap-2 flex-1 max-w-sm">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Day</span>
+                              <select
+                                value={asset.assignedDay}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setMediaAssets((prev) => prev.map((m) => m.id === asset.id ? { ...m, assignedDay: val } : m));
+                                }}
+                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                              >
+                                <option value="ANY" className="bg-slate-900 text-slate-100">Any Day (Default)</option>
+                                <option value="MON" className="bg-slate-900 text-slate-100">Monday</option>
+                                <option value="TUE" className="bg-slate-900 text-slate-100">Tuesday</option>
+                                <option value="WED" className="bg-slate-900 text-slate-100">Wednesday</option>
+                                <option value="THU" className="bg-slate-900 text-slate-100">Thursday</option>
+                                <option value="FRI" className="bg-slate-900 text-slate-100">Friday</option>
+                                <option value="SAT" className="bg-slate-900 text-slate-100">Saturday</option>
+                                <option value="SUN" className="bg-slate-900 text-slate-100">Sunday</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Platform</span>
+                              <select
+                                value={asset.assignedPlatform}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setMediaAssets((prev) => prev.map((m) => m.id === asset.id ? { ...m, assignedPlatform: val } : m));
+                                }}
+                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                              >
+                                <option value="ALL" className="bg-slate-900 text-slate-100">All Platforms</option>
+                                <option value="LINKEDIN" className="bg-slate-900 text-slate-100">LinkedIn Only</option>
+                                <option value="FACEBOOK" className="bg-slate-900 text-slate-100">Facebook Only</option>
+                                <option value="INSTAGRAM" className="bg-slate-900 text-slate-100">Instagram Only</option>
+                                <option value="X" className="bg-slate-900 text-slate-100">X (Twitter) Only</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Right: Close / Remove Cross Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMediaAssets((prev) => prev.filter((m) => m.id !== asset.id));
+                              toast.success('Media asset and assignment removed.');
+                            }}
+                            className="p-2 bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl border border-slate-800 hover:border-rose-500/30 transition-all shrink-0 cursor-pointer"
+                            title="Remove media and assigned options"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Topic Instructions */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                    Topic & Niche Instructions
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formTopic}
+                    onChange={(e) => setFormTopic(e.target.value)}
+                    placeholder="e.g. Share software growth tips, SaaS architecture insights, and productivity automation lessons."
+                    className="w-full bg-slate-955 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* PROMINENT GENERATE SAMPLE SEED BUTTON */}
+                <button
+                  type="button"
+                  onClick={handlePreviewSampleAi}
+                  disabled={generatingSample || formPlatforms.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white rounded-xl font-bold text-xs transition-all active:scale-95 disabled:opacity-50 shadow-md shadow-indigo-950/40 cursor-pointer"
+                >
+                  {generatingSample ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Generating AI Seed Previews...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 text-amber-300" />
+                      Generate Sample AI Post Preview
+                    </>
+                  )}
+                </button>
+
+                {/* Advanced Controls Accordion / Controls */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-855">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">AI Tone</label>
+                    <select
+                      value={formTone}
+                      onChange={(e) => setFormTone(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500"
+                    >
+                      {TONES.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Format Style</label>
+                    <select
+                      value={formFormatStyle}
+                      onChange={(e) => setFormFormatStyle(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="SINGLE" className="bg-slate-900 text-slate-100">Standard Post</option>
+                      <option value="THREAD" className="bg-slate-900 text-slate-100">Numbered Thread (1/ 2/)</option>
+                      <option value="CAROUSEL" className="bg-slate-900 text-slate-100">Carousel Outline</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: Live Social Feed Preview Cards (7 cols) */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                    Live Feed Mockup Previews
+                  </h4>
+                  <span className="text-[10px] text-indigo-300 font-extrabold px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30">
+                    {formPlatforms.length} Channels Active
+                  </span>
+                </div>
+
+                {!sampleDrafts ? (
+                  <div className="bg-slate-955/60 border border-slate-850 border-dashed rounded-3xl p-12 text-center space-y-3">
+                    <Zap className="h-10 w-10 text-indigo-400 mx-auto animate-bounce" />
+                    <h5 className="text-sm font-bold text-slate-200">No Sample AI Post Generated Yet</h5>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                      Click <strong className="text-indigo-300 font-semibold">"Generate Sample AI Post Preview"</strong> on the left to see realistic live mockups for LinkedIn, Facebook, Instagram, and X!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-h-[660px] overflow-y-auto pr-1.5 custom-scrollbar animate-fadeIn">
+                    {formPlatforms.map((plat) => {
+                      const text = sampleDrafts[plat] || '';
+                      // Find assigned media asset for this platform
+                      const matchedMedia = mediaAssets.find(m => m.assignedPlatform === plat) || mediaAssets[0];
+                      const activeMediaUrl = matchedMedia ? matchedMedia.url : mediaFileUrl;
+                      const activeMediaType = matchedMedia ? matchedMedia.type : mediaType;
+
+                      return (
+                        <div key={plat} className="bg-slate-955 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3 backdrop-blur-md flex flex-col justify-between">
+                          <div className="space-y-3">
+                            {/* Card Header */}
+                            <div className="flex items-center justify-between pb-2.5 border-b border-slate-850">
+                              <div className="flex items-center gap-2.5">
+                                <div className="h-8 w-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xs font-bold">
+                                  <Share2 className="h-4 w-4" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                                    Your Brand Profile
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 font-mono uppercase">{plat} Feed Mockup</p>
+                                </div>
+                              </div>
+
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                                {text.length} chars
+                              </span>
+                            </div>
+
+                            {/* Editable Post Body */}
+                            <textarea
+                              value={text}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSampleDrafts((prev) => ({ ...(prev || {}), [plat]: val }));
+                              }}
+                              rows={6}
+                              className="w-full bg-transparent border-none p-0 text-xs text-slate-200 focus:outline-none leading-relaxed resize-y font-sans placeholder:text-slate-600"
+                              placeholder={`Generated text for ${plat} will appear here...`}
+                            />
+                          </div>
+
+                          {/* Attached Media Display */}
+                          {activeMediaUrl && (
+                            <div className="rounded-2xl overflow-hidden border border-slate-850 max-h-48 bg-slate-900 flex items-center justify-center p-1 shadow-md mt-2">
+                              {activeMediaType === 'VIDEO' ? (
+                                <video src={activeMediaUrl} controls className="w-full max-h-44 object-contain rounded-xl" />
+                              ) : (
+                                <img
+                                  src={activeMediaUrl}
+                                  alt="Attached Media Preview"
+                                  className="w-full max-h-44 object-cover rounded-xl"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800';
+                                  }}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -12,6 +12,7 @@ interface LiquidUploadButtonProps {
   currentMediaUrl?: string;
   currentMediaType?: 'IMAGE' | 'VIDEO' | null;
   disabled?: boolean;
+  multiMode?: boolean;
 }
 
 export default function LiquidUploadButton({
@@ -21,6 +22,7 @@ export default function LiquidUploadButton({
   currentMediaUrl,
   currentMediaType,
   disabled = false,
+  multiMode = false,
 }: LiquidUploadButtonProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string>('');
@@ -35,7 +37,7 @@ export default function LiquidUploadButton({
   const toast = useToast();
 
   useEffect(() => {
-    if (!currentMediaUrl) {
+    if (!currentMediaUrl && !multiMode) {
       if (localPreviewUrl && localPreviewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(localPreviewUrl);
       }
@@ -48,12 +50,12 @@ export default function LiquidUploadButton({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } else if (currentMediaUrl && !localPreviewUrl) {
+    } else if (currentMediaUrl && !localPreviewUrl && !multiMode) {
       setLocalPreviewUrl(currentMediaUrl);
       setIsUploaded(true);
       setRemoteUrl(currentMediaUrl);
     }
-  }, [currentMediaUrl]);
+  }, [currentMediaUrl, multiMode]);
 
   // Handle file selection and auto-upload immediately to Cloudflare R2
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,11 +97,28 @@ export default function LiquidUploadButton({
         setProgress(98);
         setTimeout(() => {
           setProgress(100);
-          setRemoteUrl(response.fileUrl);
-          setIsUploaded(true);
-          setUploading(false);
           onUploadSuccess(response.fileUrl, response.mediaType as 'IMAGE' | 'VIDEO');
           toast.success(`Media uploaded to Cloudflare R2 (${type === 'VIDEO' ? 'uploads/videos/' : 'uploads/photos/'})!`);
+          
+          if (multiMode) {
+            if (objectUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(objectUrl);
+            }
+            setSelectedFile(null);
+            setLocalPreviewUrl('');
+            setMediaType(null);
+            setIsUploaded(false);
+            setRemoteUrl('');
+            setUploading(false);
+            setProgress(0);
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+          } else {
+            setRemoteUrl(response.fileUrl);
+            setIsUploaded(true);
+            setUploading(false);
+          }
         }, 200);
       }
     } catch (err: any) {

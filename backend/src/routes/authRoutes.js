@@ -32,6 +32,8 @@ router.get('/url', authenticateJwt, getOAuthUrl);
  * GET /api/auth/callback - OAuth Redirect Handler from LinkedIn / Social Providers
  */
 router.get('/callback', handleOAuthCallbackGet);
+router.get('/callback/x', handleOAuthCallbackGet);
+router.get('/callback/facebook', handleOAuthCallbackGet);
 
 /**
  * POST /api/auth/callback - OAuth Token Code Exchange Callback

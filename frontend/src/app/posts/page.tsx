@@ -184,6 +184,8 @@ export default function PostsPage() {
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
                     post.status === 'PUBLISHED'
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : post.status === 'PUBLISHING'
+                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 animate-pulse font-extrabold'
                       : post.status === 'FAILED'
                       ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                       : post.status === 'CANCELLED'

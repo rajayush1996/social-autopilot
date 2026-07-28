@@ -189,7 +189,18 @@ export class ScheduleService {
       throw new Error('Failed to generate AI post content.');
     }
 
-    // Create post record
+    // Calculate exact target scheduled timestamp using schedule's timeOfDay (e.g. 09:00 AM)
+    const targetScheduledAt = (() => {
+      const [hStr, mStr] = (schedule.timeOfDay || '09:00').split(':');
+      const target = new Date();
+      target.setHours(parseInt(hStr, 10) || 9, parseInt(mStr, 10) || 0, 0, 0);
+      if (target <= new Date()) {
+        target.setDate(target.getDate() + 1); // Set for tomorrow at target time if today's slot passed
+      }
+      return target;
+    })();
+
+    // Create post record scheduled for target time
     const post = await PostService.createPost({
       userId: user.id,
       content: aiResult.content,
@@ -197,12 +208,12 @@ export class ScheduleService {
       mediaType: null,
       targetPlatforms: schedule.targetPlatforms,
       status: POST_STATUS.SCHEDULED,
-      scheduledAt: new Date(Date.now() + 2 * 60 * 1000), // 2 mins from now
+      scheduledAt: targetScheduledAt,
       aiGenerated: true,
       aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
     });
 
-    // Queue in BullMQ
+    // Queue in BullMQ until exact target scheduledAt time
     await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });
 
     // Decrement user credits

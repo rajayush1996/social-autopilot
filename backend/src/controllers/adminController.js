@@ -124,3 +124,60 @@ export const setUserCredits = catchAsync(async (req, res) => {
     },
   });
 });
+
+/**
+ * Controller: Get plan feature matrix configuration.
+ */
+export const getPlanFeatures = catchAsync(async (req, res) => {
+  let setting = await prisma.systemSetting.findUnique({
+    where: { key: 'PLAN_FEATURES_MATRIX' },
+  });
+
+  const defaultMatrix = {
+    FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'], maxAiCredits: 15, videoUpload: true },
+    PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 500, videoUpload: true },
+    ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 9999, videoUpload: true },
+  };
+
+  if (!setting) {
+    try {
+      setting = await prisma.systemSetting.create({
+        data: {
+          key: 'PLAN_FEATURES_MATRIX',
+          value: defaultMatrix,
+        },
+      });
+    } catch (e) {
+      setting = { value: defaultMatrix };
+    }
+  }
+
+  return successResponse(res, HttpStatus.OK, 'Plan feature matrix retrieved.', {
+    matrix: setting?.value || defaultMatrix,
+  });
+});
+
+/**
+ * Controller: Super Admin endpoint to update Plan Feature Matrix.
+ */
+export const setPlanFeatures = catchAsync(async (req, res) => {
+  const { matrix } = req.body;
+
+  if (!matrix || typeof matrix !== 'object') {
+    throw ApiError.badRequest('Field "matrix" is required and must be an object.');
+  }
+
+  const updatedSetting = await prisma.systemSetting.upsert({
+    where: { key: 'PLAN_FEATURES_MATRIX' },
+    update: { value: matrix },
+    create: { key: 'PLAN_FEATURES_MATRIX', value: matrix },
+  });
+
+  if (socketManager.io) {
+    socketManager.io.emit('system_setting_updated', { key: 'PLAN_FEATURES_MATRIX', matrix: updatedSetting.value });
+  }
+
+  return successResponse(res, HttpStatus.OK, 'Plan feature matrix updated successfully.', {
+    matrix: updatedSetting.value,
+  });
+});

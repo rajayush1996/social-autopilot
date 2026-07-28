@@ -2,6 +2,57 @@ import OpenAI from 'openai';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
 import { convertMarkdownToUnicode } from '../utils/textFormatter.js';
+import { fetchArticleContext } from './ai/articleFetcher.js';
+
+/**
+ * Resolve an article URL into prompt context. Never throws: a failed fetch returns
+ * an `{ url, error }` marker so the caller can degrade honestly instead of letting
+ * the model invent the article's contents.
+ */
+export async function resolveArticleContext(articleUrl) {
+  try {
+    return await fetchArticleContext(articleUrl);
+  } catch (err) {
+    logger.warn(`[AIService] Article fetch failed for "${articleUrl}": ${err.message}`);
+    return { url: articleUrl, error: err.message, code: err.code };
+  }
+}
+
+/**
+ * Build the user message for article-repurposing runs.
+ */
+function buildArticleUserPrompt({ articleUrl, article, inputTopic, tone, platform }) {
+  const instructions = inputTopic || 'Summarize the key takeaways for social media.';
+
+  if (article?.text) {
+    return [
+      `Source article URL: ${article.finalUrl || articleUrl}`,
+      article.title ? `Source article title: ${article.title}` : '',
+      '',
+      'Source article text (verbatim extract):',
+      '"""',
+      article.text,
+      '"""',
+      article.truncated ? '(The extract above was truncated; work only with what is present.)' : '',
+      '',
+      `Repurpose the source article above into a ready-to-publish ${platform} post.`,
+      'CRITICAL: Use ONLY facts, names, numbers, and claims that appear in the extract. Do not invent statistics, quotes, or details that are not present.',
+      `Include the source link ${article.finalUrl || articleUrl} in the post where it reads naturally.`,
+      `Additional instructions: "${instructions}"`,
+      `Tone: ${tone}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return [
+    `An article URL was supplied (${articleUrl}) but its contents could NOT be retrieved${article?.error ? ` (${article.error})` : ''}.`,
+    'CRITICAL: Do NOT guess, summarize, or invent what that article says. Do not reference its contents at all.',
+    `Write the ${platform} post using only the instructions below, and mention the link as further reading.`,
+    `Instructions: "${instructions}"`,
+    `Tone: ${tone}`,
+  ].join('\n');
+}
 
 // Initialize OpenAI client
 const getOpenAIClient = () => {
@@ -39,6 +90,14 @@ Create a high-performing LinkedIn post that includes:
 Create concise, high-impact content:
 - For single tweets: keep under 270 characters, punchy, clear hook, minimal hashtags (0-2 max).
 - If topic requires deep explanation, format as a numbered Twitter Thread (e.g. 1/, 2/, 3/).`,
+
+  FACEBOOK: `You are an expert Facebook Page Copywriter & Social Media Strategist.
+Create an engaging Facebook post that includes:
+- A strong engaging hook in the first sentence
+- Conversational, community-oriented story or value drop
+- Clean formatting with line breaks for readability
+- Open question or CTA encouraging comments and page likes
+- 3-5 relevant hashtags at the end.`,
   
   GENERAL: `You are a master Social Media Content Strategist. Adapt content perfectly for social media audience engagement.`
 };
@@ -58,6 +117,8 @@ export async function generatePostContent({
   formatStyle = 'SINGLE',
   contentLength = 'BALANCED',
   articleUrl,
+  articleContext,
+  isXPremium = false,
 }) {
   const openai = getOpenAIClient();
   const inputTopic = prompt || topic;
@@ -66,23 +127,45 @@ export async function generatePostContent({
     throw new Error('A prompt, topic, or article URL is required to generate AI content.');
   }
 
+  // Fetch the article itself when the caller has not already resolved it, so the
+  // model works from the real text instead of guessing from the URL slug.
+  let resolvedArticle = articleContext || null;
+  if (articleUrl && !resolvedArticle) {
+    resolvedArticle = await resolveArticleContext(articleUrl);
+  }
+
   const model = config.openai.model;
+
+  // Prefer the real article title over the raw URL as the template/mock topic.
+  const fallbackTopic = inputTopic || resolvedArticle?.title || articleUrl;
 
   if (!openai) {
     logger.warn('⚠️ OPENAI_API_KEY not configured. Using intelligent template generator.');
-    return generateMockPostContent({ 
-      prompt: inputTopic || articleUrl, 
-      platform, 
-      tone, 
-      emojiDensity, 
-      hashtagCount,
-      formatStyle,
-      model: 'mock-template-engine' 
-    });
+    return {
+      ...generateMockPostContent({
+        prompt: fallbackTopic,
+        platform,
+        tone,
+        emojiDensity,
+        hashtagCount,
+        formatStyle,
+        model: 'mock-template-engine',
+      }),
+      ...(articleUrl && { sourceUrl: resolvedArticle?.finalUrl || articleUrl }),
+      ...(resolvedArticle?.error && { articleWarning: resolvedArticle.error }),
+    };
   }
 
   try {
     let systemPrompt = SYSTEM_PROMPTS[platform.toUpperCase()] || SYSTEM_PROMPTS.GENERAL;
+
+    if (platform.toUpperCase() === 'X') {
+      if (isXPremium) {
+        systemPrompt = `You are a viral X (Twitter) Premium Copywriter. The target X account is an X Premium / Twitter Blue subscriber, so long-form tweets up to 25,000 characters are fully allowed! Generate a detailed, engaging long-form article or post for X with rich insights and clean line breaks.`;
+      } else {
+        systemPrompt = `You are a viral X (Twitter) Copywriter. The target X account is a standard non-Premium account. Strictly keep single tweets under 270 characters, punchy, clear hook, minimal hashtags (0-2 max).`;
+      }
+    }
     
     if (brandContext) {
       systemPrompt += `\n\n[USER BRAND VOICE & CONTEXT]\n${brandContext}`;
@@ -99,8 +182,8 @@ export async function generatePostContent({
 
     systemPrompt += formattingInstructions;
 
-    const userPrompt = articleUrl 
-      ? `Article URL to Repurpose: "${articleUrl}"\nAdditional Instructions: "${inputTopic || 'Summarize key takeaways for social media.'}"\nTone: ${tone}\nTarget Platform: ${platform}`
+    const userPrompt = articleUrl
+      ? buildArticleUserPrompt({ articleUrl, article: resolvedArticle, inputTopic, tone, platform })
       : `Topic/Prompt: "${inputTopic}"\nTone of voice: ${tone}\nTarget Platform: ${platform}.\nPlease generate the ready-to-publish post content.`;
 
     const completion = await openai.chat.completions.create({
@@ -123,20 +206,26 @@ export async function generatePostContent({
       tone,
       modelUsed: model,
       tokensUsed: completion.usage?.total_tokens || 0,
-      isMock: false
+      isMock: false,
+      ...(articleUrl && { sourceUrl: resolvedArticle?.finalUrl || articleUrl }),
+      ...(resolvedArticle?.error && { articleWarning: resolvedArticle.error }),
     };
   } catch (error) {
     logger.error(`❌ Error during OpenAI content generation: ${error.message}`);
-    return generateMockPostContent({
-      prompt: inputTopic || articleUrl,
-      platform,
-      tone,
-      emojiDensity,
-      hashtagCount,
-      formatStyle,
-      model: `${model} (fallback)`,
-      errorNotice: error.message
-    });
+    return {
+      ...generateMockPostContent({
+        prompt: fallbackTopic,
+        platform,
+        tone,
+        emojiDensity,
+        hashtagCount,
+        formatStyle,
+        model: `${model} (fallback)`,
+        errorNotice: error.message,
+      }),
+      ...(articleUrl && { sourceUrl: resolvedArticle?.finalUrl || articleUrl }),
+      ...(resolvedArticle?.error && { articleWarning: resolvedArticle.error }),
+    };
   }
 }
 
@@ -154,9 +243,13 @@ export async function optimizePostForPlatforms({
   formatStyle,
   contentLength,
   articleUrl,
+  articleContext,
 }) {
   const results = {};
-  
+
+  // Resolve the article once for the whole batch instead of per platform.
+  const resolvedArticle = articleUrl ? articleContext || (await resolveArticleContext(articleUrl)) : null;
+
   for (const platform of platforms) {
     const result = await generatePostContent({
       prompt: content ? `Adapt this core message for ${platform}: "${content}"` : '',
@@ -169,6 +262,7 @@ export async function optimizePostForPlatforms({
       formatStyle,
       contentLength,
       articleUrl,
+      articleContext: resolvedArticle,
     });
     results[platform.toUpperCase()] = result.content;
   }
@@ -176,7 +270,9 @@ export async function optimizePostForPlatforms({
   return {
     success: true,
     originalContent: content,
-    adaptedPosts: results
+    adaptedPosts: results,
+    ...(articleUrl && { sourceUrl: resolvedArticle?.finalUrl || articleUrl }),
+    ...(resolvedArticle?.error && { articleWarning: resolvedArticle.error }),
   };
 }
 
@@ -196,25 +292,47 @@ function generateMockPostContent({ prompt, platform, tone, emojiDensity, hashtag
     hashtags = '\n\n#Growth #AI #Productivity #Workflow #TechTrends #Automation #SocialMedia #Strategy #DigitalTransformation';
   }
 
-  if (formatStyle === 'THREAD') {
-    content = `🧵 ${cleanPrompt}\n\n1/ Stop spending hours manually drafting posts.\n\n2/ Decouple content creation into reusable AI templates.\n\n3/ Schedule recurring dispatches to stay top-of-mind.\n\n4/ Measure engagement and double down on top performers.${hashtags}`;
-  } else if (formatStyle === 'CAROUSEL') {
-    content = `📌 SLIDE 1: ${cleanPrompt}\n\n📌 SLIDE 2: Problem: Manual social media posting causes burnout.\n\n📌 SLIDE 3: Solution: Intelligent AI drafting + automated queueing.\n\n📌 SLIDE 4: Actionable Tip: Define 3 content pillars today.${hashtags}`;
-  } else {
-    switch (uppercasePlatform) {
-      case 'INSTAGRAM':
+  switch (uppercasePlatform) {
+    case 'INSTAGRAM':
+      if (formatStyle === 'THREAD') {
+        content = `${emojiHeader}INSTAGRAM CAROUSEL THREAD: ${cleanPrompt}\n\nSlide 1: ${cleanPrompt}\nSlide 2: 💡 Key Insight #1: Execution beats strategy every time.\nSlide 3: ⚡ Key Insight #2: Automate repetitive workflows.\nSlide 4: 🎯 Key Insight #3: Scale your audience consistently.\n\n👇 Save this post for later!${hashtags}`;
+      } else if (formatStyle === 'CAROUSEL') {
+        content = `📸 [INSTAGRAM CAROUSEL OUTLINE]\nSLIDE 1: ${cleanPrompt}\nSLIDE 2: Why most creators get stuck\nSLIDE 3: The 3-step automation system\nSLIDE 4: Tap the link in bio to get started!${hashtags}`;
+      } else {
         content = `${emojiHeader}${cleanPrompt}\n\nHere is something game-changing you need to know today!\n\nKey Insights:\n1. Execution > Ideas\n2. Consistency drives results\n3. Automation frees your time\n\n👇 Drop a comment below if you agree!${hashtags}`;
-        break;
-      case 'LINKEDIN':
+      }
+      break;
+
+    case 'LINKEDIN':
+      if (formatStyle === 'THREAD') {
+        content = `${emojiHeader}5 Lessons on ${cleanPrompt}:\n\n1. Stop spending hours manually drafting posts.\n2. Decouple content creation into reusable AI templates.\n3. Schedule recurring dispatches to stay top-of-mind.\n4. Measure engagement and double down on top performers.\n\nAgree? Share your thoughts below.${hashtags}`;
+      } else if (formatStyle === 'CAROUSEL') {
+        content = `📄 LINKEDIN DOCUMENT / CAROUSEL\n\nPage 1: ${cleanPrompt}\nPage 2: The Core Challenge\nPage 3: Strategic Solution\nPage 4: Implementation Framework\n\nRepost ♻️ if you found this insightful!${hashtags}`;
+      } else {
         content = `${emojiHeader}How to master ${cleanPrompt} in 2026\n\nMany professionals struggle with scaling their reach online. The secret isn't spending more hours—it's building smarter workflows.\n\n3 key takeaways:\n• Systemize content creation with AI\n• Schedule posts ahead of time\n• Focus on high-signal conversations\n\nWhat strategies are working best for your workflow? Let's discuss in the comments.${hashtags}`;
-        break;
-      case 'X':
-        content = `${emojiHeader}${cleanPrompt}\n\n1. Stop overthinking content strategy.\n2. Build repeatable systems.\n3. Leverage AI & automation to stay consistent.\n\nSimplicity scales.${hashtags}`;
-        break;
-      default:
-        content = `${emojiHeader}${cleanPrompt}\n\nAutomate your social growth with smart scheduling and AI-driven content tailored for your audience!${hashtags}`;
-        break;
-    }
+      }
+      break;
+
+    case 'X':
+    case 'TWITTER':
+      if (formatStyle === 'THREAD') {
+        content = `🧵 ${cleanPrompt}\n\n1/ Stop spending hours manually drafting posts.\n\n2/ Decouple content creation into reusable AI templates.\n\n3/ Schedule recurring dispatches to stay top-of-mind.\n\n4/ Measure engagement and double down on top performers.${hashtags}`;
+      } else {
+        content = `${emojiHeader}${cleanPrompt}\n\n1. Stop overthinking content strategy.\n2. Build repeatable systems.\n3. Leverage AI & automation to stay consistent.\n\nSimplicity scales.`;
+      }
+      break;
+
+    case 'FACEBOOK':
+      if (formatStyle === 'THREAD' || formatStyle === 'CAROUSEL') {
+        content = `${emojiHeader}Community Guide: ${cleanPrompt}\n\nHere is a quick breakdown for our Facebook Community:\n\n1. Focus on engagement\n2. Share value daily\n3. Build authentic connections\n\nLike and share this post with someone who needs to see this!${hashtags}`;
+      } else {
+        content = `${emojiHeader}Hey Facebook Community! 👋\n\nLet's talk about ${cleanPrompt}.\n\nBuilding a strong online presence shouldn't consume your entire day. With smart scheduling and AI assistance, you can keep your page active and engaging 24/7.\n\nWhat are your biggest growth goals this month? Comment below!${hashtags}`;
+      }
+      break;
+
+    default:
+      content = `${emojiHeader}${cleanPrompt}\n\nAutomate your social growth with smart scheduling and AI-driven content tailored for your audience!${hashtags}`;
+      break;
   }
 
   return {
