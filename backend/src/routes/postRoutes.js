@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   generateAiPostContent,
+  enhanceUserPrompt,
   createPost,
   listPosts,
   getPostById,
@@ -17,6 +18,11 @@ const router = Router();
 
 // Apply JWT authentication guard globally across all post campaigning scopes
 router.use(authenticateJwt);
+
+/**
+ * POST /api/posts/enhance-prompt - Magic AI Prompt Enhancer
+ */
+router.post('/enhance-prompt', aiLimiter, enhanceUserPrompt);
 
 /**
  * POST /api/posts/ai-generate - Generate Post Content using OpenAI

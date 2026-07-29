@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { PlatformId } from '@/config/platforms';
+import { toast } from '@/components/Toast';
 
 // Get API base URL from env or default to localhost
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -103,6 +104,25 @@ apiClient.interceptors.response.use(
         } finally {
           isRefreshing = false;
         }
+      }
+    }
+
+    // Auto-dispatch Toast Notification on API Errors (500, 403, 404, Network error)
+    if (typeof window !== 'undefined') {
+      const data = error.response?.data;
+      const errorMessage =
+        data?.message ||
+        data?.error ||
+        (Array.isArray(data?.errors) ? data.errors.map((e: any) => e.msg || e.message || e).join(', ') : null) ||
+        error.message ||
+        'API server failed to process request. Please try again.';
+
+      const statusCode = error.response?.status;
+      const statusTitle = statusCode ? `API Error (HTTP ${statusCode})` : 'Network Connection Error';
+      
+      // Do not toast for cancelled requests or initial auth 401 redirects
+      if (statusCode !== 401) {
+        toast.error(errorMessage, statusTitle);
       }
     }
 

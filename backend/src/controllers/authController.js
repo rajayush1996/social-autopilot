@@ -157,6 +157,21 @@ export const updateUserPlan = catchAsync(async (req, res) => {
 });
 
 /**
+ * Controller: Update User role (Thin Handler).
+ */
+export const updateUserRole = catchAsync(async (req, res) => {
+  const id = req.params.id === 'me' ? (req.user?.id || 'default-user-id') : req.params.id;
+  const { role } = req.body;
+
+  if (!role) {
+    throw ApiError.badRequest('Field "role" is required.');
+  }
+
+  const updatedUser = await UserService.updateUserRole(id, role);
+  return successResponse(res, HttpStatus.OK, `User role updated to ${role.toUpperCase()} successfully.`, { user: updatedUser });
+});
+
+/**
  * Controller: Update user profile details (Thin Handler).
  */
 export const updateUserProfile = catchAsync(async (req, res) => {

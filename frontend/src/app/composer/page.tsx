@@ -254,6 +254,27 @@ export default function ComposerPage() {
     }
   };
 
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  const handleEnhancePrompt = async () => {
+    if (!topic || !topic.trim()) {
+      toast.error('Please enter a rough thought or topic first (e.g., "AI marketing tips").');
+      return;
+    }
+    setIsEnhancing(true);
+    try {
+      const result = await ApiService.enhancePrompt(topic, platforms[0] || 'GENERAL', tone);
+      if (result.enhancedPrompt) {
+        setTopic(result.enhancedPrompt);
+        toast.success('Prompt magic-enhanced! Ready to generate.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to enhance prompt.');
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   const handleAIGenerate = async () => {
     if (inputSource === 'PROMPT' && !topic) {
       toast.error('Please enter a topic or prompt first.');
@@ -489,11 +510,25 @@ export default function ComposerPage() {
                     <textarea
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
-                      placeholder="What would you like to post about today?"
+                      placeholder="What would you like to post about today? (e.g. 'ai marketing trends')"
                       rows={4}
                       className="w-full bg-slate-955 border border-slate-850 rounded-2xl px-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600 leading-relaxed resize-none"
                     />
-                    
+
+                    {/* Magic Enhance Prompt Bar */}
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={handleEnhancePrompt}
+                        disabled={isEnhancing || !topic.trim()}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-sm"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${isEnhancing ? 'animate-spin' : ''}`} />
+                        {isEnhancing ? 'Enhancing Prompt...' : '✨ Magic Enhance Prompt'}
+                      </button>
+                      <span className="text-[10px] text-slate-500">Expands rough thoughts into high-converting prompts</span>
+                    </div>
+
                     {/* Preset Pills */}
                     <div className="flex flex-wrap gap-2">
                       {PRESET_PROMPTS.map((p, idx) => (

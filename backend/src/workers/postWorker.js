@@ -10,6 +10,8 @@ import NotificationService from '../services/notificationService.js';
 import logger from '../utils/logger.js';
 import { convertMarkdownToUnicode } from '../utils/textFormatter.js';
 import { updateUserMemory } from '../services/ai/memoryService.js';
+import CacheService from '../services/cacheService.js';
+import { CACHE_KEYS } from '../config/cacheKeys.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -67,159 +69,192 @@ export async function processPostPublishing(postId) {
   let failureCount = 0;
   const executionLogs = [];
 
-  for (const platform of targetPlatforms) {
-    const account = userAccounts.find((acc) => acc.platform === platform);
+  try {
+    for (const platform of targetPlatforms) {
+      const account = userAccounts.find((acc) => acc.platform === platform);
 
-    try {
-      // Resolve platform-specific caption if post.content is a platform draft JSON map
-      let platformCaption = post.content;
       try {
-        if (post.content && post.content.trim().startsWith('{')) {
-          const parsedDrafts = JSON.parse(post.content);
-          if (parsedDrafts[platform]) {
-            platformCaption = parsedDrafts[platform];
-          } else if (parsedDrafts.content) {
-            platformCaption = parsedDrafts.content;
+        // Resolve platform-specific caption if post.content is a platform draft JSON map
+        let platformCaption = post.content;
+        try {
+          if (post.content && post.content.trim().startsWith('{')) {
+            const parsedDrafts = JSON.parse(post.content);
+            if (parsedDrafts[platform]) {
+              platformCaption = parsedDrafts[platform];
+            } else if (parsedDrafts.content) {
+              platformCaption = parsedDrafts.content;
+            }
           }
+        } catch (e) {
+          // Fallback to original post.content string if not JSON
         }
-      } catch (e) {
-        // Fallback to original post.content string if not JSON
-      }
 
-      // Convert any Markdown **bold** or *italic* text into native Unicode characters for LinkedIn/X/Instagram
-      platformCaption = convertMarkdownToUnicode(platformCaption);
+        // Convert any Markdown **bold** or *italic* text into native Unicode characters for LinkedIn/X/Instagram
+        platformCaption = convertMarkdownToUnicode(platformCaption);
 
-      // Get valid access token (auto-refreshes if expired)
-      const validAccessToken = await getValidAccessToken(post.userId, platform);
-      const platformAccountId = account?.platformAccountId || `mock_${platform.toLowerCase()}_user`;
+        // Get valid access token (auto-refreshes if expired)
+        const validAccessToken = await getValidAccessToken(post.userId, platform);
+        const platformAccountId = account?.platformAccountId || `mock_${platform.toLowerCase()}_user`;
 
-      // Creational + Strategy Design Patterns: Resolve strategy adapter at runtime via Factory
-      const adapter = SocialAdapterFactory.getAdapter(platform);
-      
-      const result = await adapter.publishPost({
-        accessToken: validAccessToken,
-        platformAccountId,
-        caption: platformCaption,
-        mediaUrls: post.mediaUrls,
-        mediaType: post.mediaType,
-      });
+        // Creational + Strategy Design Patterns: Resolve strategy adapter at runtime via Factory
+        const adapter = SocialAdapterFactory.getAdapter(platform);
+        
+        const result = await adapter.publishPost({
+          accessToken: validAccessToken,
+          platformAccountId,
+          caption: platformCaption,
+          mediaUrls: post.mediaUrls,
+          mediaType: post.mediaType,
+        });
 
-      if (result && result.success) {
-        successCount++;
+        if (result && result.success) {
+          successCount++;
+          const log = await prisma.socialPostLog.create({
+            data: {
+              postId: post.id,
+              socialAccountId: account?.id || null,
+              platform,
+              status: SOCIAL_POST_STATUS.SUCCESS,
+              externalPostId: result.externalPostId,
+              externalPostUrl: result.externalPostUrl,
+              publishedAt: new Date(),
+            },
+          });
+          executionLogs.push(log);
+        }
+      } catch (err) {
+        failureCount++;
+        logger.error(`[BullMQ Worker] Publishing failed for platform ${platform}: ${err.message}`);
         const log = await prisma.socialPostLog.create({
           data: {
             postId: post.id,
             socialAccountId: account?.id || null,
             platform,
-            status: SOCIAL_POST_STATUS.SUCCESS,
-            externalPostId: result.externalPostId,
-            externalPostUrl: result.externalPostUrl,
-            publishedAt: new Date(),
+            status: SOCIAL_POST_STATUS.FAILED,
+            errorMessage: err.message,
           },
         });
         executionLogs.push(log);
       }
-    } catch (err) {
-      failureCount++;
-      logger.error(`[BullMQ Worker] Publishing failed for platform ${platform}: ${err.message}`);
-      const log = await prisma.socialPostLog.create({
-        data: {
-          postId: post.id,
-          socialAccountId: account?.id || null,
-          platform,
-          status: SOCIAL_POST_STATUS.FAILED,
-          errorMessage: err.message,
-        },
-      });
-      executionLogs.push(log);
     }
-  }
 
-  // Determine final post status
-  let finalStatus = POST_STATUS.PUBLISHED;
-  if (successCount === 0 && failureCount > 0) {
-    finalStatus = POST_STATUS.FAILED;
-  } else if (successCount > 0 && failureCount > 0) {
-    finalStatus = POST_STATUS.PARTIALLY_PUBLISHED;
-  }
+    // Determine final post status
+    let finalStatus = POST_STATUS.PUBLISHED;
+    if (successCount === 0 && failureCount > 0) {
+      finalStatus = POST_STATUS.FAILED;
+    } else if (successCount > 0 && failureCount > 0) {
+      finalStatus = POST_STATUS.PARTIALLY_PUBLISHED;
+    }
 
-  const updatedPost = await prisma.post.update({
-    where: { id: post.id },
-    data: {
+    const updatedPost = await prisma.post.update({
+      where: { id: post.id },
+      data: {
+        status: finalStatus,
+        publishedAt: successCount > 0 ? new Date() : null,
+      },
+    });
+
+    // Invalidate Redis RAM Cache for user posts & post detail
+    await CacheService.invalidateMany([
+      CACHE_KEYS.POST_DETAIL(post.id),
+      CACHE_KEYS.PATTERNS.USER_POSTS(post.userId),
+    ]).catch(() => {});
+
+    // Emit realtime WebSockets status event & push notification
+    socketManager.emitPostStatusChange({
+      userId: post.userId,
+      postId: post.id,
       status: finalStatus,
-      publishedAt: successCount > 0 ? new Date() : null,
-    },
-  });
+      details: { successCount, failureCount },
+    });
 
-  // Emit realtime WebSockets status event & push notification
-  socketManager.emitPostStatusChange({
-    userId: post.userId,
-    postId: post.id,
-    status: finalStatus,
-    details: { successCount, failureCount },
-  });
+    const notificationType = finalStatus === POST_STATUS.PUBLISHED
+      ? 'success'
+      : finalStatus === POST_STATUS.FAILED
+        ? 'error'
+        : 'warning';
 
-  const notificationType = finalStatus === POST_STATUS.PUBLISHED
-    ? 'success'
-    : finalStatus === POST_STATUS.FAILED
-      ? 'error'
-      : 'warning';
+    const notificationTitle = finalStatus === POST_STATUS.PUBLISHED
+      ? 'Post Published Successfully 🎉'
+      : finalStatus === POST_STATUS.FAILED
+        ? 'Post Publishing Failed ⚠️'
+        : 'Post Partially Published ⚠️';
 
-  const notificationTitle = finalStatus === POST_STATUS.PUBLISHED
-    ? 'Post Published Successfully 🎉'
-    : finalStatus === POST_STATUS.FAILED
-      ? 'Post Publishing Failed ⚠️'
-      : 'Post Partially Published ⚠️';
+    const notificationMessage = finalStatus === POST_STATUS.FAILED
+      ? `Publishing failed for ${targetPlatforms.join(', ')}: ${executionLogs.map(l => l.errorMessage).filter(Boolean).join('; ') || 'Platform error'}.`
+      : finalStatus === POST_STATUS.PUBLISHED
+        ? `Your post was published to ${targetPlatforms.join(', ')} successfully.`
+        : `Published on ${successCount} platforms, failed on ${failureCount} platforms.`;
 
-  const notificationMessage = finalStatus === POST_STATUS.FAILED
-    ? `Publishing failed for ${targetPlatforms.join(', ')}: ${executionLogs.map(l => l.errorMessage).filter(Boolean).join('; ') || 'Platform error'}.`
-    : finalStatus === POST_STATUS.PUBLISHED
-      ? `Your post was published to ${targetPlatforms.join(', ')} successfully.`
-      : `Published on ${successCount} platforms, failed on ${failureCount} platforms.`;
+    await NotificationService.createNotification({
+      userId: post.userId,
+      title: notificationTitle,
+      message: notificationMessage,
+      type: notificationType,
+    });
 
-  await NotificationService.createNotification({
-    userId: post.userId,
-    title: notificationTitle,
-    message: notificationMessage,
-    type: notificationType,
-  });
-
-  // Automatic Local File Storage Cleanup Hook
-  if (post.mediaUrls && post.mediaUrls.length > 0) {
-    for (const mediaUrl of post.mediaUrls) {
-      if (mediaUrl.includes('/uploads/')) {
-        try {
-          const filename = mediaUrl.split('/uploads/').pop();
-          if (filename) {
-            const localFilePath = path.join(process.cwd(), 'public/uploads', filename);
-            if (fs.existsSync(localFilePath)) {
-              await fs.promises.unlink(localFilePath);
-              logger.info(`[BullMQ Worker] 🧹 Cleaned up temporary local upload file: ${localFilePath}`);
+    // Automatic Local File Storage Cleanup Hook
+    if (post.mediaUrls && post.mediaUrls.length > 0) {
+      for (const mediaUrl of post.mediaUrls) {
+        if (mediaUrl.includes('/uploads/')) {
+          try {
+            const filename = mediaUrl.split('/uploads/').pop();
+            if (filename) {
+              const localFilePath = path.join(process.cwd(), 'public/uploads', filename);
+              if (fs.existsSync(localFilePath)) {
+                await fs.promises.unlink(localFilePath);
+                logger.info(`[BullMQ Worker] 🧹 Cleaned up temporary local upload file: ${localFilePath}`);
+              }
             }
+          } catch (cleanupErr) {
+            logger.warn(`[BullMQ Worker] File cleanup warning: ${cleanupErr.message}`);
           }
-        } catch (cleanupErr) {
-          logger.warn(`[BullMQ Worker] File cleanup warning: ${cleanupErr.message}`);
         }
       }
     }
-  }
 
-  // Trigger Rolling Summary Memory Compaction Hook asynchronously (non-blocking)
-  if (successCount > 0) {
-    updateUserMemory(post.userId, post.content).catch((err) => {
-      logger.error(`[BullMQ Worker] Error in memory service hook: ${err.message}`);
+    // Trigger Rolling Summary Memory Compaction Hook asynchronously (non-blocking)
+    if (successCount > 0) {
+      updateUserMemory(post.userId, post.content).catch((err) => {
+        logger.error(`[BullMQ Worker] Error in memory service hook: ${err.message}`);
+      });
+    }
+
+    logger.info(`[BullMQ Worker] ✅ Post ID ${post.id} updated to status "${finalStatus}" (${successCount} succeeded, ${failureCount} failed).`);
+
+    return {
+      postId: post.id,
+      finalStatus,
+      successCount,
+      failureCount,
+      executionLogs,
+    };
+  } catch (fatalErr) {
+    logger.error(`[BullMQ Worker] 🚨 Fatal error during post processing for ID ${postId}: ${fatalErr.message}`);
+    
+    await prisma.post.update({
+      where: { id: post.id },
+      data: { status: POST_STATUS.FAILED },
+    }).catch(() => {});
+
+    await CacheService.invalidateMany([
+      CACHE_KEYS.POST_DETAIL(post.id),
+      CACHE_KEYS.PATTERNS.USER_POSTS(post.userId),
+    ]).catch(() => {});
+
+    socketManager.emitPostStatusChange({
+      userId: post.userId,
+      postId: post.id,
+      status: POST_STATUS.FAILED,
+      details: { error: fatalErr.message },
     });
+
+    return {
+      postId: post.id,
+      finalStatus: POST_STATUS.FAILED,
+      error: fatalErr.message,
+    };
   }
-
-  logger.info(`[BullMQ Worker] ✅ Post ID ${post.id} updated to status "${finalStatus}" (${successCount} succeeded, ${failureCount} failed).`);
-
-  return {
-    postId: post.id,
-    finalStatus,
-    successCount,
-    failureCount,
-    executionLogs,
-  };
 }
 
 let postWorker = null;

@@ -224,6 +224,18 @@ export class ApiService {
   }
 
   /**
+   * Magic AI Prompt Enhancer: Expands a raw 2-3 word thought into an optimized prompt
+   */
+  static async enhancePrompt(rawThought: string, platform: string = 'GENERAL', tone: string = 'ENGAGING'): Promise<{ enhancedPrompt: string; originalThought: string }> {
+    const response = await apiClient.post('/api/posts/enhance-prompt', {
+      rawThought,
+      platform,
+      tone,
+    });
+    return response.data?.data || { enhancedPrompt: rawThought, originalThought: rawThought };
+  }
+
+  /**
    * Fetch list of posts in the system
    */
   static async getPosts(userId?: string): Promise<Post[]> {

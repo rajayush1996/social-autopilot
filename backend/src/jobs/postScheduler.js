@@ -77,6 +77,39 @@ export async function checkAndTriggerAutoPilotSchedules() {
 }
 
 /**
+ * Self-Healing Recovery: Resets any posts stuck in 'PUBLISHING' status for > 2 minutes to 'FAILED'.
+ */
+export async function cleanupStuckPublishingPosts() {
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+  try {
+    const stuckPosts = await prisma.post.findMany({
+      where: {
+        status: POST_STATUS.PUBLISHING,
+        updatedAt: {
+          lte: twoMinutesAgo,
+        },
+      },
+      select: { id: true, userId: true },
+    });
+
+    if (stuckPosts.length > 0) {
+      await prisma.post.updateMany({
+        where: {
+          id: { in: stuckPosts.map(p => p.id) },
+        },
+        data: {
+          status: POST_STATUS.FAILED,
+        },
+      });
+
+      logger.warn(`[PostScheduler] 🧹 Auto-recovered ${stuckPosts.length} post(s) stuck in PUBLISHING status for > 2 mins -> set to FAILED.`);
+    }
+  } catch (err) {
+    logger.error(`[PostScheduler] Error in stuck posts cleanup: ${err.message}`);
+  }
+}
+
+/**
  * Starts the 60-second automated Cron Scheduler Loop.
  */
 export function startCronSchedulerLoop() {
@@ -85,12 +118,14 @@ export function startCronSchedulerLoop() {
   // Run initial check on server boot
   syncScheduledPostsToQueue();
   checkAndTriggerAutoPilotSchedules();
+  cleanupStuckPublishingPosts();
 
   // Polling loop every 60 seconds
   setInterval(async () => {
     try {
       await syncScheduledPostsToQueue();
       await checkAndTriggerAutoPilotSchedules();
+      await cleanupStuckPublishingPosts();
     } catch (err) {
       logger.error(`[CronScheduler Error] ${err.message}`);
     }

@@ -146,12 +146,24 @@ export class UserService {
   }
 
   /**
-   * Update user plan (FREE / PRO / ENTERPRISE).
+   * Update user subscription plan.
    */
   static async updateUserPlan(userId, plan) {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: { plan: plan.toUpperCase() },
+    });
+    await CacheService.del(CACHE_KEYS.USER_PROFILE(userId));
+    return updated;
+  }
+
+  /**
+   * Update user role (RBAC helper).
+   */
+  static async updateUserRole(userId, role) {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { role: role.toUpperCase() },
     });
     await CacheService.del(CACHE_KEYS.USER_PROFILE(userId));
     return updated;
@@ -248,7 +260,6 @@ export class UserService {
 
     return updatedUser;
   }
-}
 }
 
 export default UserService;

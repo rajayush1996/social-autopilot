@@ -3,7 +3,7 @@ import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
 import { POST_STATUS, SOCIAL_PLATFORM } from '../config/constants.js';
 import logger from '../utils/logger.js';
-import { generatePostContent, optimizePostForPlatforms } from '../services/aiService.js';
+import { generatePostContent, optimizePostForPlatforms, enhancePrompt } from '../services/aiService.js';
 import { enqueuePostJob, removePostJob } from '../queues/postQueue.js';
 import { syncScheduledPostsToQueue } from '../jobs/postScheduler.js';
 import { processPostPublishing } from '../workers/postWorker.js';
@@ -14,6 +14,8 @@ import { fetchArticleContext } from '../services/ai/articleFetcher.js';
 import CacheService from '../services/cacheService.js';
 import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
 import FeatureConfigService from '../services/featureConfigService.js';
+import { encrypt, decrypt } from "../utils/encryption.js";
+
 
 /**
  * Helper: Retrieve allowed platforms for a user based on role and plan matrix.
@@ -145,6 +147,20 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
     ...aiResult,
     aiCreditsRemaining: updatedUser.aiCredits,
   });
+});
+
+/**
+ * Controller: Magic Prompt Enhancer - expands rough thought into optimized prompt (Thin Handler).
+ */
+export const enhanceUserPrompt = catchAsync(async (req, res) => {
+  const { rawThought, platform = 'GENERAL', tone = 'ENGAGING' } = req.body;
+
+  if (!rawThought || !rawThought.trim()) {
+    throw ApiError.badRequest('Field "rawThought" is required.');
+  }
+
+  const result = await enhancePrompt({ rawThought, platform, tone });
+  return successResponse(res, HttpStatus.OK, 'Prompt enhanced successfully.', result);
 });
 
 /**

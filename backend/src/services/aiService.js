@@ -54,10 +54,12 @@ function buildArticleUserPrompt({ articleUrl, article, inputTopic, tone, platfor
   ].join('\n');
 }
 
-// Initialize OpenAI client
 const getOpenAIClient = () => {
+  if (process.env.NODE_ENV === 'test') {
+    return null;
+  }
   const apiKey = config.openai.apiKey;
-  if (!apiKey || apiKey === 'your_openai_api_key_here') {
+  if (!apiKey || apiKey === 'your_openai_api_key_here' || apiKey.includes('placeholder') || apiKey.length < 25) {
     return null;
   }
   
@@ -345,4 +347,63 @@ function generateMockPostContent({ prompt, platform, tone, emojiDensity, hashtag
     isMock: true,
     ...(errorNotice && { warning: `OpenAI API returned error: ${errorNotice}. Used fallback template.` })
   };
+}
+
+/**
+ * Magic Prompt Enhancer: Expands a user's rough 2-3 word thought into an optimized, high-converting social media prompt.
+ */
+export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = 'ENGAGING' }) {
+  if (!rawThought || !rawThought.trim()) {
+    throw new Error('A rough thought or topic is required to enhance prompt.');
+  }
+
+  const openai = getOpenAIClient();
+
+  if (!openai) {
+    const cleanThought = rawThought.trim();
+    const enhancedMock = `Write a viral, high-converting ${platform} post about "${cleanThought}". Use a ${tone.toLowerCase()} tone. Start with a powerful attention-grabbing hook in the first line, explain 3 key actionable takeaways, use clean formatting with emojis, and conclude with an engaging Call-to-Action question for the audience.`;
+    return {
+      success: true,
+      originalThought: cleanThought,
+      enhancedPrompt: enhancedMock,
+      isMock: true,
+    };
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: config.openai.model,
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert AI Prompt Engineer for Social Media Content Creators. Your job is to take a raw, short, or rough thought from a user and expand it into a detailed, high-converting, structured prompt that will generate an extraordinary ${platform} post in a ${tone} tone. Keep the output prompt concise, clear, and actionable (2-4 sentences max). Output ONLY the enhanced prompt string without meta-commentary or quotation marks.`,
+        },
+        {
+          role: 'user',
+          content: `Raw Thought: "${rawThought.trim()}"`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 200,
+    });
+
+    const enhancedText = response.choices[0]?.message?.content?.trim() || rawThought;
+
+    return {
+      success: true,
+      originalThought: rawThought,
+      enhancedPrompt: enhancedText,
+      isMock: false,
+    };
+  } catch (err) {
+    logger.warn(`[AIService] Enhance prompt OpenAI fallback: ${err.message}`);
+    const cleanThought = rawThought.trim();
+    const enhancedMock = `Write a viral, high-converting ${platform} post about "${cleanThought}". Use a ${tone.toLowerCase()} tone with a strong hook, 3 actionable bullet points, and a strong CTA.`;
+    return {
+      success: true,
+      originalThought: cleanThought,
+      enhancedPrompt: enhancedMock,
+      isMock: true,
+    };
+  }
 }
