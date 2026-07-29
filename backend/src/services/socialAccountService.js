@@ -1,7 +1,9 @@
 import { prisma } from '../config/db.js';
+import CacheService from './cacheService.js';
+import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
 
 /**
- * SocialAccountService (Single Responsibility: Social account database operations)
+ * SocialAccountService (Single Responsibility: Social account database operations with Cache-Aside pattern)
  */
 export class SocialAccountService {
   /**
@@ -15,8 +17,9 @@ export class SocialAccountService {
       },
     });
 
+    let result = null;
     if (existingAccount) {
-      return prisma.socialAccount.update({
+      result = await prisma.socialAccount.update({
         where: { id: existingAccount.id },
         data: {
           platformAccountId,
@@ -29,42 +32,49 @@ export class SocialAccountService {
           isActive: true,
         },
       });
+    } else {
+      result = await prisma.socialAccount.create({
+        data: {
+          userId,
+          platform,
+          platformAccountId,
+          username,
+          accountName: `@${username} (${platform})`,
+          accessToken,
+          refreshToken,
+          expiresAt,
+          isPremium,
+          isActive: true,
+        },
+      });
     }
 
-    return prisma.socialAccount.create({
-      data: {
-        userId,
-        platform,
-        platformAccountId,
-        username,
-        accountName: `@${username} (${platform})`,
-        accessToken,
-        refreshToken,
-        expiresAt,
-        isPremium,
-        isActive: true,
-      },
-    });
+    await CacheService.del(CACHE_KEYS.USER_SOCIAL_ACCOUNTS(userId));
+    return result;
   }
 
   /**
-   * Fetch connected social accounts for a user.
+   * Fetch connected social accounts for a user (Cached via CacheService.remember).
    */
   static async findActiveAccountsByUserId(userId) {
-    return prisma.socialAccount.findMany({
-      where: { userId, isActive: true },
-      select: {
-        id: true,
-        platform: true,
-        username: true,
-        accountName: true,
-        platformAccountId: true,
-        isPremium: true,
-        isActive: true,
-        expiresAt: true,
-        createdAt: true,
-      },
-    });
+    return CacheService.remember(
+      CACHE_KEYS.USER_SOCIAL_ACCOUNTS(userId),
+      TTL.VERY_LONG,
+      () => prisma.socialAccount.findMany({
+        where: { userId, isActive: true },
+        select: {
+          id: true,
+          platform: true,
+          username: true,
+          accountName: true,
+          platformAccountId: true,
+          isPremium: true,
+          isActive: true,
+          expiresAt: true,
+          createdAt: true,
+        },
+      })
+    );
   }
 
   /**
@@ -77,13 +87,30 @@ export class SocialAccountService {
   }
 
   /**
+   * Find active social account by user ID and platform.
+   */
+  static async findActiveAccountByPlatform(userId, platform) {
+    return prisma.socialAccount.findFirst({
+      where: {
+        userId,
+        platform: platform.toUpperCase(),
+        isActive: true,
+      },
+    });
+  }
+
+  /**
    * Mark social account connection as inactive (disconnected).
    */
   static async disconnectAccount(id) {
-    return prisma.socialAccount.update({
+    const updated = await prisma.socialAccount.update({
       where: { id },
       data: { isActive: false },
     });
+    if (updated) {
+      await CacheService.del(CACHE_KEYS.USER_SOCIAL_ACCOUNTS(updated.userId));
+    }
+    return updated;
   }
 }
 

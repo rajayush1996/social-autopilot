@@ -1,8 +1,9 @@
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../utils/ApiError.js';
 import { catchAsync } from '../utils/responseHandler.js';
+import config from '../config/env.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_sign_key_for_social_autopilot';
+const JWT_SECRET = config.jwt.secret;
 
 /**
  * Middleware: Authenticate requests using JWT authorization tokens.

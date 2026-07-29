@@ -4,12 +4,9 @@ import { ApiError } from '../utils/ApiError.js';
 import UserService from '../services/userService.js';
 import FeatureConfigService from '../services/featureConfigService.js';
 import AutopilotService from '../services/autopilotService.js';
-import { prisma } from '../config/db.js';
-import socketManager from '../services/socketService.js';
-import NotificationService from '../services/notificationService.js';
 
 /**
- * Controller: Update autopilot configurations for a user.
+ * Controller: Update autopilot configurations for a user (Thin Handler).
  */
 export const updateAutopilotSettings = catchAsync(async (req, res) => {
   const { userId, autopilotEnabled, brandContext } = req.body;
@@ -19,7 +16,6 @@ export const updateAutopilotSettings = catchAsync(async (req, res) => {
     throw ApiError.unauthorized('User authentication required.');
   }
 
-  // Save changes via UserService database layer
   const updatedUser = await UserService.updateAutopilotSettings(targetUserId, {
     autopilotEnabled: !!autopilotEnabled,
     brandContext: brandContext || '',
@@ -35,7 +31,7 @@ export const updateAutopilotSettings = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: Get all feature configs (Admin visibility).
+ * Controller: Get all feature configs (Thin Handler).
  */
 export const getFeatures = catchAsync(async (req, res) => {
   const features = await FeatureConfigService.listFeatureConfigs();
@@ -43,7 +39,7 @@ export const getFeatures = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: Update a feature's premium status (Admin change).
+ * Controller: Update a feature's premium status (Thin Handler).
  */
 export const updateFeature = catchAsync(async (req, res) => {
   const { featureName } = req.params;
@@ -54,12 +50,11 @@ export const updateFeature = catchAsync(async (req, res) => {
   }
 
   const updatedFeature = await FeatureConfigService.setFeatureConfig(featureName, isPremium);
-
   return successResponse(res, HttpStatus.OK, `Feature "${featureName}" config updated.`, { feature: updatedFeature });
 });
 
 /**
- * Controller: Manually trigger Autopilot cycle runner.
+ * Controller: Manually trigger Autopilot cycle runner (Thin Handler).
  */
 export const triggerAutopilotNow = catchAsync(async (req, res) => {
   const reports = await AutopilotService.runAutopilotCycle();
@@ -67,7 +62,7 @@ export const triggerAutopilotNow = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: Super Admin endpoint to set/grant AI credits by Unique User ID or User ID.
+ * Controller: Super Admin endpoint to set/grant AI credits by Unique User ID or User ID (Thin Handler).
  */
 export const setUserCredits = catchAsync(async (req, res) => {
   const { targetUserId, uniqueId, email, freeCreditValue } = req.body;
@@ -78,40 +73,11 @@ export const setUserCredits = catchAsync(async (req, res) => {
 
   const creditAmount = Math.max(0, parseInt(freeCreditValue, 10));
 
-  let user = null;
-  if (targetUserId) {
-    user = await prisma.user.findUnique({ where: { id: targetUserId } });
-  }
-  if (!user && uniqueId) {
-    user = await prisma.user.findFirst({
-      where: {
-        OR: [{ uniqueId }, { id: uniqueId }],
-      },
-    });
-  }
-  if (!user && email) {
-    user = await prisma.user.findUnique({ where: { email } });
-  }
-
-  if (!user) {
-    throw ApiError.notFound('Target user not found with provided User ID or Unique ID.');
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { id: user.id },
-    data: { aiCredits: creditAmount },
-  });
-
-  socketManager.emitAiCreditsUpdate({
-    userId: updatedUser.id,
-    aiCreditsRemaining: updatedUser.aiCredits,
-  });
-
-  await NotificationService.createNotification({
-    userId: updatedUser.id,
-    title: 'AI Credits Granted 🎁',
-    message: `Super Admin granted you ${creditAmount} AI Credits!`,
-    type: 'success',
+  const updatedUser = await UserService.setUserCredits({
+    targetUserId,
+    uniqueId,
+    email,
+    creditAmount,
   });
 
   return successResponse(res, HttpStatus.OK, `Granted ${creditAmount} AI credits to user "${updatedUser.name || updatedUser.email}".`, {
@@ -126,39 +92,15 @@ export const setUserCredits = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: Get plan feature matrix configuration.
+ * Controller: Get plan feature matrix configuration (Thin Handler).
  */
 export const getPlanFeatures = catchAsync(async (req, res) => {
-  let setting = await prisma.systemSetting.findUnique({
-    where: { key: 'PLAN_FEATURES_MATRIX' },
-  });
-
-  const defaultMatrix = {
-    FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'], maxAiCredits: 15, videoUpload: true },
-    PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 500, videoUpload: true },
-    ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 9999, videoUpload: true },
-  };
-
-  if (!setting) {
-    try {
-      setting = await prisma.systemSetting.create({
-        data: {
-          key: 'PLAN_FEATURES_MATRIX',
-          value: defaultMatrix,
-        },
-      });
-    } catch (e) {
-      setting = { value: defaultMatrix };
-    }
-  }
-
-  return successResponse(res, HttpStatus.OK, 'Plan feature matrix retrieved.', {
-    matrix: setting?.value || defaultMatrix,
-  });
+  const matrix = await FeatureConfigService.getPlanFeaturesMatrix();
+  return successResponse(res, HttpStatus.OK, 'Plan feature matrix retrieved.', { matrix });
 });
 
 /**
- * Controller: Super Admin endpoint to update Plan Feature Matrix.
+ * Controller: Super Admin endpoint to update Plan Feature Matrix (Thin Handler).
  */
 export const setPlanFeatures = catchAsync(async (req, res) => {
   const { matrix } = req.body;
@@ -167,17 +109,6 @@ export const setPlanFeatures = catchAsync(async (req, res) => {
     throw ApiError.badRequest('Field "matrix" is required and must be an object.');
   }
 
-  const updatedSetting = await prisma.systemSetting.upsert({
-    where: { key: 'PLAN_FEATURES_MATRIX' },
-    update: { value: matrix },
-    create: { key: 'PLAN_FEATURES_MATRIX', value: matrix },
-  });
-
-  if (socketManager.io) {
-    socketManager.io.emit('system_setting_updated', { key: 'PLAN_FEATURES_MATRIX', matrix: updatedSetting.value });
-  }
-
-  return successResponse(res, HttpStatus.OK, 'Plan feature matrix updated successfully.', {
-    matrix: updatedSetting.value,
-  });
+  const updatedMatrix = await FeatureConfigService.setPlanFeaturesMatrix(matrix);
+  return successResponse(res, HttpStatus.OK, 'Plan feature matrix updated successfully.', { matrix: updatedMatrix });
 });

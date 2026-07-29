@@ -1,10 +1,11 @@
 import Redis from 'ioredis';
 import logger from '../utils/logger.js';
+import config from './env.js';
 
-const redisUrl = process.env.REDIS_URL;
-const redisHost = process.env.REDIS_HOST || '127.0.0.1';
-const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-const redisPassword = process.env.REDIS_PASSWORD || undefined;
+const redisUrl = config.redis.url;
+const redisHost = config.redis.host;
+const redisPort = config.redis.port;
+const redisPassword = config.redis.password;
 
 const isUpstash = redisHost.includes('upstash.io') || (redisUrl && redisUrl.includes('upstash.io'));
 
@@ -33,9 +34,9 @@ let redisClient = null;
  */
 export function getRedisClient() {
   if (!redisClient) {
-    if (process.env.REDIS_URL) {
-      const isTlsUrl = process.env.REDIS_URL.startsWith('rediss://') || process.env.REDIS_URL.includes('upstash.io');
-      redisClient = new Redis(process.env.REDIS_URL, {
+    if (config.redis.url) {
+      const isTlsUrl = config.redis.url.startsWith('rediss://') || config.redis.url.includes('upstash.io');
+      redisClient = new Redis(config.redis.url, {
         maxRetriesPerRequest: null,
         ...(isTlsUrl ? { tls: { rejectUnauthorized: false } } : {}),
       });

@@ -1,15 +1,14 @@
 import { prisma } from '../config/db.js';
 import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
+import ScheduleService from '../services/scheduleService.js';
 import logger from '../utils/logger.js';
 
 /**
  * Synchronize overdue or un-enqueued scheduled posts from DB into BullMQ queue.
- * Useful on server startup or for manual recovery checks.
  */
 export async function syncScheduledPostsToQueue() {
   const now = new Date();
-  logger.info(`[PostScheduler] 🔄 Syncing scheduled posts with BullMQ at ${now.toISOString()}`);
 
   try {
     const pendingPosts = await prisma.post.findMany({
@@ -23,11 +22,10 @@ export async function syncScheduledPostsToQueue() {
     });
 
     if (pendingPosts.length === 0) {
-      logger.info('[PostScheduler] No pending overdue scheduled posts found in DB.');
       return { syncedCount: 0 };
     }
 
-    logger.info(`[PostScheduler] Found ${pendingPosts.length} overdue post(s). Enqueueing into BullMQ...`);
+    logger.info(`[PostScheduler] 🚀 Found ${pendingPosts.length} due/overdue post(s). Dispatching to BullMQ...`);
 
     for (const post of pendingPosts) {
       await enqueuePostJob({
@@ -41,4 +39,60 @@ export async function syncScheduledPostsToQueue() {
     logger.error(`[PostScheduler] Error syncing scheduled posts: ${error.message}`);
     return { error: error.message };
   }
+}
+
+/**
+ * Checks active Auto-Pilot Schedules and triggers dispatches if timeOfDay & day matches.
+ */
+export async function checkAndTriggerAutoPilotSchedules() {
+  const now = new Date();
+  const currentHours = String(now.getHours()).padStart(2, '0');
+  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+  const currentTimeOfDay = `${currentHours}:${currentMinutes}`;
+  
+  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const currentDay = dayNames[now.getDay()];
+
+  try {
+    const matchingSchedules = await prisma.automationSchedule.findMany({
+      where: {
+        isActive: true,
+        timeOfDay: currentTimeOfDay,
+        daysOfWeek: { has: currentDay },
+      },
+    });
+
+    for (const sched of matchingSchedules) {
+      // Skip if triggered in the last 2 minutes to prevent duplicate runs
+      if (sched.lastRunAt && (now.getTime() - new Date(sched.lastRunAt).getTime() < 120000)) {
+        continue;
+      }
+
+      logger.info(`⏰ [CronScheduler] Executing Auto-Pilot Schedule "${sched.name}" at ${currentTimeOfDay} (${currentDay})...`);
+      await ScheduleService.runScheduleNow(sched.id, sched.userId);
+    }
+  } catch (err) {
+    logger.error(`[CronScheduler] Error checking Auto-Pilot schedules: ${err.message}`);
+  }
+}
+
+/**
+ * Starts the 60-second automated Cron Scheduler Loop.
+ */
+export function startCronSchedulerLoop() {
+  logger.info('⏰ [CronScheduler] Starting 60-second automated dispatcher loop...');
+
+  // Run initial check on server boot
+  syncScheduledPostsToQueue();
+  checkAndTriggerAutoPilotSchedules();
+
+  // Polling loop every 60 seconds
+  setInterval(async () => {
+    try {
+      await syncScheduledPostsToQueue();
+      await checkAndTriggerAutoPilotSchedules();
+    } catch (err) {
+      logger.error(`[CronScheduler Error] ${err.message}`);
+    }
+  }, 60000);
 }

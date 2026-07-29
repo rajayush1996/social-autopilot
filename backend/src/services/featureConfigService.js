@@ -67,6 +67,49 @@ export class FeatureConfigService {
     // Otherwise, check if user's plan is PREMIUM
     return (userPlan || '').toUpperCase() === 'PREMIUM';
   }
+
+  /**
+   * Get plan feature matrix configuration (Cached via CacheService.remember).
+   */
+  static async getPlanFeaturesMatrix() {
+    let setting = await prisma.systemSetting.findUnique({
+      where: { key: 'PLAN_FEATURES_MATRIX' },
+    });
+
+    const defaultMatrix = {
+      FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'], maxAiCredits: 15, videoUpload: true },
+      PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 500, videoUpload: true },
+      ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 9999, videoUpload: true },
+    };
+
+    if (!setting) {
+      try {
+        setting = await prisma.systemSetting.create({
+          data: {
+            key: 'PLAN_FEATURES_MATRIX',
+            value: defaultMatrix,
+          },
+        });
+      } catch (e) {
+        setting = { value: defaultMatrix };
+      }
+    }
+
+    return setting?.value || defaultMatrix;
+  }
+
+  /**
+   * Super Admin method to update Plan Feature Matrix.
+   */
+  static async setPlanFeaturesMatrix(matrix) {
+    const updatedSetting = await prisma.systemSetting.upsert({
+      where: { key: 'PLAN_FEATURES_MATRIX' },
+      update: { value: matrix },
+      create: { key: 'PLAN_FEATURES_MATRIX', value: matrix },
+    });
+
+    return updatedSetting.value;
+  }
 }
 
 export default FeatureConfigService;

@@ -11,7 +11,7 @@ import uploadRoutes from './src/routes/uploadRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import scheduleRoutes from './src/routes/scheduleRoutes.js';
 import { initPostWorker } from './src/workers/postWorker.js';
-import { syncScheduledPostsToQueue } from './src/jobs/postScheduler.js';
+import { startCronSchedulerLoop } from './src/jobs/postScheduler.js';
 import logger from './src/utils/logger.js';
 
 import helmet from 'helmet';
@@ -144,12 +144,12 @@ server.listen(PORT, async () => {
   await checkDatabaseConnection();
   await checkRedisConnection();
 
-  // Initialize BullMQ Worker
+  // Initialize BullMQ Worker & 60-Second Automated Scheduler Loop
   try {
     initPostWorker();
-    await syncScheduledPostsToQueue();
+    startCronSchedulerLoop();
   } catch (queueErr) {
-    logger.warn(`[BullMQ Init Warning] ${queueErr.message}`);
+    logger.warn(`[Scheduler Init Warning] ${queueErr.message}`);
   }
 });
 

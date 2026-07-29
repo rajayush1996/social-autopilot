@@ -7,6 +7,9 @@ import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
 import logger from '../utils/logger.js';
 
+import CacheService from './cacheService.js';
+import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
+
 export const SCHEDULER_FEATURE_KEY = 'scheduling-dispatcher';
 
 export class ScheduleService {
@@ -32,14 +35,18 @@ export class ScheduleService {
   }
 
   /**
-   * Get all automation schedules for a specific user.
+   * Get all automation schedules for a specific user (Cached via CacheService.remember).
    */
   static async getUserSchedules(userId) {
     await UserService.ensureUserExists(userId);
-    return prisma.automationSchedule.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+    return CacheService.remember(
+      CACHE_KEYS.USER_SCHEDULES(userId),
+      TTL.LONG,
+      () => prisma.automationSchedule.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      })
+    );
   }
 
   /**
@@ -68,7 +75,7 @@ export class ScheduleService {
       topicPrompt,
     } = data;
 
-    return prisma.automationSchedule.create({
+    const result = await prisma.automationSchedule.create({
       data: {
         userId,
         name: name || 'Automated Daily Pulse',
@@ -86,6 +93,8 @@ export class ScheduleService {
         topicPrompt: topicPrompt || '',
       },
     });
+    await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
+    return result;
   }
 
   /**
@@ -109,7 +118,7 @@ export class ScheduleService {
       topicPrompt,
     } = data;
 
-    return prisma.automationSchedule.update({
+    const updated = await prisma.automationSchedule.update({
       where: { id },
       data: {
         ...(name !== undefined && { name }),
@@ -123,6 +132,8 @@ export class ScheduleService {
         ...(topicPrompt !== undefined && { topicPrompt }),
       },
     });
+    await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
+    return updated;
   }
 
   /**
@@ -136,10 +147,12 @@ export class ScheduleService {
 
     const targetState = isActive !== undefined ? !!isActive : !existing.isActive;
 
-    return prisma.automationSchedule.update({
+    const toggled = await prisma.automationSchedule.update({
       where: { id },
       data: { isActive: targetState },
     });
+    await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
+    return toggled;
   }
 
   /**
@@ -151,9 +164,11 @@ export class ScheduleService {
       throw new Error('Schedule not found or unauthorized.');
     }
 
-    return prisma.automationSchedule.delete({
+    const deleted = await prisma.automationSchedule.delete({
       where: { id },
     });
+    await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
+    return deleted;
   }
 
   /**

@@ -375,15 +375,13 @@ export function SchedulingDispatcher() {
     }
   };
 
-  // Helper to format time (09:00 -> 9:00 AM)
+  // Helper to format time in 24-Hour standard format (e.g. 09:00, 14:30, 21:00)
   const formatTimeDisplay = (time24: string) => {
-    if (!time24) return '09:00 AM';
+    if (!time24) return '09:00';
     const [hStr, mStr] = time24.split(':');
-    let h = parseInt(hStr, 10);
-    const m = mStr || '00';
-    const period = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return `${h}:${m} ${period}`;
+    const h = (parseInt(hStr, 10) || 0).toString().padStart(2, '0');
+    const m = (mStr || '00').padStart(2, '0');
+    return `${h}:${m}`;
   };
 
   if (loading) {
@@ -679,7 +677,7 @@ export function SchedulingDispatcher() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                      Execution Time (HH:MM)
+                      Execution Time (24h Standard)
                     </label>
                     <input
                       type="time"

@@ -1,4 +1,3 @@
-import { prisma } from '../config/db.js';
 import { catchAsync, successResponse } from '../utils/responseHandler.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -11,8 +10,10 @@ import { processPostPublishing } from '../workers/postWorker.js';
 import UserService from '../services/userService.js';
 import PostService from '../services/postService.js';
 import NotificationService from '../services/notificationService.js';
-import { decrypt } from '../utils/encryption.js';
 import { fetchArticleContext } from '../services/ai/articleFetcher.js';
+import CacheService from '../services/cacheService.js';
+import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
+import FeatureConfigService from '../services/featureConfigService.js';
 
 /**
  * Helper: Retrieve allowed platforms for a user based on role and plan matrix.
@@ -22,15 +23,8 @@ async function getUserAllowedPlatforms(user) {
     return ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
   }
   try {
-    const setting = await prisma.systemSetting.findUnique({
-      where: { key: 'PLAN_FEATURES_MATRIX' },
-    });
+    const matrix = await FeatureConfigService.getPlanFeaturesMatrix();
     const userPlan = (user.plan || 'FREE').toUpperCase();
-    const matrix = setting?.value || {
-      FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'] },
-      PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
-      ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
-    };
     return matrix[userPlan]?.allowedPlatforms || ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
   } catch (e) {
     return ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
@@ -132,18 +126,14 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
   // 2. Decrement AI credits (Service layer)
   const updatedUser = await UserService.decrementCredits(userId);
 
-  // 3. Log AI generation in audit logs
+  // 3. Log AI generation in audit logs (PostService)
   try {
-    await prisma.aIGenerationLog.create({
-      data: {
-        userId,
-        prompt: inputTopic,
-        targetPlatform: ['INSTAGRAM', 'LINKEDIN', 'X'].includes(platform.toUpperCase()) ? platform.toUpperCase() : null,
-        tone: ['PROFESSIONAL', 'CASUAL', 'ENGAGING', 'EDUCATIONAL', 'PROMOTIONAL', 'HUMOROUS'].includes(tone.toUpperCase()) ? tone.toUpperCase() : 'ENGAGING',
-        generatedText: JSON.stringify(aiResult.adaptedPosts || aiResult),
-        modelUsed: aiResult.modelUsed || 'MockEngine',
-        tokensUsed: aiResult.tokensUsed || 0,
-      },
+    await PostService.logAiGeneration({
+      userId,
+      prompt: inputTopic,
+      generatedContent: aiResult.adaptedPosts || aiResult,
+      modelUsed: aiResult.modelUsed || 'MockEngine',
+      tokensUsed: aiResult.tokensUsed || 0,
     });
   } catch (logErr) {
     logger.warn(`[PostController] AI log db warning: ${logErr.message}`);
@@ -214,45 +204,27 @@ export const createPost = catchAsync(async (req, res) => {
     initialStatus = POST_STATUS.SCHEDULED;
   }
 
-  // 1. Create database record using PostService
-  const post = await PostService.createPost({
+  // Delegate post creation, BullMQ enqueue, and cache eviction to PostService
+  const { post, queueResult } = await PostService.createPost({
     userId,
     content,
     mediaUrls,
     mediaType: resolvedMediaType,
     targetPlatforms: formattedPlatforms,
-    status: initialStatus,
-    scheduledAt: parseScheduledDate,
+    scheduledAt,
+    publishNow,
     aiGenerated,
     aiPrompt,
   });
 
-  // 2. Enqueue in BullMQ (Immediate or Delayed Job)
-  let queueResult = null;
-  if (publishNow) {
-    try {
-      const immediateExecution = await processPostPublishing(post.id);
-      return successResponse(res, HttpStatus.OK, 'Post created and published immediately.', {
-        post: immediateExecution || post,
-      });
-    } catch (err) {
-      logger.error(`[PostController] Immediate post execution error: ${err.message}`);
-      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, `Post publishing failed: ${err.message}`);
-    }
-  } else if (parseScheduledDate) {
-    queueResult = await enqueuePostJob({ postId: post.id, scheduledAt: parseScheduledDate });
-    await NotificationService.createNotification({
-      userId,
-      title: 'Post Scheduled 📅',
-      message: `Your post is scheduled for ${parseScheduledDate.toLocaleDateString()} at ${parseScheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
-      type: 'info',
-    });
-  }
-
   return successResponse(
     res,
     HttpStatus.CREATED,
-    initialStatus === POST_STATUS.SCHEDULED ? 'Post scheduled in BullMQ queue successfully.' : 'Post draft saved successfully.',
+    publishNow
+      ? 'Post created and published immediately.'
+      : scheduledAt
+      ? 'Post scheduled in BullMQ queue successfully.'
+      : 'Post draft saved successfully.',
     {
       post,
       queueResult,
@@ -261,46 +233,24 @@ export const createPost = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: List posts with status filtering & pagination.
+ * Controller: List posts with status filtering & pagination (Delegated to PostService).
  */
 export const listPosts = catchAsync(async (req, res) => {
-  const { page = 1, limit = 10, status, platform } = req.query;
+  const { page = 1, limit = 10, status, platform, userId: targetUserIdParam } = req.query;
   const userId = req.user.id;
+  const isAdmin = req.user.role === 'ADMIN';
 
-  const pageNumber = Number.isNaN(Number(page)) ? 1 : parseInt(page, 10);
-  const pageSize = Number.isNaN(Number(limit)) ? 10 : parseInt(limit, 10);
-  const skip = (pageNumber - 1) * pageSize;
-  const take = pageSize;
-  const targetUserId = req.user.role === 'ADMIN' && req.query.userId ? req.query.userId : userId;
-
-  const where = {
-    userId: targetUserId,
-    ...(status && { status: status.toUpperCase() }),
-    ...(platform && { targetPlatforms: { has: platform.toUpperCase() } }),
-  };
-
-  const [totalCount, posts] = await Promise.all([
-    prisma.post.count({ where }),
-    prisma.post.findMany({
-      where,
-      skip,
-      take,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        socialPostLogs: true,
-      },
-    }),
-  ]);
-
-  return successResponse(res, HttpStatus.OK, 'Posts fetched successfully.', {
-    posts,
-    meta: {
-      totalCount,
-      page: pageNumber,
-      limit: pageSize,
-      totalPages: Math.ceil(totalCount / pageSize) || 1,
-    },
+  const result = await PostService.listPosts({
+    userId,
+    page,
+    limit,
+    status,
+    platform,
+    isAdmin,
+    targetUserIdParam,
   });
+
+  return successResponse(res, HttpStatus.OK, 'Posts fetched successfully.', result);
 });
 
 /**
@@ -361,31 +311,11 @@ export const triggerScheduledPostsNow = catchAsync(async (req, res) => {
  */
 export const retryFailedPost = catchAsync(async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.id;
 
-  const post = await PostService.findPostById(id);
-  if (!post) {
-    throw ApiError.notFound(`Post with ID "${id}" not found.`);
-  }
-
-  logger.info(`[PostController] Retrying post execution for Post ID: ${id}`);
-
-  // Clean up previous failed logs
-  await prisma.socialPostLog.deleteMany({
-    where: { postId: id, status: 'FAILED' },
-  });
-
-  // Reset post status to DRAFT so atomic lock allows re-publishing
-  await PostService.updatePostStatus(id, POST_STATUS.DRAFT);
-
-  let executionResult = null;
-  try {
-    executionResult = await processPostPublishing(id);
-  } catch (err) {
-    logger.error(`[PostController] Direct worker execution error during retry: ${err.message}`);
-    throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, `Retry publishing failed: ${err.message}`);
-  }
+  const result = await PostService.retryFailedPost(id, userId);
 
   return successResponse(res, HttpStatus.OK, 'Post retry executed successfully.', {
-    post: executionResult || post,
+    post: result,
   });
 });
