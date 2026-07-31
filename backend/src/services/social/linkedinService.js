@@ -115,24 +115,102 @@ export class LinkedinAdapter extends SocialAdapter {
       });
 
       const accessToken = response.data.access_token;
-      let platformAccountId = null;
-      let username = null;
+      const expiresIn = response.data.expires_in;
+      const accountsList = [];
+
+      // 1. Fetch Personal Profile
+      let personalUrn = null;
+      let personalName = null;
+      let personalAvatar = null;
 
       try {
         const userinfoRes = await axios.get(`${config.social.linkedin.apiBaseUrl}/userinfo`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
-        platformAccountId = userinfoRes.data?.sub || null;
-        username = userinfoRes.data?.name || userinfoRes.data?.email || null;
+        const sub = userinfoRes.data?.sub;
+        personalUrn = sub ? (sub.startsWith('urn:li:') ? sub : `urn:li:person:${sub}`) : null;
+        personalName = userinfoRes.data?.name || userinfoRes.data?.email || 'LinkedIn Personal Profile';
+        personalAvatar = userinfoRes.data?.picture || null;
+
+        if (personalUrn) {
+          accountsList.push({
+            platformAccountId: personalUrn,
+            username: personalName,
+            accountName: `${personalName} (Personal)`,
+            accountType: 'PERSONAL',
+            avatarUrl: personalAvatar,
+          });
+        }
       } catch (profileErr) {
-        logger.warn(`[LinkedinAdapter] userinfo fetch warning: ${profileErr.message}`);
+        logger.warn(`[LinkedinAdapter] Personal profile fetch warning: ${profileErr.message}`);
+      }
+
+      // 2. Fetch Managed LinkedIn Company Pages (Organizations)
+      try {
+        const aclsRes = await axios.get(`${config.social.linkedin.apiBaseUrl}/organizationalEntityAcls?q=roleAssignee`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'LinkedIn-Version': '202607',
+          },
+        });
+
+        const elements = aclsRes.data?.elements || [];
+        const adminRoles = ['ADMINISTRATOR', 'CONTENT_ADMINISTRATOR', 'ADMIN', 'OWNER'];
+
+        for (const elem of elements) {
+          const role = elem.role || elem.roleType;
+          if (adminRoles.includes(role) && elem.organizationalTarget) {
+            const orgUrn = elem.organizationalTarget;
+            const orgId = orgUrn.replace('urn:li:organization:', '');
+
+            let orgName = `Company Page (${orgId})`;
+            let orgLogo = null;
+
+            try {
+              const orgDetailsRes = await axios.get(`${config.social.linkedin.apiBaseUrl}/organizations/${orgId}`, {
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'LinkedIn-Version': '202607',
+                },
+              });
+              orgName = orgDetailsRes.data?.localizedName || orgDetailsRes.data?.name || orgName;
+              orgLogo = orgDetailsRes.data?.logoV2?.['cropped~']?.elements?.[0]?.identifiers?.[0]?.identifier || null;
+            } catch (orgDetailErr) {
+              logger.warn(`[LinkedinAdapter] Details fetch failed for org ${orgId}: ${orgDetailErr.message}`);
+            }
+
+            accountsList.push({
+              platformAccountId: orgUrn,
+              username: orgName,
+              accountName: `${orgName} (Company Page)`,
+              accountType: 'ORGANIZATION',
+              avatarUrl: orgLogo,
+            });
+          }
+        }
+      } catch (orgsErr) {
+        logger.warn(`[LinkedinAdapter] Organizational ACLs fetch warning: ${orgsErr.message}`);
+      }
+
+      // Fallback if no specific account was returned
+      if (accountsList.length === 0) {
+        accountsList.push({
+          platformAccountId: personalUrn || `urn:li:person:user_${Date.now()}`,
+          username: personalName || 'LinkedIn Account',
+          accountName: 'LinkedIn Account',
+          accountType: 'PERSONAL',
+          avatarUrl: null,
+        });
       }
 
       return {
         accessToken,
-        expiresIn: response.data.expires_in,
-        platformAccountId,
-        username,
+        expiresIn,
+        accounts: accountsList,
+        platformAccountId: accountsList[0].platformAccountId,
+        username: accountsList[0].username,
+        accountType: accountsList[0].accountType,
+        avatarUrl: accountsList[0].avatarUrl,
       };
     } catch (error) {
       logger.error(`[LinkedinAdapter] OAuth Error: ${error.response?.data?.message || error.message}`);

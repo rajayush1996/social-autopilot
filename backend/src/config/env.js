@@ -63,7 +63,8 @@ export const config = {
       oauthBaseUrl: process.env.LINKEDIN_OAUTH_BASE_URL || 'https://www.linkedin.com/oauth/v2',
       clientId: process.env.LINKEDIN_CLIENT_ID,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
-      scope: process.env.LINKEDIN_SCOPE || 'openid profile w_member_social',
+      scope: process.env.LINKEDIN_SCOPE || (process.env.LINKEDIN_ENABLE_ORGANIZATIONS === 'true' ? 'openid profile w_member_social w_organization_social r_organization_social' : 'openid profile w_member_social'),
+      enableOrganizations: process.env.LINKEDIN_ENABLE_ORGANIZATIONS === 'true',
     },
   },
   cloudinary: {

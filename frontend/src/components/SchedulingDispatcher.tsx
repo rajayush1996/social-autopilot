@@ -24,7 +24,9 @@ import {
   Upload,
   FileText,
   Send,
-  ListFilter
+  ListFilter,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import ApiService, { AutomationSchedule } from '@/services/apiService';
 import { Post } from '@/lib/api';
@@ -94,8 +96,33 @@ export function SchedulingDispatcher() {
   const [saving, setSaving] = useState<boolean>(false);
   const [sampleDrafts, setSampleDrafts] = useState<Record<string, string> | null>(null);
   const [generatingSample, setGeneratingSample] = useState<boolean>(false);
+  const [isEnhancingTopic, setIsEnhancingTopic] = useState<boolean>(false);
+  const [isTopicExpanded, setIsTopicExpanded] = useState<boolean>(false);
 
   const toast = useToast();
+
+  const handleEnhanceTopic = async () => {
+    if (!formTopic || !formTopic.trim()) {
+      toast.error('Please enter a topic or instruction first (e.g. "SaaS growth tips").');
+      return;
+    }
+    setIsEnhancingTopic(true);
+    try {
+      const result = await ApiService.enhancePrompt(
+        formTopic,
+        formPlatforms[0] || 'GENERAL',
+        formTone
+      );
+      if (result.enhancedPrompt) {
+        setFormTopic(result.enhancedPrompt);
+        toast.success('Auto-Pilot prompt magic-enhanced!');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to enhance prompt.');
+    } finally {
+      setIsEnhancingTopic(false);
+    }
+  };
 
   const handlePreviewSampleAi = async () => {
     if (formPlatforms.length === 0) {
@@ -912,12 +939,24 @@ export function SchedulingDispatcher() {
                   )}
                 </div>
 
-                {/* Topic Instructions */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-                    Topic & Niche Instructions
-                  </label>
+                {/* Topic Instructions & Magic Enhancer */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                      Topic & Niche Instructions
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsTopicExpanded(true)}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-indigo-300 bg-slate-900 hover:bg-slate-850 border border-slate-800 px-2 py-0.5 rounded-lg transition-all cursor-pointer"
+                      title="Expand to Full Screen View"
+                    >
+                      <Maximize2 className="h-3 w-3" />
+                      Full View
+                    </button>
+                  </div>
+
                   <textarea
                     rows={3}
                     value={formTopic}
@@ -925,6 +964,20 @@ export function SchedulingDispatcher() {
                     placeholder="e.g. Share software growth tips, SaaS architecture insights, and productivity automation lessons."
                     className="w-full bg-slate-955 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
                   />
+
+                  {/* Magic Enhance Prompt Button */}
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={handleEnhanceTopic}
+                      disabled={isEnhancingTopic || !formTopic.trim()}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-sm cursor-pointer"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isEnhancingTopic ? 'animate-spin' : ''}`} />
+                      {isEnhancingTopic ? 'Enhancing Prompt...' : '✨ Magic Enhance Prompt'}
+                    </button>
+                    <span className="text-[10px] text-slate-500">Auto-optimizes prompt for schedule</span>
+                  </div>
                 </div>
 
                 {/* PROMINENT GENERATE SAMPLE SEED BUTTON */}
@@ -1065,6 +1118,68 @@ export function SchedulingDispatcher() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* FULL SCREEN EXPANDED TOPIC MODAL OVERLAY */}
+      {isTopicExpanded && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 md:p-8 animate-fadeIn">
+          <div className="bg-slate-900 border border-indigo-500/30 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-955">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-100">Full Screen Topic & Niche Instructions</h3>
+                  <p className="text-xs text-slate-400">Write or review detailed instructions for your Auto-Pilot schedule</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleEnhanceTopic}
+                  disabled={isEnhancingTopic || !formTopic.trim()}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-3 py-2 rounded-xl transition-all disabled:opacity-40 cursor-pointer"
+                >
+                  <Sparkles className={`w-4 h-4 ${isEnhancingTopic ? 'animate-spin' : ''}`} />
+                  {isEnhancingTopic ? 'Enhancing...' : '✨ Magic Enhance'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTopicExpanded(false)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 transition-colors cursor-pointer"
+                  title="Close Full View"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Textarea */}
+            <div className="p-6 flex-1 flex flex-col bg-slate-955">
+              <textarea
+                value={formTopic}
+                onChange={(e) => setFormTopic(e.target.value)}
+                placeholder="Type your full, detailed topic instructions, niche details, target audience preferences, and guidelines here..."
+                className="w-full flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed font-sans placeholder:text-slate-600 min-h-[350px]"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-slate-900">
+              <span className="text-xs text-slate-400 font-mono">Character count: {formTopic.length}</span>
+              <button
+                type="button"
+                onClick={() => setIsTopicExpanded(false)}
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Done / Close View
+              </button>
             </div>
           </div>
         </div>,

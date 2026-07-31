@@ -3,6 +3,10 @@ import config from '../../config/env.js';
 import logger from '../../utils/logger.js';
 import SocialAdapterFactory from '../social/socialAdapterFactory.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
+import socketManager from '../socketService.js';
+import NotificationService from '../notificationService.js';
+import CacheService from '../cacheService.js';
+import { CACHE_KEYS } from '../../config/cacheKeys.js';
 
 /**
  * Validates, refreshes (if needed), and returns a valid decrypted access token for the specified user and platform.
@@ -95,7 +99,34 @@ export async function getValidAccessToken(userId, platform) {
     return refreshedData.accessToken;
   } catch (err) {
     logger.error(`[TokenManager] Failed to refresh token for ${platformUpper}: ${err.message}`);
-    throw new Error(`Failed to refresh ${platformUpper} access token: ${err.message}`);
+
+    // Auto-Disconnect logic: Mark account as inactive in DB, clear Redis cache, and emit WebSocket & Notification
+    try {
+      await prisma.socialAccount.update({
+        where: { id: account.id },
+        data: { isActive: false },
+      });
+
+      await CacheService.del(CACHE_KEYS.USER_SOCIAL_ACCOUNTS(userId)).catch(() => {});
+
+      socketManager.emitAccountStatusChange({
+        userId,
+        platform: platformUpper,
+        connected: false,
+        reason: 'TOKEN_EXPIRED',
+      });
+
+      await NotificationService.createNotification({
+        userId,
+        title: `⚠️ ${platformUpper} Session Expired`,
+        message: `Your ${platformUpper} account session has expired. Please reconnect your account to resume publishing.`,
+        type: 'warning',
+      }).catch(() => {});
+    } catch (dbErr) {
+      logger.warn(`[TokenManager] Failed to auto-deactivate expired account ${account.id}: ${dbErr.message}`);
+    }
+
+    throw new Error(`Your ${platformUpper} session has expired (${err.message}). Account has been automatically disconnected. Please reconnect.`);
   }
 }
 

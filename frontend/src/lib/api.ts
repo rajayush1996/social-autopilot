@@ -158,6 +158,8 @@ export interface SocialAccount {
   platformAccountId: string;
   username: string;
   accountName: string | null;
+  accountType?: string;
+  avatarUrl?: string | null;
   accessToken: string;
   refreshToken: string | null;
   expiresAt: string | null;

@@ -161,10 +161,12 @@ export class ApiService {
   /**
    * Connect a mock profile directly (Simulation mode helper)
    */
-  static async connectMockAccount(platform: string, username: string): Promise<SocialAccount> {
+  static async connectMockAccount(platform: string, username: string, accountType: string = 'PERSONAL', avatarUrl?: string): Promise<SocialAccount> {
     const response = await apiClient.post(API_ENDPOINTS.CONNECT_ACCOUNT, {
       platform,
       username,
+      accountType,
+      avatarUrl,
     });
     return response.data?.data?.account;
   }

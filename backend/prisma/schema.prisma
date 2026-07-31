@@ -88,6 +88,8 @@ model SocialAccount {
   platformAccountId String
   username          String
   accountName       String?
+  accountType       String          @default("PERSONAL")
+  avatarUrl         String?
   accessToken       String
   refreshToken      String?
   expiresAt         DateTime?

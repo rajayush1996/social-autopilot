@@ -125,6 +125,41 @@ export async function processPostPublishing(postId) {
       } catch (err) {
         failureCount++;
         logger.error(`[BullMQ Worker] Publishing failed for platform ${platform}: ${err.message}`);
+
+        // Check if error is due to an expired/invalid/revoked OAuth token
+        const isTokenInvalid = err.message && (
+          err.message.includes('401') ||
+          err.message.includes('Unauthorized') ||
+          err.message.includes('Invalid') ||
+          err.message.includes('expired') ||
+          err.message.includes('revoked') ||
+          err.message.includes('403')
+        );
+
+        if (isTokenInvalid && account?.id) {
+          logger.warn(`[BullMQ Worker] ⚠️ Access token for ${platform} is invalid or revoked. Auto-deactivating account ${account.id}...`);
+          await prisma.socialAccount.update({
+            where: { id: account.id },
+            data: { isActive: false },
+          }).catch(() => {});
+
+          await CacheService.del(`*${post.userId}*`).catch(() => {});
+
+          socketManager.emitAccountStatusChange({
+            userId: post.userId,
+            platform,
+            connected: false,
+            reason: 'TOKEN_INVALID',
+          });
+
+          await NotificationService.createNotification({
+            userId: post.userId,
+            title: `⚠️ ${platform} Account Disconnected`,
+            message: `Publishing failed because your ${platform} session has expired or was revoked. Please reconnect your account in Accounts page.`,
+            type: 'warning',
+          }).catch(() => {});
+        }
+
         const log = await prisma.socialPostLog.create({
           data: {
             postId: post.id,

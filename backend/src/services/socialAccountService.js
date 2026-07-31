@@ -9,22 +9,38 @@ export class SocialAccountService {
   /**
    * Link or upsert connected social media profile token metadata.
    */
-  static async upsertAccount({ userId, platform, platformAccountId, username, accessToken, refreshToken, expiresAt, isPremium = false }) {
-    const existingAccount = await prisma.socialAccount.findFirst({
-      where: {
-        userId,
-        platform,
-      },
-    });
+  static async upsertAccount({ userId, platform, platformAccountId, username, accountType = 'PERSONAL', avatarUrl = null, accessToken, refreshToken, expiresAt, isPremium = false }) {
+    let existingAccount = null;
+    if (platformAccountId) {
+      existingAccount = await prisma.socialAccount.findFirst({
+        where: {
+          userId,
+          platform,
+          platformAccountId,
+        },
+      });
+    } else {
+      existingAccount = await prisma.socialAccount.findFirst({
+        where: {
+          userId,
+          platform,
+        },
+      });
+    }
 
     let result = null;
+    const typeLabel = accountType === 'ORGANIZATION' ? 'Company Page' : 'Personal';
+    const accountName = `@${username} (${platform} ${typeLabel})`;
+
     if (existingAccount) {
       result = await prisma.socialAccount.update({
         where: { id: existingAccount.id },
         data: {
           platformAccountId,
           username,
-          accountName: `@${username} (${platform})`,
+          accountName,
+          accountType,
+          avatarUrl,
           accessToken,
           refreshToken,
           expiresAt,
@@ -39,7 +55,9 @@ export class SocialAccountService {
           platform,
           platformAccountId,
           username,
-          accountName: `@${username} (${platform})`,
+          accountName,
+          accountType,
+          avatarUrl,
           accessToken,
           refreshToken,
           expiresAt,
@@ -55,9 +73,10 @@ export class SocialAccountService {
 
   /**
    * Fetch connected social accounts for a user (Cached via CacheService.remember).
+   * Automatically auto-deactivates accounts whose tokens have expired.
    */
   static async findActiveAccountsByUserId(userId) {
-    return CacheService.remember(
+    const accounts = await CacheService.remember(
       CACHE_KEYS.USER_SOCIAL_ACCOUNTS(userId),
       TTL.VERY_LONG,
       () => prisma.socialAccount.findMany({
@@ -67,6 +86,8 @@ export class SocialAccountService {
           platform: true,
           username: true,
           accountName: true,
+          accountType: true,
+          avatarUrl: true,
           platformAccountId: true,
           isPremium: true,
           isActive: true,
@@ -75,6 +96,28 @@ export class SocialAccountService {
         },
       })
     );
+
+    const now = Date.now();
+    let hasExpiredAccounts = false;
+
+    const validatedAccounts = (accounts || []).map((acc) => {
+      const isExpired = acc.expiresAt && new Date(acc.expiresAt).getTime() <= now;
+      if (isExpired) {
+        hasExpiredAccounts = true;
+        prisma.socialAccount.update({
+          where: { id: acc.id },
+          data: { isActive: false },
+        }).catch(() => {});
+        return { ...acc, isActive: false, status: 'EXPIRED' };
+      }
+      return acc;
+    });
+
+    if (hasExpiredAccounts) {
+      await CacheService.del(CACHE_KEYS.USER_SOCIAL_ACCOUNTS(userId)).catch(() => {});
+    }
+
+    return validatedAccounts.filter((acc) => acc.isActive);
   }
 
   /**

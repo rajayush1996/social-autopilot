@@ -154,8 +154,11 @@ export class AuthService {
         });
         tokenData.accessToken = exchanged.accessToken;
         tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+        if (exchanged.accounts) tokenData.accounts = exchanged.accounts;
         if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
         if (exchanged.username) tokenData.username = exchanged.username;
+        if (exchanged.accountType) tokenData.accountType = exchanged.accountType;
+        if (exchanged.avatarUrl) tokenData.avatarUrl = exchanged.avatarUrl;
       } else if (platform === 'INSTAGRAM') {
         const exchanged = await adapter.exchangeToken({
           code,
@@ -201,16 +204,35 @@ export class AuthService {
 
     await UserService.ensureUserExists(userId);
 
-    await SocialAccountService.upsertAccount({
-      userId,
-      platform,
-      platformAccountId: tokenData.platformAccountId,
-      username: tokenData.username,
-      accessToken: encrypt(tokenData.accessToken),
-      refreshToken: tokenData.refreshToken ? encrypt(tokenData.refreshToken) : null,
-      expiresAt: tokenData.expiresAt,
-      isPremium: tokenData.isPremium || false,
-    });
+    const accountsToSave = Array.isArray(tokenData.accounts) && tokenData.accounts.length > 0
+      ? tokenData.accounts.map((acc) => ({
+          userId,
+          platform,
+          platformAccountId: acc.platformAccountId,
+          username: acc.username,
+          accountType: acc.accountType || 'PERSONAL',
+          avatarUrl: acc.avatarUrl || null,
+          accessToken: encrypt(tokenData.accessToken),
+          refreshToken: tokenData.refreshToken ? encrypt(tokenData.refreshToken) : null,
+          expiresAt: tokenData.expiresAt,
+          isPremium: tokenData.isPremium || false,
+        }))
+      : [{
+          userId,
+          platform,
+          platformAccountId: tokenData.platformAccountId,
+          username: tokenData.username,
+          accountType: tokenData.accountType || 'PERSONAL',
+          avatarUrl: tokenData.avatarUrl || null,
+          accessToken: encrypt(tokenData.accessToken),
+          refreshToken: tokenData.refreshToken ? encrypt(tokenData.refreshToken) : null,
+          expiresAt: tokenData.expiresAt,
+          isPremium: tokenData.isPremium || false,
+        }];
+
+    for (const accPayload of accountsToSave) {
+      await SocialAccountService.upsertAccount(accPayload);
+    }
 
     emitAccountStatusChange({ userId, platform, action: 'CONNECTED' });
 
@@ -287,7 +309,7 @@ export class AuthService {
   /**
    * Connect mock social account for simulation.
    */
-  static async connectMockAccount({ userIdInput, platform, platformAccountId, username = 'mock_user', accessToken }) {
+  static async connectMockAccount({ userIdInput, platform, platformAccountId, username = 'mock_user', accountType = 'PERSONAL', avatarUrl = null, accessToken }) {
     if (!platform) {
       throw ApiError.badRequest('Field "platform" is required.');
     }
@@ -298,13 +320,15 @@ export class AuthService {
 
     await UserService.ensureUserExists(userId);
 
-    const accountId = platformAccountId || `id_${platformLower}_${Date.now()}`;
+    const accountId = platformAccountId || (accountType === 'ORGANIZATION' ? `urn:li:organization:mock_${Date.now()}` : `id_${platformLower}_${Date.now()}`);
 
     const account = await SocialAccountService.upsertAccount({
       userId,
       platform: platformUpper,
       platformAccountId: accountId,
       username,
+      accountType,
+      avatarUrl,
       accessToken: encrypt(accessToken || `mock_${platformLower}_token`),
       refreshToken: null,
       expiresAt: null,

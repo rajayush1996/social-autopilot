@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Sparkles, 
@@ -153,31 +153,37 @@ export default function ComposerPage() {
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
 
+  const isFetchingRef = useRef(false);
+
+  const fetchAccounts = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const [accounts, user] = await Promise.all([
+        ApiService.getConnectedAccounts(),
+        ApiService.getMe(),
+      ]);
+      if (Array.isArray(accounts)) {
+        const activePlatforms = accounts
+          .filter((acc: any) => acc.isActive !== false)
+          .map((acc: any) => acc.platform.toUpperCase() as PlatformKey);
+        setConnectedPlatforms(activePlatforms);
+      }
+      if (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0) {
+        setAllowedPlatforms(user.allowedPlatforms.map((platform) => platform.toUpperCase()));
+      }
+    } catch (err) {
+      console.error('Failed to load connected accounts:', err);
+    } finally {
+      setLoadingAccounts(false);
+      setInitialChecked(true);
+      isFetchingRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     socketClient.connect();
 
-    const fetchAccounts = async () => {
-      try {
-        const [accounts, user] = await Promise.all([
-          ApiService.getConnectedAccounts(),
-          ApiService.getMe(),
-        ]);
-        if (Array.isArray(accounts)) {
-          const activePlatforms = accounts
-            .filter((acc: any) => acc.isActive !== false)
-            .map((acc: any) => acc.platform.toUpperCase() as PlatformKey);
-          setConnectedPlatforms(activePlatforms);
-        }
-        if (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0) {
-          setAllowedPlatforms(user.allowedPlatforms.map((platform) => platform.toUpperCase()));
-        }
-      } catch (err) {
-        console.error('Failed to load connected accounts:', err);
-      } finally {
-        setLoadingAccounts(false);
-        setInitialChecked(true);
-      }
-    };
     fetchAccounts();
 
     // Verify channel statuses via WebSocket immediately on mount

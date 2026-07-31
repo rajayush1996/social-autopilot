@@ -42,10 +42,10 @@ export const handleOAuthCallback = catchAsync(async (req, res) => {
  * Controller: Connect mock social account for simulation mode (Thin Handler).
  */
 export const connectMockAccount = catchAsync(async (req, res) => {
-  const { platform, platformAccountId, username, accessToken } = req.body;
+  const { platform, platformAccountId, username, accountType, avatarUrl, accessToken } = req.body;
   const userIdInput = req.user?.id || req.body.userId;
 
-  const account = await AuthService.connectMockAccount({ userIdInput, platform, platformAccountId, username, accessToken });
+  const account = await AuthService.connectMockAccount({ userIdInput, platform, platformAccountId, username, accountType, avatarUrl, accessToken });
   return successResponse(res, HttpStatus.CREATED, `Social account connected successfully.`, { account });
 });
 

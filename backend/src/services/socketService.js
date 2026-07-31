@@ -58,6 +58,7 @@ export class SocketServerManager {
 
       socket.on(SOCKET_EVENTS.JOIN_USER_ROOM, (userId) => {
         if (userId) {
+          socket.userId = userId;
           const roomName = `user_${userId}`;
           socket.join(roomName);
           logger.info(`⚡ [SocketServerManager] Socket ${socket.id} joined room ${roomName}`);
@@ -67,7 +68,7 @@ export class SocketServerManager {
       socket.on('check_platform', async (data) => {
         try {
           const rawPlatform = typeof data === 'string' ? data : data?.platform;
-          const userId = data?.userId;
+          const userId = (typeof data === 'object' && data?.userId) ? data.userId : socket.userId;
 
           if (!rawPlatform) return;
 
@@ -84,7 +85,14 @@ export class SocketServerManager {
             });
           }
 
-          const connected = !!account;
+          let connected = !!account;
+          if (account && account.expiresAt && new Date(account.expiresAt).getTime() <= Date.now()) {
+            connected = false;
+            prisma.socialAccount.update({
+              where: { id: account.id },
+              data: { isActive: false },
+            }).catch(() => {});
+          }
 
           const payload = {
             platform: platformUpper,

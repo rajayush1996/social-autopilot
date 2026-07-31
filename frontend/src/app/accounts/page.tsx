@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   Link2, 
   Unlink, 
   CheckCircle2, 
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Building2,
+  User
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -65,8 +67,28 @@ export default function SocialAccountsPage() {
   const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([]);
   const toast = useToast();
 
+  const isFetchingRef = useRef(false);
+
+  const fetchAccounts = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    try {
+      const activeAccounts = await ApiService.getConnectedAccounts();
+      if (Array.isArray(activeAccounts)) {
+        setAccounts(activeAccounts);
+      }
+    } catch (err) {
+      console.error('Failed to query connected accounts:', err);
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchPermissionsAndAccounts = async () => {
+    socketClient.connect();
+
+    const initPageData = async () => {
+      setLoading(true);
       try {
         const [meRes, activeAccounts] = await Promise.all([
           ApiService.getMe(),
@@ -88,41 +110,25 @@ export default function SocialAccountsPage() {
       } finally {
         setLoading(false);
       }
+
+      // Check for callback parameters when returning from real OAuth provider redirect
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const connected = params.get('connected');
+        const error = params.get('error');
+
+        if (connected) {
+          toast.success(`Successfully connected your real ${connected} profile!`);
+          accountEvents.notifyAccountChange('CONNECTED', connected.toUpperCase());
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (error) {
+          toast.error(`OAuth Connection Error: ${decodeURIComponent(error)}`);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
     };
-    fetchPermissionsAndAccounts();
-  }, []);
 
-  const fetchAccounts = async () => {
-    try {
-      const activeAccounts = await ApiService.getConnectedAccounts();
-      if (Array.isArray(activeAccounts)) {
-        setAccounts(activeAccounts);
-      }
-    } catch (err) {
-      console.error('Failed to query connected accounts:', err);
-    }
-  };
-
-  useEffect(() => {
-    socketClient.connect();
-    fetchAccounts();
-
-    // Check for callback parameters when returning from real OAuth provider redirect
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const connected = params.get('connected');
-      const error = params.get('error');
-
-      if (connected) {
-        toast.success(`Successfully connected your real ${connected} profile!`);
-        accountEvents.notifyAccountChange('CONNECTED', connected.toUpperCase());
-        window.history.replaceState({}, document.title, window.location.pathname);
-        fetchAccounts();
-      } else if (error) {
-        toast.error(`OAuth Connection Error: ${decodeURIComponent(error)}`);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
+    initPageData();
   }, [toast]);
 
   const handleConnect = async (platform: 'INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK') => {
@@ -130,11 +136,25 @@ export default function SocialAccountsPage() {
 
     if (simulateMode) {
       try {
+        let accountType = 'PERSONAL';
+        let username = `mock_${platform.toLowerCase()}_creator`;
+
+        if (platform === 'LINKEDIN') {
+          const hasPersonal = accounts.some((acc) => acc.platform === 'LINKEDIN' && (acc.accountType === 'PERSONAL' || !acc.accountType));
+          if (hasPersonal) {
+            accountType = 'ORGANIZATION';
+            username = 'Avenar (Company Page)';
+          } else {
+            username = 'Ayush Raj (Personal Profile)';
+          }
+        }
+
         await ApiService.connectMockAccount(
           platform,
-          `mock_${platform.toLowerCase()}_creator`
+          username,
+          accountType
         );
-        toast.success(`Successfully linked mock ${platform} account (Sandbox Simulation Mode).`);
+        toast.success(`Linked mock ${platform} ${accountType === 'ORGANIZATION' ? 'Company Page' : 'account'} (Sandbox Mode).`);
         accountEvents.notifyAccountChange('CONNECTED', platform);
         fetchAccounts();
       } catch (mockErr) {
@@ -260,9 +280,9 @@ export default function SocialAccountsPage() {
           .filter((plt) => allowedPlatforms.includes(plt.id))
           .map((plt) => {
           const Icon = plt.icon;
-          const linkedAccount = findAccount(plt.id);
-          const isLinked = !!linkedAccount;
-          const isLoading = actionLoading === plt.id || (isLinked && actionLoading === linkedAccount.id);
+          const platformAccounts = accounts.filter(acc => acc.platform?.toUpperCase() === plt.id);
+          const isLinked = platformAccounts.length > 0;
+          const isLoading = actionLoading === plt.id;
 
           return (
             <div 
@@ -287,7 +307,7 @@ export default function SocialAccountsPage() {
                     ) : (
                       <span className="w-2 h-2 rounded-full bg-slate-600 shrink-0" />
                     )}
-                    {isLinked ? 'Connected' : 'Unlinked'}
+                    {isLinked ? `${platformAccounts.length} Connected` : 'Unlinked'}
                   </span>
                 </div>
 
@@ -296,55 +316,61 @@ export default function SocialAccountsPage() {
               </div>
 
               {/* Connected details or button */}
-              <div className="mt-8 pt-4 border-t border-slate-800/60">
+              <div className="mt-8 pt-4 border-t border-slate-800/60 space-y-3">
                 {isLinked ? (
-                  <div className="space-y-4">
-                    <div className="bg-slate-950/60 border border-slate-800/50 rounded-xl p-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center font-bold text-indigo-400 text-xs">
-                        {linkedAccount.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="overflow-hidden">
-                        <p className="text-xs font-semibold text-slate-200 truncate">@{linkedAccount.username}</p>
-                        {linkedAccount.expiresAt && (
-                          <span className="text-[9px] text-slate-500 font-semibold block uppercase">
-                            Expires: {formatDate(linkedAccount.expiresAt)} UTC
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="space-y-3">
+                    {platformAccounts.map((linkedAccount) => {
+                      const isOrg = linkedAccount.accountType === 'ORGANIZATION';
+                      const isAccLoading = actionLoading === linkedAccount.id;
 
-                    {plt.id === 'X' && (
-                      <div className="flex items-center justify-between bg-cyan-950/20 border border-cyan-500/20 rounded-xl px-3 py-2 text-[10px]">
-                        <span className="font-bold text-cyan-300 flex items-center gap-1.5">
-                          <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-                          X Premium (25,000 Chars Limit)
-                        </span>
-                        <span className={`font-extrabold px-2 py-0.5 rounded-full uppercase ${
-                          linkedAccount.isPremium ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {linkedAccount.isPremium ? 'ACTIVE' : 'STANDARD'}
-                        </span>
-                      </div>
-                    )}
+                      return (
+                        <div key={linkedAccount.id} className="bg-slate-950/70 border border-slate-800/60 rounded-2xl p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              {linkedAccount.avatarUrl ? (
+                                <img src={linkedAccount.avatarUrl} alt={linkedAccount.username} className="w-8 h-8 rounded-xl object-cover border border-slate-800 shrink-0" />
+                              ) : (
+                                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isOrg ? 'bg-purple-600/20 border-purple-500/30 text-purple-400' : 'bg-indigo-600/20 border-indigo-500/30 text-indigo-400'
+                                }`}>
+                                  {isOrg ? <Building2 className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                                </div>
+                              )}
+                              <div className="overflow-hidden">
+                                <p className="text-xs font-semibold text-slate-200 truncate">{linkedAccount.username}</p>
+                                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border inline-flex items-center gap-1 mt-0.5 ${
+                                  isOrg
+                                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                                    : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                                }`}>
+                                  {isOrg ? <Building2 className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
+                                  {isOrg ? 'Company Page' : 'Personal'}
+                                </span>
+                              </div>
+                            </div>
 
-                    <button
-                      onClick={() => handleDisconnect(linkedAccount.id, plt.name)}
-                      disabled={isLoading}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-950 hover:bg-rose-950/10 border border-slate-800 hover:border-rose-900/30 text-slate-300 hover:text-rose-400 rounded-xl text-xs font-semibold transition-all duration-300 disabled:opacity-50"
-                    >
-                      {isLoading ? (
-                        <span className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Unlink className="h-3.5 w-3.5" />
-                      )}
-                      Disconnect Account
-                    </button>
+                            <button
+                              onClick={() => handleDisconnect(linkedAccount.id, plt.name)}
+                              disabled={isAccLoading}
+                              className="p-2 bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/40 text-slate-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer"
+                              title="Disconnect Account"
+                            >
+                              {isAccLoading ? (
+                                <span className="w-3.5 h-3.5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin block" />
+                              ) : (
+                                <Unlink className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <button
                     onClick={() => handleConnect(plt.id)}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all duration-300 active:scale-95 shadow-md shadow-indigo-500/10 hover:shadow-indigo-500/20 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all duration-300 active:scale-95 shadow-md shadow-indigo-500/10 hover:shadow-indigo-500/20 disabled:opacity-50 cursor-pointer"
                   >
                     {isLoading ? (
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
