@@ -55,3 +55,4 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+scratch/
