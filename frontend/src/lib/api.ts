@@ -3,7 +3,10 @@ import type { PlatformId } from '@/config/platforms';
 import { toast } from '@/components/Toast';
 
 // Get API base URL from env or default to localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = rawApiUrl.startsWith('http://') || rawApiUrl.startsWith('https://') 
+  ? rawApiUrl 
+  : `https://${rawApiUrl}`;
 
 export const apiClient = axios.create({
   baseURL: API_URL,

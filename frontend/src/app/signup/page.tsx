@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
   const toast = useToast();
@@ -20,6 +21,11 @@ export default function SignupPage() {
     e.preventDefault();
     if (!name || !email || !password) {
       toast.error('Please fill in all registration details.');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      toast.error('Please accept the Privacy Policy to create an account.');
       return;
     }
 
@@ -132,6 +138,24 @@ export default function SignupPage() {
               className="w-full pl-11 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder:text-slate-650 focus:outline-none focus:border-indigo-650 transition-all"
             />
           </div>
+        </div>
+
+        {/* Privacy Policy Agreement Checkbox */}
+        <div className="flex items-start gap-2.5 pt-1 pb-1">
+          <input
+            type="checkbox"
+            id="terms"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            disabled={loading}
+            className="mt-0.5 rounded border-slate-800 bg-slate-950/60 text-indigo-600 focus:ring-indigo-650 accent-indigo-650 cursor-pointer"
+          />
+          <label htmlFor="terms" className="text-[11px] text-slate-400 leading-snug cursor-pointer select-none">
+            I agree to the{' '}
+            <Link href="/privacy" target="_blank" className="text-indigo-400 hover:text-indigo-300 font-semibold underline">
+              Privacy Policy & Terms
+            </Link>
+          </label>
         </div>
 
         {/* Submit Button */}
