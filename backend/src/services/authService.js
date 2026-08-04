@@ -375,9 +375,9 @@ export class AuthService {
     ==================================================================
     📧 [MOCK EMAIL SERVICE] SENDING VERIFICATION EMAIL
     To: ${email}
-    Subject: Verify your Social Autopilot Account
+    Subject: Verify your OmniSync Account
     
-    Welcome to Social Autopilot! Please confirm your email address by clicking the link below:
+    Welcome to OmniSync! Please confirm your email address by clicking the link below:
     ${verificationLink}
     ==================================================================
     `);

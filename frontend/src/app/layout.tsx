@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Social Autopilot Dashboard',
+  title: 'OmniSync Dashboard',
   description: 'Enterprise Social Media Posting Scheduler & AI Content Generator',
 };
 

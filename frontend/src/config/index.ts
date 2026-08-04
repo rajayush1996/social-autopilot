@@ -9,7 +9,7 @@ const formattedApiUrl = rawApiUrl.startsWith('http://') || rawApiUrl.startsWith(
 
 export const CONFIG = {
   API_URL: formattedApiUrl,
-  APP_NAME: 'Autopilot',
+  APP_NAME: 'OmniSync',
   APP_SUBTITLE: 'Social Copilot',
   POLLING_INTERVAL_MS: 15000, // 15 seconds credits refresh
 };

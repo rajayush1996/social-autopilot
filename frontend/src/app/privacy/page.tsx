@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">1. Overview & Multi-Platform Scope</h2>
           <p className="text-xs leading-relaxed text-slate-300">
-            Social Autopilot (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) provides an automated social media content generation, scheduling, and multi-channel publishing SaaS platform. This Privacy Policy details how we collect, handle, encrypt, and protect your data when you connect your accounts across <strong>Instagram (Meta)</strong>, <strong>LinkedIn</strong>, and <strong>X (Twitter)</strong>.
+            OmniSync (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) provides an automated social media content generation, scheduling, and multi-channel publishing SaaS platform. This Privacy Policy details how we collect, handle, encrypt, and protect your data when you connect your accounts across <strong>Instagram (Meta)</strong>, <strong>LinkedIn</strong>, and <strong>X (Twitter)</strong>.
           </p>
         </section>
 
@@ -26,7 +26,7 @@ export default function PrivacyPolicy() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">2. Information We Collect</h2>
           <div className="text-xs leading-relaxed text-slate-300 space-y-2">
-            <p>When you register and interact with Social Autopilot, we collect:</p>
+            <p>When you register and interact with OmniSync, we collect:</p>
             <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
               <li><strong>User Account Profile:</strong> Your name, email address, password hash, and subscription plan tier.</li>
               <li><strong>Social OAuth Tokens:</strong> Encrypted OAuth 2.0 access tokens, refresh tokens, profile IDs, handle names, and expiration timestamps provided by linked platforms.</li>

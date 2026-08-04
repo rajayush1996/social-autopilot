@@ -55,7 +55,7 @@ export default function LoginPage() {
             Welcome Back
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Access your autonomous social publishing autopilot
+            Access your OmniSync social media publishing platform
           </p>
         </div>
       </div>

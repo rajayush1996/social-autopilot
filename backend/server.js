@@ -63,7 +63,7 @@ app.get('/health', async (req, res) => {
   const redisConnected = await checkRedisConnection();
   return res.json({
     status: dbConnected && redisConnected ? 'UP' : 'DEGRADED',
-    service: 'Social Media Autopilot Backend (BullMQ & Redis Enabled)',
+    service: 'OmniSync Platform Backend (BullMQ & Redis Enabled)',
     database: dbConnected ? 'CONNECTED' : 'DISCONNECTED',
     redis: redisConnected ? 'CONNECTED' : 'DISCONNECTED',
     timestamp: new Date().toISOString(),
@@ -77,7 +77,7 @@ app.get('/', (req, res) => {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>Social Autopilot API Dashboard (BullMQ & Redis)</title>
+      <title>OmniSync API Dashboard (BullMQ & Redis)</title>
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; max-width: 900px; margin: 0 auto; }
         h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 0.5rem; }
@@ -89,7 +89,7 @@ app.get('/', (req, res) => {
       </style>
     </head>
     <body>
-      <h1>🚀 Social Autopilot Backend (BullMQ Queue & Redis)</h1>
+      <h1>🚀 OmniSync Backend (BullMQ Queue & Redis)</h1>
       <p>High-performance Express.js Backend with PostgreSQL/Prisma, BullMQ, OpenAI, & Social Media APIs (Instagram, LinkedIn, X).</p>
       
       <div class="card">

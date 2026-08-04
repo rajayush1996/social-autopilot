@@ -59,7 +59,7 @@ export function Sidebar() {
     { name: 'Social Accounts', href: '/accounts', icon: Users },
     { name: 'AI Post Composer', href: '/composer', icon: PenTool },
     { name: 'Queue & History', href: '/posts', icon: Calendar },
-    { name: 'Autopilot Settings', href: '/settings', icon: Settings },
+    { name: 'OmniSync Settings', href: '/settings', icon: Settings },
     { name: 'Profile & Settings', href: '/profile', icon: UserIcon },
     ...(role.toUpperCase() === 'SUPER_ADMIN' || role.toUpperCase() === 'ADMIN' ? [{ name: 'Admin Control', href: '/admin', icon: Sliders }] : []),
   ];

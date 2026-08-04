@@ -1,4 +1,4 @@
-# 🚀 Social Autopilot (Social Copilot)
+# 🚀 OmniSync (Social Copilot)
 
 An enterprise-grade, multi-platform social media scheduler and automated content generator. The system leverages **OpenAI GPT** to dynamically generate and adapt posts for different social platforms, schedules them via distributed queues (**BullMQ & Redis**), handles direct media uploads, and publishes them across **Instagram**, **LinkedIn**, and **X (Twitter)**.
 

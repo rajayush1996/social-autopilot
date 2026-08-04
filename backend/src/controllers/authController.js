@@ -220,7 +220,7 @@ export const verifyEmail = catchAsync(async (req, res) => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Verification Failed - Social Autopilot</title>
+        <title>Verification Failed - OmniSync</title>
         <style>
           body {
             background-color: #0b0f19;
@@ -265,7 +265,7 @@ export const verifyEmail = catchAsync(async (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Email Verified - Social Autopilot</title>
+      <title>Email Verified - OmniSync</title>
       <style>
         body { background-color: #0b0f19; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
         .card { background: rgba(17, 24, 39, 0.4); border: 1px solid rgba(30, 41, 59, 0.8); padding: 2.5rem; border-radius: 1.5rem; text-align: center; max-width: 400px; backdrop-filter: blur(12px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }

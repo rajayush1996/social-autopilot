@@ -1,5 +1,5 @@
 {
-  "name": "social-autopilot-backend",
+  "name": "omnisync-backend",
   "version": "1.0.0",
   "description": "Production Express.js backend with PostgreSQL/Prisma, Node-Cron task scheduler, OpenAI text generation, and Social Media Publishing APIs (Instagram, LinkedIn, X).",
   "main": "server.js",

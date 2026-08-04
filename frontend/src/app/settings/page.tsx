@@ -82,7 +82,7 @@ export default function AutopilotSettingsPage() {
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">
-          Autonomous Autopilot Engine Settings
+          OmniSync Engine Settings
         </h1>
         <p className="text-slate-400 mt-1">
           Configure daily autonomous AI post generation, brand niche context, and recurring alarm dispatches.
@@ -100,7 +100,7 @@ export default function AutopilotSettingsPage() {
               <div>
                 <h2 className="text-md font-bold flex items-center gap-2 text-slate-100">
                   <Settings className="h-5 w-5 text-indigo-400" />
-                  Autopilot Engine Controls
+                  OmniSync Engine Controls
                 </h2>
                 <span className="text-[10px] text-slate-400 font-semibold">
                   Enable or disable automated daily publishing cycles
