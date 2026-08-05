@@ -187,6 +187,8 @@ export default function Home() {
             </Link>
             <Link 
               href="/login"
+              className="px-6 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2"
+            >
               <Play className="h-3.5 w-3.5 fill-slate-300" />
               Live Workspace Demo
             </Link>

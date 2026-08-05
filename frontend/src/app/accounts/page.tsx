@@ -129,7 +129,7 @@ export default function SocialAccountsPage() {
     };
 
     initPageData();
-  }, [toast]);
+  }, []);
 
   const handleConnect = async (platform: 'INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK') => {
     setActionLoading(platform);

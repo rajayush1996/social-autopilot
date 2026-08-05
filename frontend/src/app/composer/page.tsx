@@ -232,7 +232,7 @@ export default function ComposerPage() {
       unsubscribeNotification();
       unsubscribeEvents();
     };
-  }, [toast]);
+  }, []);
 
   const handlePresetSelect = (presetText: string) => {
     setTopic(presetText);

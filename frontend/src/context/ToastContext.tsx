@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -40,8 +40,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const error = useCallback((message: string) => showToast(message, 'error'), [showToast]);
   const info = useCallback((message: string) => showToast(message, 'info'), [showToast]);
 
+  const value = useMemo(() => ({ showToast, success, error, info }), [showToast, success, error, info]);
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info }}>
+    <ToastContext.Provider value={value}>
       {children}
       {/* Toast Notification Container */}
       <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none" suppressHydrationWarning>
