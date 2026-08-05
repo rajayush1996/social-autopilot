@@ -350,22 +350,55 @@ function generateMockPostContent({ prompt, platform, tone, emojiDensity, hashtag
 }
 
 /**
- * Magic Prompt Enhancer: Expands a user's rough 2-3 word thought into an optimized, high-converting social media prompt.
+ * Helper: Recursively unwrap nested prompt enhancement strings to extract true core thought.
+ */
+function extractCoreThought(text) {
+  if (!text) return '';
+  let cleaned = text.trim();
+  
+  // Strip outer quotes and common template prefixes
+  cleaned = cleaned.replace(/^(?:💡\s*How to master\s*)?(?:Adapt this core message for [^:]+:\s*)?/gi, '');
+
+  let prev;
+  do {
+    prev = cleaned;
+    // Unwrap nested 'Write a viral, high-converting ... post about "... "'
+    cleaned = cleaned.replace(/^Write a (?:viral,\s*)?high-converting \w+ post about "([\s\S]*)"(?:\.\s*Use a [\s\S]*tone[\s\S]*)?$/i, '$1').trim();
+    cleaned = cleaned.replace(/^Write a (?:viral,\s*)?high-converting \w+ post about ([\s\S]*)$/i, '$1').trim();
+    // Unwrap quotes surrounding whole string
+    if (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.length > 2) {
+      cleaned = cleaned.slice(1, -1).trim();
+    }
+  } while (cleaned !== prev && cleaned.length > 0);
+
+  return cleaned;
+}
+
+/**
+ * Magic Prompt Enhancer: Expands a user's rough thought into an optimized, high-converting social media prompt.
  */
 export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = 'ENGAGING' }) {
   if (!rawThought || !rawThought.trim()) {
     throw new Error('A rough thought or topic is required to enhance prompt.');
   }
 
+  const cleanThought = extractCoreThought(rawThought);
   const openai = getOpenAIClient();
 
+  // Helper to format mock response cleanly without recursive nesting
+  const formatMockPrompt = (thought) => {
+    const isDetailed = thought.split(/\s+/).length > 12;
+    if (isDetailed) {
+      return `Create a high-converting ${platform} post focusing on: ${thought}. Tone: ${tone.toLowerCase()}. Include a compelling hook, 3 key takeaways, clean formatting with emojis, and an engaging question at the end.`;
+    }
+    return `Write a viral, high-converting ${platform} post about "${thought}". Use a ${tone.toLowerCase()} tone. Start with a powerful hook in the first line, explain 3 key actionable takeaways, use clean formatting with emojis, and conclude with an engaging Call-to-Action question.`;
+  };
+
   if (!openai) {
-    const cleanThought = rawThought.trim();
-    const enhancedMock = `Write a viral, high-converting ${platform} post about "${cleanThought}". Use a ${tone.toLowerCase()} tone. Start with a powerful attention-grabbing hook in the first line, explain 3 key actionable takeaways, use clean formatting with emojis, and conclude with an engaging Call-to-Action question for the audience.`;
     return {
       success: true,
       originalThought: cleanThought,
-      enhancedPrompt: enhancedMock,
+      enhancedPrompt: formatMockPrompt(cleanThought),
       isMock: true,
     };
   }
@@ -376,33 +409,31 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
       messages: [
         {
           role: 'system',
-          content: `You are an expert AI Prompt Engineer for Social Media Content Creators. Your job is to take a raw, short, or rough thought from a user and expand it into a detailed, high-converting, structured prompt that will generate an extraordinary ${platform} post in a ${tone} tone. Keep the output prompt concise, clear, and actionable (2-4 sentences max). Output ONLY the enhanced prompt string without meta-commentary or quotation marks.`,
+          content: `You are an expert AI Prompt Engineer for Social Media Content Creators. Your job is to take a raw, short, or rough thought from a user and expand it into a detailed, high-converting, structured prompt that will generate an extraordinary ${platform} post in a ${tone} tone. Keep the output prompt concise, clear, and actionable (2-4 sentences max). Output ONLY the enhanced prompt string without meta-commentary, quotation marks, or recursive nested wrappers.`,
         },
         {
           role: 'user',
-          content: `Raw Thought: "${rawThought.trim()}"`,
+          content: `Raw Thought: "${cleanThought}"`,
         },
       ],
       temperature: 0.7,
       max_tokens: 200,
     });
 
-    const enhancedText = response.choices[0]?.message?.content?.trim() || rawThought;
+    const enhancedText = extractCoreThought(response.choices[0]?.message?.content?.trim() || cleanThought);
 
     return {
       success: true,
-      originalThought: rawThought,
-      enhancedPrompt: enhancedText,
+      originalThought: cleanThought,
+      enhancedPrompt: enhancedText || formatMockPrompt(cleanThought),
       isMock: false,
     };
   } catch (err) {
     logger.warn(`[AIService] Enhance prompt OpenAI fallback: ${err.message}`);
-    const cleanThought = rawThought.trim();
-    const enhancedMock = `Write a viral, high-converting ${platform} post about "${cleanThought}". Use a ${tone.toLowerCase()} tone with a strong hook, 3 actionable bullet points, and a strong CTA.`;
     return {
       success: true,
       originalThought: cleanThought,
-      enhancedPrompt: enhancedMock,
+      enhancedPrompt: formatMockPrompt(cleanThought),
       isMock: true,
     };
   }
