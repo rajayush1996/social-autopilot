@@ -392,11 +392,13 @@ export default function ComposerPage() {
       await ApiService.createPost(payload);
       toast.success(publishNow ? 'Post published successfully!' : 'Post scheduled successfully!');
       
-      // Reset Form Inputs
+      // Reset Form & Context Inputs
       setTopic('');
+      dispatch(setTopicAction(''));
       setGeneratedDrafts({});
       setMediaFileUrl('');
       setMediaType(null);
+      setScheduledDate('');
     } catch (err: any) {
       console.error('Scheduling failed:', err);
       toast.error(err.response?.data?.message || 'Failed to schedule post.');

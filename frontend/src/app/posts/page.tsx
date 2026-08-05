@@ -18,6 +18,7 @@ import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { formatDateTime, formatDate } from '@/utils/date';
 import CarouselSlideDeck from '@/components/CarouselSlideDeck';
+import socketClient from '@/utils/socket';
 
 // Custom Instagram icon component to avoid missing lucide exports
 function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -84,8 +85,6 @@ export default function PostsPage() {
       setSavingPostId(null);
     }
   };
-
-import socketClient from '@/utils/socket';
 
   const fetchPosts = async () => {
     try {
