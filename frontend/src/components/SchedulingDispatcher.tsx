@@ -1101,10 +1101,7 @@ export function SchedulingDispatcher() {
                   </div>
 
                   <div className="col-span-2 space-y-1 pt-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block flex items-center justify-between">
-                      <span>Hashtag / Tags Strategy</span>
-                      <span className="text-[9px] text-cyan-400 font-mono">Excluded from body length</span>
-                    </label>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Hashtags</label>
                     <select
                       value={formHashtagCount}
                       onChange={(e) => setFormHashtagCount(e.target.value)}

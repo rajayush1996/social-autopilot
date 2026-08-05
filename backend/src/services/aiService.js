@@ -439,6 +439,29 @@ function extractCoreThought(text) {
 }
 
 /**
+ * Helper to mask and unmask dynamic placeholders (e.g. {{PRODUCT_LINK}}, {brand_name}) during AI enhancement
+ */
+function maskPlaceholders(text) {
+  if (!text) return { maskedText: '', placeholders: [] };
+  const placeholders = [];
+  const maskedText = text.replace(/\{\{[\w\-_:]+\}\}|\{[\w\-_:]+\}/g, (match) => {
+    const token = `__PLACEHOLDER_${placeholders.length}__`;
+    placeholders.push({ token, original: match });
+    return token;
+  });
+  return { maskedText, placeholders };
+}
+
+function unmaskPlaceholders(text, placeholders) {
+  if (!text || !placeholders || !placeholders.length) return text;
+  let result = text;
+  placeholders.forEach(({ token, original }) => {
+    result = result.split(token).join(original);
+  });
+  return result;
+}
+
+/**
  * Magic Prompt Enhancer: Expands a user's rough thought into an optimized, high-converting social media prompt.
  */
 export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = 'ENGAGING' }) {
@@ -447,6 +470,7 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
   }
 
   const cleanThought = extractCoreThought(rawThought);
+  const { maskedText, placeholders } = maskPlaceholders(cleanThought);
   const openai = getOpenAIClient();
 
   // Helper to format mock response cleanly without raw bracket tags or recursive nesting
@@ -466,10 +490,11 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
   };
 
   if (!openai) {
+    const mockOutput = formatMockPrompt(maskedText);
     return {
       success: true,
       originalThought: cleanThought,
-      enhancedPrompt: formatMockPrompt(cleanThought),
+      enhancedPrompt: unmaskPlaceholders(mockOutput, placeholders),
       isMock: true,
       mockReason: 'OpenAI API key missing or invalid format',
     };
@@ -483,34 +508,37 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
           role: 'system',
           content: `You are an expert AI Prompt Optimizer. Your job is to refine a user's prompt for ${platform} in a ${tone} tone.
 RULES:
-1. Preserve 100% of the user's domain, theme, and intent (whether it is Shayari, Relationship advice, Sports analysis, Fitness tips, or Startup case studies).
-2. If the user provided multiple examples (e.g. Loom or Skyscanner, Keto or Fasting), add an explicit instruction to focus on EXACTLY ONE primary subject per post.
+1. Preserve 100% of the user's domain, theme, and intent.
+2. If the user provided multiple examples, add an explicit instruction to focus on EXACTLY ONE primary subject per post.
 3. If the user's prompt is already detailed and rich, keep it mostly intact, only sharpening the clarity.
-4. Output ONLY the optimized prompt string without meta-commentary, headers like "Create a post focusing on:", or quotation marks.`,
+4. CRITICAL: Preserve all __PLACEHOLDER_X__ tokens EXACTLY as they are without deleting, renaming, or modifying them.
+5. Output ONLY the optimized prompt string without meta-commentary, headers like "Create a post focusing on:", or quotation marks.`,
         },
         {
           role: 'user',
-          content: `Raw Prompt: "${cleanThought}"`,
+          content: `Raw Prompt: "${maskedText}"`,
         },
       ],
       temperature: 0.5,
       max_tokens: 250,
     });
 
-    const enhancedText = extractCoreThought(response.choices[0]?.message?.content?.trim() || cleanThought);
+    const rawEnhancedText = extractCoreThought(response.choices[0]?.message?.content?.trim() || maskedText);
+    const finalEnhanced = unmaskPlaceholders(rawEnhancedText || formatMockPrompt(maskedText), placeholders);
 
     return {
       success: true,
       originalThought: cleanThought,
-      enhancedPrompt: enhancedText || formatMockPrompt(cleanThought),
+      enhancedPrompt: finalEnhanced,
       isMock: false,
     };
   } catch (err) {
     logger.warn(`[AIService] Enhance prompt OpenAI fallback: ${err.message}`);
+    const fallbackOutput = formatMockPrompt(maskedText);
     return {
       success: true,
       originalThought: cleanThought,
-      enhancedPrompt: formatMockPrompt(cleanThought),
+      enhancedPrompt: unmaskPlaceholders(fallbackOutput, placeholders),
       isMock: true,
       mockReason: err.message,
     };
