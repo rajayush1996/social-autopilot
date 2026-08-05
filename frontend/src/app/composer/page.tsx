@@ -845,11 +845,14 @@ export default function ComposerPage() {
             <div className="lg:col-span-5 space-y-6">
               <div className="sticky top-6 space-y-4">
                 <div className="flex items-center justify-between px-1">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Feed Preview</h2>
+                  <div>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Feed Preview & Live Draft Editor</h2>
+                    <p className="text-[10px] text-indigo-400/80 font-medium">✏️ Click inside any preview box to edit text or carousel slides before scheduling</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsFullscreenPreview(true)}
-                    className="flex items-center gap-1.5 text-[10px] text-indigo-400 hover:text-indigo-300 font-bold bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 px-2.5 py-1 rounded-lg transition-all active:scale-95 shadow-sm"
+                    className="flex items-center gap-1.5 text-[10px] text-indigo-400 hover:text-indigo-300 font-bold bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 px-2.5 py-1 rounded-lg transition-all active:scale-95 shadow-sm cursor-pointer"
                     title="Expand preview to full screen popup"
                   >
                     <Maximize2 className="h-3 w-3" />

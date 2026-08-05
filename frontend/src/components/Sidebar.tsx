@@ -13,7 +13,8 @@ import {
   User as UserIcon,
   Settings,
   Sliders,
-  LogOut
+  LogOut,
+  BookOpen
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';

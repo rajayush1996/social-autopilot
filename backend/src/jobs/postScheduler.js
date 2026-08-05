@@ -42,49 +42,107 @@ export async function syncScheduledPostsToQueue() {
 }
 
 /**
+ * Helper to compute hours, minutes, day of week, and date string in a specific timezone.
+ */
+function getTimeAndDayInTimezone(date, timezone = 'UTC') {
+  try {
+    const tz = timezone || 'UTC';
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour12: false,
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    const partMap = {};
+    parts.forEach((p) => { partMap[p.type] = p.value; });
+
+    const dayMap = { Sun: 'SUN', Mon: 'MON', Tue: 'TUE', Wed: 'WED', Thu: 'THU', Fri: 'FRI', Sat: 'SAT' };
+    const day = dayMap[partMap.weekday] || 'MON';
+    let hours = parseInt(partMap.hour, 10);
+    if (hours === 24) hours = 0; // Handle 24:00 edge case in Intl
+    const minutes = parseInt(partMap.minute, 10);
+    const dateStr = `${partMap.year}-${partMap.month}-${partMap.day}`;
+
+    return {
+      hours,
+      minutes,
+      totalMinutes: hours * 60 + minutes,
+      day,
+      dateStr,
+    };
+  } catch (e) {
+    // Fallback to UTC
+    return {
+      hours: date.getUTCHours(),
+      minutes: date.getUTCMinutes(),
+      totalMinutes: date.getUTCHours() * 60 + date.getUTCMinutes(),
+      day: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getUTCDay()],
+      dateStr: date.toISOString().split('T')[0],
+    };
+  }
+}
+
+/**
  * Checks active Auto-Pilot Schedules and triggers dispatches if timeOfDay & day matches.
  */
 export async function checkAndTriggerAutoPilotSchedules() {
   const now = new Date();
-  const currentHours = now.getHours();
-  const currentMinutes = now.getMinutes();
-  const nowTotalMinutes = currentHours * 60 + currentMinutes;
-  
-  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  const currentDay = dayNames[now.getDay()];
-  const todayDateString = now.toDateString();
 
   try {
-    const matchingSchedules = await prisma.automationSchedule.findMany({
+    const activeSchedules = await prisma.automationSchedule.findMany({
       where: {
         isActive: true,
-        daysOfWeek: { has: currentDay },
       },
       include: {
         user: true,
       },
     });
 
-    for (const sched of matchingSchedules) {
+    for (const sched of activeSchedules) {
       if (!sched.user || sched.user.autopilotEnabled === false) continue;
 
-      // Parse schedule target time (e.g. "09:00" -> 9 * 60 = 540 total minutes)
+      const schedTz = sched.timezone || 'UTC';
+      const timeInfo = getTimeAndDayInTimezone(now, schedTz);
+
+      // Check if current day in target timezone matches schedule's active days
+      if (!sched.daysOfWeek || !sched.daysOfWeek.includes(timeInfo.day)) {
+        continue;
+      }
+
+      // Parse schedule target time (e.g. "20:00" -> 20 * 60 = 1200 total minutes)
       const [hStr, mStr] = (sched.timeOfDay || '09:00').split(':');
       const targetTotalMinutes = (parseInt(hStr, 10) || 9) * 60 + (parseInt(mStr, 10) || 0);
 
-      // Check if current time is at or past the scheduled timeOfDay for today
-      if (nowTotalMinutes >= targetTotalMinutes) {
-        // Skip if already executed today
-        if (sched.lastRunAt && new Date(sched.lastRunAt).toDateString() === todayDateString) {
+      // Check if current time in target timezone is at or past the scheduled timeOfDay
+      if (timeInfo.totalMinutes >= targetTotalMinutes) {
+        // Check if already executed for today's date in target timezone
+        const lastRunDateStr = sched.lastRunAt ? getTimeAndDayInTimezone(new Date(sched.lastRunAt), schedTz).dateStr : null;
+        if (lastRunDateStr === timeInfo.dateStr) {
           continue;
         }
 
-        logger.info(`⏰ [CronScheduler] Executing Auto-Pilot Schedule "${sched.name}" (${sched.id}) for user ${sched.userId}...`);
-        await ScheduleService.runScheduleNow(sched.id, sched.userId);
+        logger.info(`[PostScheduler] Triggering AutoPilot schedule "${sched.name}" (${sched.id}) for user ${sched.userId} at ${sched.timeOfDay} ${schedTz}`);
+
+        try {
+          await ScheduleService.runScheduleNow(sched.id, sched.userId);
+          
+          // Record successful execution timestamp
+          await prisma.automationSchedule.update({
+            where: { id: sched.id },
+            data: { lastRunAt: now },
+          });
+        } catch (err) {
+          logger.error(`[PostScheduler] Error running schedule ${sched.id}: ${err.message}`);
+        }
       }
     }
-  } catch (err) {
-    logger.error(`[CronScheduler] Error checking Auto-Pilot schedules: ${err.message}`);
+  } catch (error) {
+    logger.error(`[PostScheduler] Error checking autopilot schedules: ${error.message}`);
   }
 }
 

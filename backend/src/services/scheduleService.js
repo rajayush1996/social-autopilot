@@ -165,8 +165,9 @@ export class ScheduleService {
 
   /**
    * Trigger immediate execution of a single automation schedule.
+   * If updateExistingPostId is provided, updates an existing pending queued post instead of creating a duplicate.
    */
-  static async runScheduleNow(scheduleId, userId) {
+  static async runScheduleNow(scheduleId, userId, updateExistingPostId = null) {
     const schedule = await this.getScheduleById(scheduleId, userId);
     if (!schedule) {
       throw new Error('Schedule not found or unauthorized.');
@@ -223,18 +224,31 @@ export class ScheduleService {
       return target;
     })();
 
-    // Create post record scheduled for target time
-    const post = await PostService.createPost({
-      userId: user.id,
-      content: aiResult.content,
-      mediaUrls: [],
-      mediaType: null,
-      targetPlatforms: schedule.targetPlatforms,
-      status: POST_STATUS.SCHEDULED,
-      scheduledAt: targetScheduledAt,
-      aiGenerated: true,
-      aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
-    });
+    let post;
+    if (updateExistingPostId) {
+      // Update existing pending queued post with new AI content instead of creating a duplicate
+      post = await PostService.updatePost(updateExistingPostId, userId, {
+        content: aiResult.content,
+        targetPlatforms: schedule.targetPlatforms,
+        status: POST_STATUS.SCHEDULED,
+        scheduledAt: targetScheduledAt,
+        aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
+      });
+      logger.info(`[ScheduleService] Updated existing pending queued post (${post.id}) with new AI draft!`);
+    } else {
+      // Create post record scheduled for target time
+      post = await PostService.createPost({
+        userId: user.id,
+        content: aiResult.content,
+        mediaUrls: [],
+        mediaType: null,
+        targetPlatforms: schedule.targetPlatforms,
+        status: POST_STATUS.SCHEDULED,
+        scheduledAt: targetScheduledAt,
+        aiGenerated: true,
+        aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
+      });
+    }
 
     // Queue in BullMQ until exact target scheduledAt time
     await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });

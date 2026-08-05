@@ -9,7 +9,8 @@ import {
   CalendarDays,
   XCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Edit3
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -60,6 +61,29 @@ export default function PostsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const toast = useToast();
+
+  // Inline Post Editor state
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState<string>('');
+  const [savingPostId, setSavingPostId] = useState<string | null>(null);
+
+  const handleSavePostEdit = async (e: React.MouseEvent, postId: string) => {
+    e.stopPropagation();
+    setSavingPostId(postId);
+    try {
+      await ApiService.updatePost(postId, { content: editingContent });
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, content: editingContent } : p)));
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost({ ...selectedPost, content: editingContent });
+      }
+      toast.success('Post content updated successfully!');
+      setEditingPostId(null);
+    } catch (err) {
+      toast.error('Failed to save post edit.');
+    } finally {
+      setSavingPostId(null);
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -206,18 +230,66 @@ export default function PostsPage() {
                   </div>
                 </div>
 
-                {/* Content snippet & media thumbnail */}
+                {/* Content snippet & media thumbnail / Inline Editor */}
                 <div className="flex gap-4">
                   <div className="flex-1 space-y-2">
-                    <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">{post.content}</p>
-                    <span className="text-[10px] text-slate-500 font-semibold uppercase flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-slate-500" />
-                      {post.scheduledAt ? `${formatDateTime(post.scheduledAt)} UTC` : 'Published Immediate'}
-                    </span>
+                    {editingPostId === post.id ? (
+                      <div className="space-y-2 bg-slate-955 p-3 rounded-2xl border border-indigo-500/50" onClick={(e) => e.stopPropagation()}>
+                        <textarea
+                          rows={4}
+                          value={editingContent}
+                          onChange={(e) => setEditingContent(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 resize-none font-sans leading-relaxed"
+                          placeholder="Edit post content..."
+                        />
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setEditingPostId(null); }}
+                            className="px-3 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-lg text-xs font-semibold"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleSavePostEdit(e, post.id)}
+                            disabled={savingPostId === post.id}
+                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                          >
+                            {savingPostId === post.id ? 'Saving...' : 'Save Content'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">{post.content}</p>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-slate-500 font-semibold uppercase flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5 text-slate-500" />
+                            {post.scheduledAt ? `${formatDateTime(post.scheduledAt)} UTC` : 'Published Immediate'}
+                          </span>
+                          
+                          {(post.status === 'SCHEDULED' || post.status === 'DRAFT') && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingPostId(post.id);
+                                setEditingContent(post.content);
+                              }}
+                              className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 px-2.5 py-1 rounded-lg transition-all active:scale-95 cursor-pointer shadow-sm"
+                              title="Edit pending post content"
+                            >
+                              <Edit3 className="h-3 w-3" /> Edit Post Content
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {post.mediaUrls.length > 0 && (
-                    <div className="w-20 h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shrink-0">
+                    <div className="w-20 h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-955 shrink-0">
                       {post.mediaType === 'VIDEO' ? (
                         <video src={post.mediaUrls[0]} muted className="w-full h-full object-cover" />
                       ) : (
@@ -294,11 +366,42 @@ export default function PostsPage() {
                       platformLabel={selectedPost.targetPlatforms[0] || 'Social Post'}
                     />
                   ) : (
-                    <div className="bg-slate-950 border border-slate-855 rounded-2xl p-4 text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
+                    <div className="bg-slate-955 border border-slate-855 rounded-2xl p-4 text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
                       {selectedPost.content}
                     </div>
                   )}
                 </div>
+
+                {selectedPost.status === 'SCHEDULED' && (
+                  <div className="bg-slate-955 border border-indigo-500/30 rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-indigo-400" /> Reschedule Release Time
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-mono">Moves this post to a new slot</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        defaultValue={selectedPost.scheduledAt ? new Date(selectedPost.scheduledAt).toISOString().slice(0, 16) : ''}
+                        onChange={async (e) => {
+                          const newDateStr = e.target.value;
+                          if (!newDateStr) return;
+                          try {
+                            const isoDate = new Date(newDateStr).toISOString();
+                            await ApiService.updatePost(selectedPost.id, { scheduledAt: isoDate });
+                            setSelectedPost({ ...selectedPost, scheduledAt: isoDate });
+                            setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, scheduledAt: isoDate } : p));
+                            toast.success('Post rescheduled to new target date & time!');
+                          } catch (err) {
+                            toast.error('Failed to reschedule post.');
+                          }
+                        }}
+                        className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {selectedPost.mediaUrls.length > 0 && (
                   <div className="space-y-1.5">

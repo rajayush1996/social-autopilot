@@ -87,8 +87,8 @@ export class ApiService {
   /**
    * Trigger immediate execution of a specific schedule
    */
-  static async runScheduleNow(id: string): Promise<any> {
-    const response = await apiClient.post(API_ENDPOINTS.RUN_SCHEDULE_NOW(id));
+  static async runScheduleNow(id: string, updateExistingPostId?: string): Promise<any> {
+    const response = await apiClient.post(API_ENDPOINTS.RUN_SCHEDULE_NOW(id), { updateExistingPostId });
     return response.data?.data;
   }
 

@@ -351,6 +351,16 @@ export function SchedulingDispatcher() {
     }
   };
 
+  const getLocalBrowserTimezone = () => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
+    } catch (e) {
+      return 'UTC';
+    }
+  };
+
+  const [formTimezone, setFormTimezone] = useState<string>(getLocalBrowserTimezone());
+
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -358,6 +368,7 @@ export function SchedulingDispatcher() {
       const payload = {
         name: formName.trim() || 'Daily Auto-Post',
         timeOfDay: formTime,
+        timezone: formTimezone || getLocalBrowserTimezone(),
         daysOfWeek: formDays,
         repeatType: formRepeat,
         targetPlatforms: formPlatforms,
@@ -399,10 +410,20 @@ export function SchedulingDispatcher() {
   const handleRunNow = async (sched: AutomationSchedule) => {
     setRunningId(sched.id);
     try {
-      await ApiService.runScheduleNow(sched.id);
+      // Check if there is already a SCHEDULED pending post in the queue
+      const existingPendingPost = posts.find((p) => p.status === 'SCHEDULED');
+      const updateTargetId = existingPendingPost ? existingPendingPost.id : undefined;
+
+      await ApiService.runScheduleNow(sched.id, updateTargetId);
       setSchedules(prev => prev.map(s => s.id === sched.id ? { ...s, lastRunAt: new Date().toISOString() } : s));
-      toast.success(`Dispatched schedule "${sched.name}"! Post queued in Posts page.`);
+      
+      toast.success(
+        updateTargetId
+          ? `✨ Refreshed pending post for "${sched.name}" with new AI content!`
+          : `🚀 Dispatched schedule "${sched.name}"! Post queued in Posts page.`
+      );
       fetchSchedulesData();
+      fetchPostsData();
     } catch (err: any) {
       console.error('Failed to trigger schedule:', err);
       toast.error(err.response?.data?.message || 'Failed to trigger schedule dispatch.');
@@ -712,9 +733,14 @@ export function SchedulingDispatcher() {
                 {/* Timing & Repeat Mode */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                      Execution Time (24h Standard)
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                        Execution Time (24h)
+                      </label>
+                      <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full" title="Detected Local Browser Timezone">
+                        🌐 {formTimezone}
+                      </span>
+                    </div>
                     <input
                       type="time"
                       required

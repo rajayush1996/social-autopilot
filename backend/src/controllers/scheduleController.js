@@ -75,8 +75,9 @@ export const deleteSchedule = catchAsync(async (req, res) => {
 export const runScheduleNow = catchAsync(async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
+  const { updateExistingPostId } = req.body || {};
 
-  const result = await ScheduleService.runScheduleNow(id, userId);
+  const result = await ScheduleService.runScheduleNow(id, userId, updateExistingPostId);
   return successResponse(res, HttpStatus.OK, 'Schedule dispatched successfully.', result);
 });
 
