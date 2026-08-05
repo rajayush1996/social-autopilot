@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+import config from '../config/env.js';
 import { prisma } from '../config/db.js';
 import FeatureConfigService from './featureConfigService.js';
 import PostService from './postService.js';
@@ -7,6 +9,7 @@ import CampaignMemoryService from './campaignMemoryService.js';
 import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
 import logger from '../utils/logger.js';
+import emailService from './emailService.js';
 
 import CacheService from './cacheService.js';
 import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
@@ -252,6 +255,28 @@ export class ScheduleService {
 
     // Queue in BullMQ until exact target scheduledAt time
     await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });
+
+    // Send Email Approval Notification to User
+    if (user.email) {
+      try {
+        const approvalToken = jwt.sign(
+          { postId: post.id, userId: user.id },
+          config.jwt.secret,
+          { expiresIn: '7d' }
+        );
+        await emailService.sendPostApprovalEmail({
+          userEmail: user.email,
+          userName: user.name,
+          postId: post.id,
+          postContent: post.content,
+          targetPlatforms: post.targetPlatforms,
+          scheduledAt: post.scheduledAt,
+          approvalToken,
+        });
+      } catch (emailErr) {
+        logger.warn(`[ScheduleService] Email notification warning: ${emailErr.message}`);
+      }
+    }
 
     // Decrement user credits
     await UserService.decrementCredits(user.id);

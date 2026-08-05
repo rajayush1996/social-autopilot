@@ -156,6 +156,30 @@ export default function ComposerPage() {
   const toast = useToast();
 
   const isFetchingRef = useRef(false);
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertPlaceholderAtCursor = (placeholder: string) => {
+    if (!promptTextareaRef.current) {
+      setTopic(topic ? `${topic} ${placeholder}` : placeholder);
+      return;
+    }
+    const textarea = promptTextareaRef.current;
+    const start = textarea.selectionStart ?? topic.length;
+    const end = textarea.selectionEnd ?? topic.length;
+    const currentTopic = topic || '';
+    const needsSpaceBefore = start > 0 && currentTopic[start - 1] !== ' ';
+    const needsSpaceAfter = end < currentTopic.length && currentTopic[end] !== ' ';
+    const prefix = needsSpaceBefore ? ' ' : '';
+    const suffix = needsSpaceAfter ? ' ' : '';
+    const inserted = `${prefix}${placeholder}${suffix}`;
+    const newText = currentTopic.substring(0, start) + inserted + currentTopic.substring(end);
+    setTopic(newText);
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = start + inserted.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 10);
+  };
 
   const fetchAccounts = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -381,11 +405,13 @@ export default function ComposerPage() {
       await ApiService.createPost(payload);
       toast.success(publishNow ? 'Post published successfully!' : 'Post scheduled successfully!');
       
-      // Reset Form Inputs
+      // Reset Form & Context Inputs
       setTopic('');
+      dispatch(setTopicAction(''));
       setGeneratedDrafts({});
       setMediaFileUrl('');
       setMediaType(null);
+      setScheduledDate('');
     } catch (err: any) {
       console.error('Scheduling failed:', err);
       toast.error(err.response?.data?.message || 'Failed to schedule post.');
@@ -533,16 +559,64 @@ export default function ComposerPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    {/* Prompt Header Toolbar with Dropdown */}
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <PenTool className="w-3.5 h-3.5 text-indigo-400" />
+                        Prompt Text
+                      </label>
+
+                      {/* Universal Dynamic Variable Dropdown */}
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            insertPlaceholderAtCursor(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="bg-slate-955 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 text-[11px] font-bold rounded-xl px-2.5 py-1 outline-none cursor-pointer hover:border-indigo-500/60 transition-all shadow-sm"
+                        title="Insert dynamic links or variables at cursor position"
+                      >
+                        <option value="">+ Insert Placeholder ▾</option>
+                        <option value="{{PRODUCT_LINK}}">🔗 {"{{PRODUCT_LINK}}"}</option>
+                        <option value="{{PRODUCT_NAME}}">🏷️ {"{{PRODUCT_NAME}}"}</option>
+                        <option value="{{WEBSITE_URL}}">🌐 {"{{WEBSITE_URL}}"}</option>
+                        <option value="{{PROMO_CODE}}">🎟️ {"{{PROMO_CODE}}"}</option>
+                        <option value="{{CTA_LINK}}">⚡ {"{{CTA_LINK}}"}</option>
+                      </select>
+                    </div>
+
                     <textarea
+                      ref={promptTextareaRef}
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
-                      placeholder="What would you like to post about today? (e.g. 'ai marketing trends')"
+                      placeholder="What would you like to post about? Type @ or use the Insert Placeholder dropdown to attach dynamic links (e.g. 'Promote {{PRODUCT_NAME}} using link {{PRODUCT_LINK}}')"
                       rows={4}
                       className="w-full bg-slate-955 border border-slate-850 rounded-2xl px-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600 leading-relaxed resize-none"
                     />
 
+                    {/* Quick Insert Pills */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Variables:</span>
+                      {[
+                        { label: '🔗 Link', tag: '{{PRODUCT_LINK}}' },
+                        { label: '🏷️ Name', tag: '{{PRODUCT_NAME}}' },
+                        { label: '🌐 Website', tag: '{{WEBSITE_URL}}' },
+                        { label: '🎟️ Code', tag: '{{PROMO_CODE}}' },
+                      ].map((item, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => insertPlaceholderAtCursor(item.tag)}
+                          className="text-[10px] bg-slate-955 hover:bg-indigo-950/40 text-indigo-400 hover:text-indigo-300 border border-slate-850 hover:border-indigo-500/40 font-mono font-medium px-2 py-0.5 rounded-md transition-all active:scale-95"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Magic Enhance Prompt Bar */}
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2 pt-1">
                       <button
                         type="button"
                         onClick={handleEnhancePrompt}
@@ -552,7 +626,7 @@ export default function ComposerPage() {
                         <Sparkles className={`w-3.5 h-3.5 ${isEnhancing ? 'animate-spin' : ''}`} />
                         {isEnhancing ? 'Enhancing Prompt...' : '✨ Magic Enhance Prompt'}
                       </button>
-                      <span className="text-[10px] text-slate-500">Expands rough thoughts into high-converting prompts</span>
+                      <span className="text-[10px] text-slate-500">Expands rough thoughts while keeping placeholders safe</span>
                     </div>
 
                     {/* Preset Pills */}
@@ -685,10 +759,7 @@ export default function ComposerPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block flex items-center justify-between">
-                      <span>Hashtag / Tags Strategy</span>
-                      <span className="text-[9px] text-cyan-400 font-mono font-normal">Excluded from body length</span>
-                    </label>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Hashtags</label>
                     <select
                       value={hashtagCount}
                       onChange={(e) => setHashtagCount(e.target.value)}
