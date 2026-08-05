@@ -5,6 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import StoreProvider from '@/store/StoreProvider';
 import GlobalErrorBoundary from '@/components/GlobalErrorBoundary';
 import { ToastContainer } from '@/components/Toast';
+import ConsoleGuard from '@/components/ConsoleGuard';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className="bg-slate-950 text-slate-100" suppressHydrationWarning>
         <GlobalErrorBoundary>
           <StoreProvider>
+            <ConsoleGuard />
             <ToastContainer />
             <AppLayout>{children}</AppLayout>
           </StoreProvider>

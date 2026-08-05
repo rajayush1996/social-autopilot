@@ -270,6 +270,7 @@ export class PostService {
    * Log AI generation history.
    */
   static async logAiGeneration({ userId, prompt, generatedContent, generatedText, modelUsed = 'openai-gpt-4o', tokensUsed = 120 }) {
+    if (process.env.DISABLE_AUDIT_LOGS === 'true') return null;
     const textToSave = generatedText || (typeof generatedContent === 'object' ? JSON.stringify(generatedContent) : String(generatedContent || ''));
     return prisma.aIGenerationLog.create({
       data: {

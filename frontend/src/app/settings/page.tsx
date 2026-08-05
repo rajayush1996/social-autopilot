@@ -152,6 +152,25 @@ export default function AutopilotSettingsPage() {
                 </span>
               </div>
 
+              {/* System Audit & Production Logging Mode Control */}
+              <div className="bg-slate-955 border border-slate-850 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Settings className="h-3.5 w-3.5 text-indigo-400" />
+                      Production Logging & Audit Trail Mode
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Filters debug clutter in production while keeping critical error logs active
+                    </p>
+                  </div>
+
+                  <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                    Filtered Production Mode (Quiet)
+                  </span>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={updatingSettings}

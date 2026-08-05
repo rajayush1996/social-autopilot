@@ -21,9 +21,10 @@ const LOG_LEVELS = {
   debug: 3,
 };
 
-const currentLogLevel = config.logLevel || (config.env === 'production' ? 'info' : 'debug');
+const currentLogLevel = process.env.LOG_LEVEL || config.logLevel || (config.env === 'production' ? 'info' : 'debug');
 
 function shouldLog(level) {
+  if (process.env.DISABLE_LOGGING === 'true' || currentLogLevel === 'silent') return false;
   return LOG_LEVELS[level] <= (LOG_LEVELS[currentLogLevel] ?? 2);
 }
 
