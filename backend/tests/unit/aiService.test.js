@@ -52,4 +52,19 @@ describe('AI Service Unit Tests', () => {
       }
     );
   });
+
+  it('should never duplicate [PROMPT DIRECTIVE] blocks even after repeated enhancePrompt calls', async () => {
+    const { enhancePrompt } = await import('../../src/services/aiService.js');
+    let promptText = 'Story of Loom acquired by Atlassian or Skyscanner';
+    
+    // Call enhancePrompt 5 times in succession
+    for (let i = 0; i < 5; i++) {
+      const res = await enhancePrompt({ rawThought: promptText, platform: 'LINKEDIN', tone: 'ENGAGING' });
+      promptText = res.enhancedPrompt;
+    }
+
+    // Count occurrences of '[PROMPT DIRECTIVE]'
+    const directiveMatches = promptText.match(/\[PROMPT DIRECTIVE\]/gi) || [];
+    assert.strictEqual(directiveMatches.length <= 1, true, 'PROMPT DIRECTIVE block should appear at most ONCE, never duplicated');
+  });
 });

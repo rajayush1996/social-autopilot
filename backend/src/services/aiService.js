@@ -412,6 +412,8 @@ function generateMockPostContent({ prompt, platform, tone, emojiDensity, hashtag
 function extractCoreThought(text) {
   if (!text) return '';
   let cleaned = text.trim();
+  // Strip any existing [PROMPT DIRECTIVE] blocks to prevent recursive duplication
+  cleaned = cleaned.replace(/\n*\[PROMPT DIRECTIVE\]:[\s\S]*/gi, '').trim();
   
   // Strip outer quotes and common template prefixes/headers
   cleaned = cleaned.replace(/^💡\s*/gi, '');
@@ -447,17 +449,18 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
   const cleanThought = extractCoreThought(rawThought);
   const openai = getOpenAIClient();
 
-  // Helper to format mock response cleanly without recursive nesting
+  // Helper to format mock response cleanly without recursive nesting or duplication
   const formatMockPrompt = (thought) => {
-    const isDetailed = thought.split(/\s+/).length > 10;
-    const containsExamples = /(?:for example|such as|like|e\.g\.|or)\s+/i.test(thought);
+    let clean = (thought || '').replace(/\n*\[PROMPT DIRECTIVE\]:[\s\S]*/gi, '').trim();
+    const isDetailed = clean.split(/\s+/).length > 10;
+    const containsExamples = /(?:for example|such as|like|e\.g\.|or)\s+/i.test(clean);
     if (containsExamples) {
-      return `${thought}\n\n[PROMPT DIRECTIVE]: Focus 100% on EXACTLY ONE primary subject from your examples. Tell a deep, authentic narrative without combining multiple items.`;
+      return `${clean}\n\n[PROMPT DIRECTIVE]: Focus 100% on EXACTLY ONE primary subject from your examples. Tell a deep, authentic narrative without combining multiple items.`;
     }
     if (isDetailed) {
-      return thought;
+      return clean;
     }
-    return `Write an engaging ${platform} post about "${thought}". Use a ${tone.toLowerCase()} tone. Start with a compelling scroll-stopping hook, detail key insights with clean line breaks, and end with an engaging audience question.`;
+    return `Write an engaging ${platform} post about "${clean}". Use a ${tone.toLowerCase()} tone. Start with a compelling scroll-stopping hook, detail key insights with clean line breaks, and end with an engaging audience question.`;
   };
 
   if (!openai) {
@@ -466,6 +469,7 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
       originalThought: cleanThought,
       enhancedPrompt: formatMockPrompt(cleanThought),
       isMock: true,
+      mockReason: 'OpenAI API key missing or invalid format',
     };
   }
 
@@ -506,6 +510,7 @@ RULES:
       originalThought: cleanThought,
       enhancedPrompt: formatMockPrompt(cleanThought),
       isMock: true,
+      mockReason: err.message,
     };
   }
 }

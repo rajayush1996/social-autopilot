@@ -30,7 +30,7 @@ export const config = {
   },
 
   openai: {
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY || process.env.OPENAI_KEY,
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
     baseUrl: process.env.OPENAI_BASE_URL,
   },
