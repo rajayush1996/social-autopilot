@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+import config from '../config/env.js';
 import { catchAsync, successResponse } from '../utils/responseHandler.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -15,6 +17,8 @@ import CacheService from '../services/cacheService.js';
 import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
 import FeatureConfigService from '../services/featureConfigService.js';
 import { encrypt, decrypt } from "../utils/encryption.js";
+import emailService from '../services/emailService.js';
+import { prisma } from '../config/db.js';
 
 
 /**
@@ -335,3 +339,105 @@ export const retryFailedPost = catchAsync(async (req, res) => {
     post: result,
   });
 });
+
+/**
+ * Controller: 1-Click Email Post Approval Endpoint
+ */
+export const approvePostViaEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Approval Failed</title></head>
+        <body style="background:#0b0f19; color:#f3f4f6; font-family:sans-serif; text-align:center; padding:60px 20px;">
+          <div style="max-width:500px; margin:0 auto; background:#111827; border:1px solid #f43f5e; border-radius:20px; padding:40px;">
+            <h1 style="color:#f43f5e; margin-bottom:10px;">⚠️ Invalid Link</h1>
+            <p style="color:#9ca3af;">Approval token is missing from the request URL.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const decoded = jwt.verify(token, config.jwt.secret);
+    const { postId } = decoded;
+
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      include: { user: true },
+    });
+
+    if (!post) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Post Not Found</title></head>
+        <body style="background:#0b0f19; color:#f3f4f6; font-family:sans-serif; text-align:center; padding:60px 20px;">
+          <div style="max-width:500px; margin:0 auto; background:#111827; border:1px solid #f43f5e; border-radius:20px; padding:40px;">
+            <h1 style="color:#f43f5e; margin-bottom:10px;">⚠️ Post Not Found</h1>
+            <p style="color:#9ca3af;">The requested post could not be found or has already been deleted.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Update status to SCHEDULED
+    const updated = await prisma.post.update({
+      where: { id: postId },
+      data: { status: POST_STATUS.SCHEDULED },
+    });
+
+    const now = new Date();
+    if (!post.scheduledAt || post.scheduledAt <= now) {
+      await enqueuePostJob({ postId, publishNow: true });
+    } else {
+      await enqueuePostJob({ postId, scheduledAt: post.scheduledAt });
+    }
+
+    const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+    return res.status(200).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Post Approved Successfully - OmniSync</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; text-align: center; padding: 60px 20px; }
+          .card { max-width: 520px; margin: 0 auto; background: #111827; border: 1px solid #10b981; border-radius: 24px; padding: 40px; box-shadow: 0 20px 40px rgba(16, 185, 129, 0.2); }
+          .icon { font-size: 48px; margin-bottom: 16px; }
+          h1 { color: #34d399; font-size: 22px; margin: 0 0 12px 0; }
+          p { color: #9ca3af; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+          .post-preview { background: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 16px; text-align: left; font-size: 13px; color: #e5e7eb; margin-bottom: 28px; max-height: 150px; overflow-y: auto; white-space: pre-wrap; }
+          .btn { display: inline-block; background: #4f46e5; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4); }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="icon">🎉</div>
+          <h1>Post Approved & Scheduled!</h1>
+          <p>Your post content has been approved and queued for automated publishing across your target social channels.</p>
+          <div class="post-preview">${post.content}</div>
+          <a href="${appUrl}/posts" class="btn">View in Dashboard 🚀</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Approval Link Expired</title></head>
+      <body style="background:#0b0f19; color:#f3f4f6; font-family:sans-serif; text-align:center; padding:60px 20px;">
+        <div style="max-width:500px; margin:0 auto; background:#111827; border:1px solid #f43f5e; border-radius:20px; padding:40px;">
+          <h1 style="color:#f43f5e; margin-bottom:10px;">⚠️ Link Expired or Invalid</h1>
+          <p style="color:#9ca3af;">This approval link is invalid or has expired.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+};

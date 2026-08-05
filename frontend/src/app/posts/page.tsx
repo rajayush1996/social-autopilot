@@ -85,6 +85,8 @@ export default function PostsPage() {
     }
   };
 
+import socketClient from '@/utils/socket';
+
   const fetchPosts = async () => {
     try {
       const postsList = await ApiService.getPosts();
@@ -98,6 +100,26 @@ export default function PostsPage() {
 
   useEffect(() => {
     fetchPosts();
+
+    socketClient.connect();
+
+    const handleUpdateEvent = () => {
+      fetchPosts();
+    };
+
+    socketClient.on('notification:new', handleUpdateEvent);
+    socketClient.on('post:updated', handleUpdateEvent);
+
+    // Auto-refresh interval every 10 seconds to catch background worker state changes
+    const intervalId = setInterval(() => {
+      fetchPosts();
+    }, 10000);
+
+    return () => {
+      socketClient.off('notification:new', handleUpdateEvent);
+      socketClient.off('post:updated', handleUpdateEvent);
+      clearInterval(intervalId);
+    };
   }, []);
 
   const handleCancelSchedule = async (e: React.MouseEvent, postId: string) => {

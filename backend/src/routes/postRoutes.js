@@ -8,6 +8,7 @@ import {
   cancelScheduledPost,
   triggerScheduledPostsNow,
   retryFailedPost,
+  approvePostViaEmail,
 } from '../controllers/postController.js';
 import { validate } from '../middlewares/validate.js';
 import { generateAiSchema, createPostSchema } from '../validations/postValidation.js';
@@ -16,7 +17,12 @@ import { aiLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
 
-// Apply JWT authentication guard globally across all post campaigning scopes
+/**
+ * GET /api/posts/approve-email - Public 1-Click Email Post Approval Handler
+ */
+router.get('/approve-email', approvePostViaEmail);
+
+// Apply JWT authentication guard globally across remaining post endpoints
 router.use(authenticateJwt);
 
 /**

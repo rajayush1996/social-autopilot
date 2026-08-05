@@ -18,9 +18,10 @@ export class InstagramAdapter extends SocialAdapter {
   async publishPost({ accessToken, platformAccountId, caption, mediaUrls = [], mediaType }) {
     logger.info(`[InstagramAdapter] Attempting to publish post for account: ${platformAccountId || 'default'}`);
 
-    // Verify if account ID is a real numerical Meta Instagram Business ID (e.g. 178414...)
+    // Verify if account ID is a real numerical Meta Instagram Business ID (e.g. 178414...) & real Meta token (starts with EAA)
     const isRealIgAccount = accessToken && 
       platformAccountId && 
+      accessToken.startsWith('EAA') &&
       !accessToken.startsWith('mock_') && 
       !platformAccountId.startsWith('ig_account_') && 
       !platformAccountId.startsWith('acc_') && 

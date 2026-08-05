@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+import config from '../config/env.js';
 import UserService from './userService.js';
 import PostService from './postService.js';
 import FeatureConfigService from './featureConfigService.js';
@@ -6,6 +8,7 @@ import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
 import { prisma } from '../config/db.js';
 import logger from '../utils/logger.js';
+import emailService from './emailService.js';
 
 /**
  * AutopilotService
@@ -88,7 +91,29 @@ export class AutopilotService {
         // 6. Enqueue inside BullMQ
         await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });
 
-        // 7. Decrement user credits
+        // 7. Send Email Approval Notification strictly for Autopilot runs
+        if (user.email) {
+          try {
+            const approvalToken = jwt.sign(
+              { postId: post.id, userId: user.id },
+              config.jwt.secret,
+              { expiresIn: '7d' }
+            );
+            await emailService.sendPostApprovalEmail({
+              userEmail: user.email,
+              userName: user.name,
+              postId: post.id,
+              postContent: post.content,
+              targetPlatforms: post.targetPlatforms,
+              scheduledAt: post.scheduledAt,
+              approvalToken,
+            });
+          } catch (emailErr) {
+            logger.warn(`[AutopilotService] Email notification warning: ${emailErr.message}`);
+          }
+        }
+
+        // 8. Decrement user credits
         await UserService.decrementCredits(user.id);
 
         // 8. Log generation audit trail

@@ -162,7 +162,9 @@ export class FacebookAdapter extends SocialAdapter {
     const targetPageId = platformAccountId || pageId || 'me';
     const textMessage = caption || (typeof content === 'object' ? content?.FACEBOOK || content?.text || JSON.stringify(content) : content) || '';
 
-    if (!accessToken || accessToken.startsWith('mock_')) {
+    const isRealFbToken = accessToken && accessToken.startsWith('EAA');
+
+    if (!isRealFbToken || accessToken.startsWith('mock_')) {
       logger.info(`[FacebookAdapter SIMULATION] Post to Facebook Page "${targetPageId}": ${textMessage}`);
       const mockPostId = `fb_mock_post_${Date.now()}`;
       return {

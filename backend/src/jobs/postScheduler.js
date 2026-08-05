@@ -3,6 +3,7 @@ import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
 import ScheduleService from '../services/scheduleService.js';
 import logger from '../utils/logger.js';
+import { refreshExpiringTokens } from './tokenRefreshJob.js';
 
 /**
  * Synchronize overdue or un-enqueued scheduled posts from DB into BullMQ queue.
@@ -189,8 +190,9 @@ export function startCronSchedulerLoop() {
   syncScheduledPostsToQueue();
   checkAndTriggerAutoPilotSchedules();
   cleanupStuckPublishingPosts();
+  refreshExpiringTokens();
 
-  // Polling loop every 60 seconds
+  // Polling loop every 60 seconds for posts/schedules
   setInterval(async () => {
     try {
       await syncScheduledPostsToQueue();
@@ -200,4 +202,13 @@ export function startCronSchedulerLoop() {
       logger.error(`[CronScheduler Error] ${err.message}`);
     }
   }, 60000);
+
+  // Proactive token refresh loop every 12 hours (scans and refreshes tokens expiring within 7 days)
+  setInterval(async () => {
+    try {
+      await refreshExpiringTokens();
+    } catch (err) {
+      logger.error(`[CronScheduler TokenRefresh Error] ${err.message}`);
+    }
+  }, 12 * 60 * 60 * 1000);
 }

@@ -19,6 +19,14 @@ const IV_LENGTH = 12; // 12 bytes is standard for GCM to prevent iv repetition a
 export function encrypt(text) {
   if (!text) return '';
 
+  // Prevent double-encryption if string is already encrypted cipher
+  if (typeof text === 'string' && text.includes(':')) {
+    const parts = text.split(':');
+    if (parts.length === 3 && parts[0].length === 24 && parts[1].length === 32) {
+      return text;
+    }
+  }
+
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -41,33 +49,32 @@ export function encrypt(text) {
 export function decrypt(encryptedText) {
   if (!encryptedText) return '';
 
-  const parts = encryptedText.split(':');
-  // Check if string follows the iv:authTag:ciphertext layout
-  if (parts.length !== 3) {
-    return encryptedText;
+  let current = encryptedText;
+  let attempts = 0;
+
+  while (typeof current === 'string' && current.includes(':') && attempts < 5) {
+    const parts = current.split(':');
+    if (parts.length !== 3 || parts[0].length !== 24 || parts[1].length !== 32) {
+      break;
+    }
+
+    try {
+      const key = getEncryptionKey();
+      const iv = Buffer.from(parts[0], 'hex');
+      const authTag = Buffer.from(parts[1], 'hex');
+      const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+      
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(parts[2], 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+
+      current = decrypted;
+      attempts++;
+    } catch (err) {
+      break;
+    }
   }
 
-  const [ivHex, authTagHex, ciphertextHex] = parts;
-
-  // Validate hex lengths to prevent simple parsing errors
-  if (ivHex.length !== 24 || authTagHex.length !== 32) {
-    return encryptedText;
-  }
-
-  try {
-    const key = getEncryptionKey();
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    
-    decipher.setAuthTag(authTag);
-
-    let decrypted = decipher.update(ciphertextHex, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-
-    return decrypted;
-  } catch (err) {
-    // Gracefully fallback to original text if decryption fails (e.g. unencrypted strings)
-    return encryptedText;
-  }
+  return current;
 }
