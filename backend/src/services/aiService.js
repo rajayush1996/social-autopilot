@@ -449,17 +449,19 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
   const cleanThought = extractCoreThought(rawThought);
   const openai = getOpenAIClient();
 
-  // Helper to format mock response cleanly without recursive nesting or duplication
+  // Helper to format mock response cleanly without raw bracket tags or recursive nesting
   const formatMockPrompt = (thought) => {
     let clean = (thought || '').replace(/\n*\[PROMPT DIRECTIVE\]:[\s\S]*/gi, '').trim();
-    const isDetailed = clean.split(/\s+/).length > 10;
     const containsExamples = /(?:for example|such as|like|e\.g\.|or)\s+/i.test(clean);
+    
     if (containsExamples) {
-      return `${clean}\n\n[PROMPT DIRECTIVE]: Focus 100% on EXACTLY ONE primary subject from your examples. Tell a deep, authentic narrative without combining multiple items.`;
+      return `${clean}\n\nNote: For each generated post, focus deeply on exactly ONE primary subject from your examples to deliver an authentic, high-impact narrative.`;
     }
-    if (isDetailed) {
+    
+    if (clean.split(/\s+/).length > 10) {
       return clean;
     }
+    
     return `Write an engaging ${platform} post about "${clean}". Use a ${tone.toLowerCase()} tone. Start with a compelling scroll-stopping hook, detail key insights with clean line breaks, and end with an engaging audience question.`;
   };
 

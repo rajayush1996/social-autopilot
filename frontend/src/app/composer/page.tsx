@@ -662,15 +662,20 @@ export default function ComposerPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Hashtag Strategy</label>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block flex items-center justify-between">
+                      <span>Hashtag / Tags Strategy</span>
+                      <span className="text-[9px] text-cyan-400 font-mono font-normal">Excluded from body length</span>
+                    </label>
                     <select
                       value={hashtagCount}
                       onChange={(e) => setHashtagCount(e.target.value)}
                       className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="NONE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">No Hashtags</option>
-                      <option value="MODERATE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Moderate (3-5 Hashtags)</option>
-                      <option value="HEAVY" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Heavy (8-12 Hashtags)</option>
+                      <option value="NONE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">0 Tags (No Hashtags)</option>
+                      <option value="FEW_3" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">3 Tags (Minimal Focus)</option>
+                      <option value="MODERATE_5" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">5 Tags (Standard Reach)</option>
+                      <option value="GROWTH_8" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">8 Tags (Growth Boost)</option>
+                      <option value="VIRAL_12" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">12 Tags (Viral Maximum)</option>
                     </select>
                   </div>
 

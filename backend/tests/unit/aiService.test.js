@@ -53,7 +53,7 @@ describe('AI Service Unit Tests', () => {
     );
   });
 
-  it('should never duplicate [PROMPT DIRECTIVE] blocks even after repeated enhancePrompt calls', async () => {
+  it('should never contain raw [PROMPT DIRECTIVE] bracket tags after enhancePrompt calls', async () => {
     const { enhancePrompt } = await import('../../src/services/aiService.js');
     let promptText = 'Story of Loom acquired by Atlassian or Skyscanner';
     
@@ -63,8 +63,8 @@ describe('AI Service Unit Tests', () => {
       promptText = res.enhancedPrompt;
     }
 
-    // Count occurrences of '[PROMPT DIRECTIVE]'
+    // Ensure ZERO occurrences of raw '[PROMPT DIRECTIVE]' bracket tags
     const directiveMatches = promptText.match(/\[PROMPT DIRECTIVE\]/gi) || [];
-    assert.strictEqual(directiveMatches.length <= 1, true, 'PROMPT DIRECTIVE block should appear at most ONCE, never duplicated');
+    assert.strictEqual(directiveMatches.length, 0, 'Enhanced prompt should be natural English without raw bracket directive tags');
   });
 });

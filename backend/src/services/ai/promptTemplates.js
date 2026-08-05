@@ -115,14 +115,14 @@ export function buildFormattingInstructions({ emojiDensity, hashtagCount, format
 - Tone of Voice Directive: ${selectedToneDirective}
 - Emoji Density: ${emojiDensity} (NONE = 0 emojis, LOW = 1-2 subtle emojis at headers, MEDIUM = 3-5 emojis on bullet points and takeaways, HIGH = vibrant emoji layout on every section).
 * EMOJI PLACEMENT MANDATE: When Emoji Density is LOW, MEDIUM, or HIGH, you MUST place relevant emojis next to key takeaways, moral of the story, or CTA lines (e.g., 📌 3 Key Takeaways, 🎯 Moral of the story, 💡 CTA question). Do not omit emojis when LOW, MEDIUM, or HIGH is selected.
-- Hashtag Strategy: ${hashtagCount} (NONE = 0 hashtags, MODERATE = 3-5 targeted hashtags, HEAVY = 8-12 niche hashtags)
+- Hashtag Strategy Directive: ${hashtagCount} (NONE = 0 hashtags, FEW_3 / 3 = 3 targeted hashtags, MODERATE_5 / 5 = 5 hashtags, GROWTH_8 / 8 = 8 hashtags, VIRAL_12 / HEAVY = 12 niche hashtags).
 - Output Format Style: ${formatStyle} (SINGLE = standard single post, THREAD = numbered 1/ 2/ 3/ thread breakdown, CAROUSEL = structured slide-by-slide outline)
 ${formatStyle === 'CAROUSEL' ? `- CAROUSEL PLATFORM ADAPTATION DIRECTIVE:
   * For INSTAGRAM: Output a clean [INSTAGRAM CAPTION BELOW POST] (intro & hashtags) + [SLIDE 1 TO 5 GRAPHIC OVERLAYS] (text for 5 image slides).
   * For LINKEDIN: Output a clean [LINKEDIN FEED INTRO CAPTION] (intro pointing to document) + [SLIDE 1 TO 5 PDF DOCUMENT PAGES] (text for 5 PDF slides).
   * For X (TWITTER): Adapt carousel slides into a [NUMBERED TWITTER THREAD (1/, 2/, 3/, 4/, 5/)].` : ''}
 - Character Length Target: ${contentLength} (CONCISE = ~100-300 characters, BALANCED = ~400-1000 characters, DETAILED = ~1000-2500 characters, LONG_FORM = ~3000-6000 characters for deep-dive story teardowns).
-* NOTE: Character length targets apply strictly to the core body/story copy, EXCLUDING hashtag blocks and emoji padding.`;
+* HASHTAG SEPARATION & BODY LENGTH MANDATE: You MUST write the complete body narrative (hook, friction, solution, takeaways, moral, CTA) to fulfill 100% of the requested character length (${contentLength}) BEFORE adding hashtags. Do NOT count hashtag characters toward the body copy target. Append the hashtags as a separate block at the very bottom of the post after a double blank line.`;
 }
 
 export const MOCK_CASE_STUDIES = [

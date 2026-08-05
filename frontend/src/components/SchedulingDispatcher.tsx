@@ -1073,6 +1073,24 @@ export function SchedulingDispatcher() {
                       <option value="LONG_FORM" className="bg-slate-900 text-slate-100">Long-Form Story (~3000-6000 chars)</option>
                     </select>
                   </div>
+
+                  <div className="col-span-2 space-y-1 pt-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block flex items-center justify-between">
+                      <span>Hashtag / Tags Strategy</span>
+                      <span className="text-[9px] text-cyan-400 font-mono">Excluded from body length</span>
+                    </label>
+                    <select
+                      value={formHashtagCount}
+                      onChange={(e) => setFormHashtagCount(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="NONE" className="bg-slate-900 text-slate-100">0 Tags (No Hashtags)</option>
+                      <option value="FEW_3" className="bg-slate-900 text-slate-100">3 Tags (Minimal Focus)</option>
+                      <option value="MODERATE_5" className="bg-slate-900 text-slate-100">5 Tags (Standard Reach)</option>
+                      <option value="GROWTH_8" className="bg-slate-900 text-slate-100">8 Tags (Growth Boost)</option>
+                      <option value="VIRAL_12" className="bg-slate-900 text-slate-100">12 Tags (Viral Maximum)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* GENERATE SAMPLE SEED BUTTON (Placed BELOW Selection Controls) */}
