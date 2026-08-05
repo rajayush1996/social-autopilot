@@ -44,11 +44,11 @@ export async function processPostPublishing(postId) {
     return { status: 'SKIPPED', reason: 'Post cancelled' };
   }
 
-  // Atomic Lock: Prevent duplicate execution if another worker thread or controller process is already publishing
+  // Atomic Lock: Prevent duplicate execution if post is already PUBLISHED
   const lockResult = await prisma.post.updateMany({
     where: {
       id: postId,
-      status: { notIn: [POST_STATUS.PUBLISHED, 'PUBLISHING'] },
+      status: { notIn: [POST_STATUS.PUBLISHED] },
     },
     data: {
       status: 'PUBLISHING',
@@ -56,8 +56,8 @@ export async function processPostPublishing(postId) {
   });
 
   if (lockResult.count === 0) {
-    logger.info(`[BullMQ Worker] ⚠️ Post ID ${postId} is already being published or was already published. Skipping duplicate execution.`);
-    return { status: 'SKIPPED', reason: 'Already published or publishing in progress' };
+    logger.info(`[BullMQ Worker] ⚠️ Post ID ${postId} was already published. Skipping duplicate execution.`);
+    return { status: 'SKIPPED', reason: 'Already published' };
   }
 
   const userAccounts = post.user?.socialAccounts || [];

@@ -52,28 +52,41 @@ export function decrypt(encryptedText) {
   let current = encryptedText;
   let attempts = 0;
 
+  const candidateKeys = [
+    getEncryptionKey(),
+    crypto.createHash('sha256').update('default_dev_encryption_secret_key_change_me').digest(),
+  ];
+
   while (typeof current === 'string' && current.includes(':') && attempts < 5) {
     const parts = current.split(':');
     if (parts.length !== 3 || parts[0].length !== 24 || parts[1].length !== 32) {
       break;
     }
 
-    try {
-      const key = getEncryptionKey();
-      const iv = Buffer.from(parts[0], 'hex');
-      const authTag = Buffer.from(parts[1], 'hex');
-      const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-      
-      decipher.setAuthTag(authTag);
+    let success = false;
+    for (const key of candidateKeys) {
+      try {
+        const iv = Buffer.from(parts[0], 'hex');
+        const authTag = Buffer.from(parts[1], 'hex');
+        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+        
+        decipher.setAuthTag(authTag);
 
-      let decrypted = decipher.update(parts[2], 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
+        let decrypted = decipher.update(parts[2], 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
 
-      current = decrypted;
-      attempts++;
-    } catch (err) {
+        current = decrypted;
+        success = true;
+        break;
+      } catch (err) {
+        // try next key candidate
+      }
+    }
+
+    if (!success) {
       break;
     }
+    attempts++;
   }
 
   return current;
