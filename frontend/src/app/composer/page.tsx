@@ -170,6 +170,19 @@ export default function ComposerPage() {
           .filter((acc: any) => acc.isActive !== false)
           .map((acc: any) => acc.platform.toUpperCase() as PlatformKey);
         setConnectedPlatforms(activePlatforms);
+
+        // Auto-sync selected platforms to connected ones so unconnected platforms (like X) don't show preview cards unexpectedly
+        if (activePlatforms.length > 0) {
+          const currentSelected = reduxComposer.selectedPlatforms || [];
+          const validSelected = currentSelected.filter((p) => activePlatforms.includes(p));
+          if (validSelected.length > 0) {
+            dispatch(setSelectedPlatforms(validSelected));
+          } else {
+            dispatch(setSelectedPlatforms(activePlatforms));
+          }
+        } else {
+          dispatch(setSelectedPlatforms([]));
+        }
       }
       if (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0) {
         setAllowedPlatforms(user.allowedPlatforms.map((platform) => platform.toUpperCase()));
@@ -382,6 +395,11 @@ export default function ComposerPage() {
   };
 
   const togglePlatform = (p: PlatformKey) => {
+    const isConnected = connectedPlatforms.includes(p);
+    if (!isConnected) {
+      toast.info(`Please connect your ${p} account in Social Accounts first.`);
+      return;
+    }
     const isSelecting = !platforms.includes(p);
     dispatch(togglePlatformAction(p));
 
@@ -568,51 +586,56 @@ export default function ComposerPage() {
                         </a>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {selectablePlatforms.map((platform) => {
-                        const active = platforms.includes(platform.id);
-                        const isConnected = connectedPlatforms.includes(platform.id);
-                        const isVerifying = !initialChecked;
+                    {loadingAccounts ? (
+                      <div className="flex items-center gap-2 py-1">
+                        <div className="h-7 w-28 bg-slate-955 border border-slate-850 rounded-full animate-pulse flex items-center gap-2 px-3">
+                          <span className="w-2 h-2 rounded-full bg-indigo-400/80 animate-ping" />
+                          <span className="text-[10px] text-slate-400 font-semibold">Checking accounts...</span>
+                        </div>
+                        <div className="h-7 w-20 bg-slate-955/60 border border-slate-850/60 rounded-full animate-pulse" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectablePlatforms.map((platform) => {
+                          const isConnected = connectedPlatforms.includes(platform.id);
+                          const active = platforms.includes(platform.id) && isConnected;
 
-                        return (
-                          <button
-                            key={platform.id}
-                            type="button"
-                            onClick={() => togglePlatform(platform.id)}
-                            aria-pressed={active}
-                            className={`inline-flex items-center gap-2 py-1.5 pl-2.5 pr-3.5 rounded-full border text-[11px] font-extrabold tracking-wide transition-all duration-300 ${
-                              active
-                                ? isVerifying
-                                  ? 'bg-slate-900 text-slate-300 border-slate-800'
-                                  : isConnected
-                                  ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                                  : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                                : 'bg-slate-955 text-slate-500 border-slate-850 hover:border-slate-750 hover:text-slate-300'
-                            }`}
-                            title={
-                              isVerifying
-                                ? `Verifying ${platform.label}...`
-                                : isConnected
-                                ? `${platform.label} Connected`
-                                : `${platform.label} Not Connected - Click to connect in Social Accounts`
-                            }
-                          >
-                            <span
-                              className={`w-2 h-2 rounded-full shrink-0 ${
+                          return (
+                            <button
+                              key={platform.id}
+                              type="button"
+                              onClick={() => togglePlatform(platform.id)}
+                              aria-pressed={active}
+                              className={`inline-flex items-center gap-2 py-1.5 pl-2.5 pr-3.5 rounded-full border text-[11px] font-extrabold tracking-wide transition-all duration-200 cursor-pointer ${
                                 active
-                                  ? isVerifying
-                                    ? 'bg-slate-600 animate-pulse'
-                                    : isConnected
-                                    ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/60'
-                                    : 'bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50'
-                                  : 'bg-slate-700'
+                                  ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
+                                  : isConnected
+                                  ? 'bg-slate-955 text-slate-400 border-slate-850 hover:border-slate-750 hover:text-slate-200'
+                                  : 'bg-slate-955/50 text-slate-600 border-slate-850/60 hover:text-slate-400'
                               }`}
-                            />
-                            {platform.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                              title={
+                                isConnected
+                                  ? active
+                                    ? `${platform.label} Selected & Ready`
+                                    : `Click to select ${platform.label}`
+                                  : `${platform.label} Not Connected - Click to connect in Social Accounts`
+                              }
+                            >
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  active
+                                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400/60'
+                                    : isConnected
+                                    ? 'bg-slate-500'
+                                    : 'bg-slate-700'
+                                }`}
+                              />
+                              {platform.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">

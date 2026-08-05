@@ -48,8 +48,8 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
   },
 ];
 
-export const DEFAULT_COMPOSER_PLATFORMS: PlatformId[] = ['LINKEDIN', 'X'];
-export const DEFAULT_SCHEDULE_PLATFORMS: PlatformId[] = ['LINKEDIN', 'X', 'FACEBOOK'];
+export const DEFAULT_COMPOSER_PLATFORMS: PlatformId[] = [];
+export const DEFAULT_SCHEDULE_PLATFORMS: PlatformId[] = [];
 
 const platformById = new Map(
   PLATFORM_REGISTRY.map((platform) => [platform.id, platform])
