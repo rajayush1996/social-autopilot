@@ -16,6 +16,7 @@ import CONFIG from '@/config';
 import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { formatDateTime, formatDate } from '@/utils/date';
+import CarouselSlideDeck from '@/components/CarouselSlideDeck';
 
 // Custom Instagram icon component to avoid missing lucide exports
 function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -287,9 +288,16 @@ export default function PostsPage() {
               <div className="py-6 space-y-6 overflow-y-auto max-h-[70vh]">
                 <div className="space-y-1.5">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Post Content</span>
-                  <div className="bg-slate-950 border border-slate-855 rounded-2xl p-4 text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
-                    {selectedPost.content}
-                  </div>
+                  {selectedPost.content && /(?:SLIDE|Slide)\s*\d+/i.test(selectedPost.content) ? (
+                    <CarouselSlideDeck
+                      text={selectedPost.content}
+                      platformLabel={selectedPost.targetPlatforms[0] || 'Social Post'}
+                    />
+                  ) : (
+                    <div className="bg-slate-950 border border-slate-855 rounded-2xl p-4 text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap">
+                      {selectedPost.content}
+                    </div>
+                  )}
                 </div>
 
                 {selectedPost.mediaUrls.length > 0 && (

@@ -33,6 +33,7 @@ import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { formatDateTime } from '@/utils/date';
 import LiquidUploadButton from '@/components/LiquidUploadButton';
+import CarouselSlideDeck from '@/components/CarouselSlideDeck';
 
 export interface MediaAssetItem {
   id: string;
@@ -60,6 +61,7 @@ const PLATFORMS = [
 ];
 
 const TONES = [
+  { id: 'STORYTELLING', label: 'Storytelling (Case Study & Breakdown)' },
   { id: 'ENGAGING', label: 'Engaging & Viral' },
   { id: 'PROFESSIONAL', label: 'Professional Business' },
   { id: 'CASUAL', label: 'Casual & Friendly' },
@@ -98,6 +100,13 @@ export function SchedulingDispatcher() {
   const [generatingSample, setGeneratingSample] = useState<boolean>(false);
   const [isEnhancingTopic, setIsEnhancingTopic] = useState<boolean>(false);
   const [isTopicExpanded, setIsTopicExpanded] = useState<boolean>(false);
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+
+  useEffect(() => {
+    ApiService.getConnectedAccounts()
+      .then((accs) => setConnectedPlatforms(accs.map((a) => a.platform.toUpperCase())))
+      .catch(() => {});
+  }, []);
 
   const toast = useToast();
 
@@ -634,7 +643,7 @@ export function SchedulingDispatcher() {
 
       {/* CREATE / EDIT SCHEDULE MODAL (PORTAL TO DOCUMENT.BODY) */}
       {isModalOpen && portalMounted && createPortal(
-        <div className="fixed inset-0 z-[999999] bg-slate-955/85 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn pointer-events-auto">
+        <div className="fixed inset-0 z-[99990] bg-slate-955/85 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn pointer-events-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-[96vw] xl:max-w-[1550px] w-full p-6 sm:p-8 md:p-10 shadow-2xl space-y-6 relative my-auto border-indigo-500/20 max-h-[94vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-850 pb-4 shrink-0">
@@ -785,26 +794,55 @@ export function SchedulingDispatcher() {
                 </div>
 
                 {/* Target Channels */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                    Target Channels
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Target Channels
+                    </label>
+                    <a href="/accounts" className="text-[10px] text-indigo-400 hover:underline font-semibold flex items-center gap-1">
+                      Connect Accounts <ChevronRight className="h-3 w-3" />
+                    </a>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {PLATFORMS.map((p) => {
                       const isSelected = formPlatforms.includes(p.id as any);
+                      const isConnected = connectedPlatforms.includes(p.id);
+
                       return (
                         <button
                           type="button"
                           key={p.id}
                           onClick={() => handleTogglePlatform(p.id as any)}
-                          className={`py-2 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                          className={`py-2.5 px-3 rounded-2xl font-bold text-xs transition-all duration-300 flex items-center justify-between gap-2 border cursor-pointer ${
                             isSelected
-                              ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500 shadow-md'
-                              : 'bg-slate-955 text-slate-500 border border-slate-850 hover:border-slate-750'
+                              ? isConnected
+                                ? 'bg-indigo-600/25 text-indigo-200 border-indigo-500/50 shadow-md shadow-indigo-950/40'
+                                : 'bg-rose-500/15 text-rose-300 border-rose-500/40 shadow-sm'
+                              : 'bg-slate-955 text-slate-500 border border-slate-850 hover:border-slate-750 hover:text-slate-300'
                           }`}
+                          title={
+                            isConnected
+                              ? `${p.label} Connected & Ready`
+                              : `${p.label} Not Connected - Click to connect account`
+                          }
                         >
-                          {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
-                          {p.label}
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                isSelected
+                                  ? isConnected
+                                    ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/80'
+                                    : 'bg-rose-500 animate-pulse shadow-sm shadow-rose-500/80'
+                                  : 'bg-slate-700'
+                              }`}
+                            />
+                            <span className="truncate">{p.label}</span>
+                          </div>
+
+                          {isSelected && isConnected && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                          )}
                         </button>
                       );
                     })}
@@ -980,7 +1018,64 @@ export function SchedulingDispatcher() {
                   </div>
                 </div>
 
-                {/* PROMINENT GENERATE SAMPLE SEED BUTTON */}
+                {/* Advanced Controls Accordion / Controls */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-855">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">AI Tone</label>
+                    <select
+                      value={formTone}
+                      onChange={(e) => setFormTone(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      {TONES.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Format Style</label>
+                    <select
+                      value={formFormatStyle}
+                      onChange={(e) => setFormFormatStyle(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="SINGLE" className="bg-slate-900 text-slate-100">Standard Post</option>
+                      <option value="THREAD" className="bg-slate-900 text-slate-100">Numbered Thread (1/ 2/)</option>
+                      <option value="CAROUSEL" className="bg-slate-900 text-slate-100">Carousel Outline</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Emoji Density</label>
+                    <select
+                      value={formEmojiDensity}
+                      onChange={(e) => setFormEmojiDensity(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="NONE" className="bg-slate-900 text-slate-100">None (0 Emojis)</option>
+                      <option value="LOW" className="bg-slate-900 text-slate-100">Subtle (1-2 Emojis)</option>
+                      <option value="MEDIUM" className="bg-slate-900 text-slate-100">Balanced (3-5 Emojis)</option>
+                      <option value="HIGH" className="bg-slate-900 text-slate-100">Vibrant (Heavy Emojis)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Char Length (Body)</label>
+                    <select
+                      value={formContentLength}
+                      onChange={(e) => setFormContentLength(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="CONCISE" className="bg-slate-900 text-slate-100">Concise (~100-300 chars)</option>
+                      <option value="BALANCED" className="bg-slate-900 text-slate-100">Balanced (~400-1000 chars)</option>
+                      <option value="DETAILED" className="bg-slate-900 text-slate-100">Detailed (~1000-2500 chars)</option>
+                      <option value="LONG_FORM" className="bg-slate-900 text-slate-100">Long-Form Story (~3000-6000 chars)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* GENERATE SAMPLE SEED BUTTON (Placed BELOW Selection Controls) */}
                 <button
                   type="button"
                   onClick={handlePreviewSampleAi}
@@ -999,35 +1094,6 @@ export function SchedulingDispatcher() {
                     </>
                   )}
                 </button>
-
-                {/* Advanced Controls Accordion / Controls */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-855">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">AI Tone</label>
-                    <select
-                      value={formTone}
-                      onChange={(e) => setFormTone(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500"
-                    >
-                      {TONES.map((t) => (
-                        <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">{t.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Format Style</label>
-                    <select
-                      value={formFormatStyle}
-                      onChange={(e) => setFormFormatStyle(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-200 text-[11px] focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="SINGLE" className="bg-slate-900 text-slate-100">Standard Post</option>
-                      <option value="THREAD" className="bg-slate-900 text-slate-100">Numbered Thread (1/ 2/)</option>
-                      <option value="CAROUSEL" className="bg-slate-900 text-slate-100">Carousel Outline</option>
-                    </select>
-                  </div>
-                </div>
               </div>
 
               {/* RIGHT COLUMN: Live Social Feed Preview Cards (7 cols) */}
@@ -1051,7 +1117,7 @@ export function SchedulingDispatcher() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-h-[660px] overflow-y-auto pr-1.5 custom-scrollbar animate-fadeIn">
+                  <div className="grid grid-cols-1 gap-5 max-h-[680px] overflow-y-auto pr-1.5 custom-scrollbar animate-fadeIn">
                     {formPlatforms.map((plat) => {
                       const text = sampleDrafts[plat] || '';
                       // Find assigned media asset for this platform
@@ -1060,51 +1126,59 @@ export function SchedulingDispatcher() {
                       const activeMediaType = matchedMedia ? matchedMedia.type : mediaType;
 
                       return (
-                        <div key={plat} className="bg-slate-955 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3 backdrop-blur-md flex flex-col justify-between">
+                        <div key={plat} className="bg-slate-955 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4 backdrop-blur-md flex flex-col justify-between">
                           <div className="space-y-3">
                             {/* Card Header */}
-                            <div className="flex items-center justify-between pb-2.5 border-b border-slate-850">
-                              <div className="flex items-center gap-2.5">
-                                <div className="h-8 w-8 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xs font-bold">
-                                  <Share2 className="h-4 w-4" />
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-850">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold">
+                                  <Share2 className="h-4.5 w-4.5" />
                                 </div>
                                 <div>
                                   <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
                                     Your Brand Profile
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                   </p>
-                                  <p className="text-[10px] text-slate-400 font-mono uppercase">{plat} Feed Mockup</p>
+                                  <p className="text-[10px] text-slate-400 font-mono uppercase">{plat} Live Feed Mockup</p>
                                 </div>
                               </div>
 
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl bg-slate-900 text-slate-400 border border-slate-800">
                                 {text.length} chars
                               </span>
                             </div>
 
-                            {/* Editable Post Body */}
-                            <textarea
-                              value={text}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setSampleDrafts((prev) => ({ ...(prev || {}), [plat]: val }));
-                              }}
-                              rows={6}
-                              className="w-full bg-transparent border-none p-0 text-xs text-slate-200 focus:outline-none leading-relaxed resize-y font-sans placeholder:text-slate-600"
-                              placeholder={`Generated text for ${plat} will appear here...`}
-                            />
+                            {/* Editable Post Body or Carousel Deck Render */}
+                            {formFormatStyle === 'CAROUSEL' || (text && /(?:SLIDE|Slide)\s*\d+/i.test(text)) ? (
+                              <CarouselSlideDeck
+                                text={text}
+                                onTextChange={(val) => setSampleDrafts((prev) => ({ ...(prev || {}), [plat]: val }))}
+                                platformLabel={plat}
+                              />
+                            ) : (
+                              <textarea
+                                value={text}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSampleDrafts((prev) => ({ ...(prev || {}), [plat]: val }));
+                                }}
+                                rows={7}
+                                className="w-full bg-slate-900/60 border border-slate-850 rounded-2xl p-3.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 leading-relaxed resize-y font-sans placeholder:text-slate-600"
+                                placeholder={`Generated text for ${plat} will appear here...`}
+                              />
+                            )}
                           </div>
 
                           {/* Attached Media Display */}
                           {activeMediaUrl && (
-                            <div className="rounded-2xl overflow-hidden border border-slate-850 max-h-48 bg-slate-900 flex items-center justify-center p-1 shadow-md mt-2">
+                            <div className="rounded-2xl overflow-hidden border border-slate-850 max-h-56 bg-slate-900 flex items-center justify-center p-1 shadow-md mt-2">
                               {activeMediaType === 'VIDEO' ? (
-                                <video src={activeMediaUrl} controls className="w-full max-h-44 object-contain rounded-xl" />
+                                <video src={activeMediaUrl} controls className="w-full max-h-52 object-contain rounded-xl" />
                               ) : (
                                 <img
                                   src={activeMediaUrl}
                                   alt="Attached Media Preview"
-                                  className="w-full max-h-44 object-cover rounded-xl"
+                                  className="w-full max-h-52 object-cover rounded-xl"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800';
                                   }}
@@ -1124,9 +1198,9 @@ export function SchedulingDispatcher() {
         document.body
       )}
 
-      {/* FULL SCREEN EXPANDED TOPIC MODAL OVERLAY */}
+      {/* FULL SCREEN EXPANDED TOPIC MODAL OVERLAY (HIGHEST Z-INDEX ON TOP OF MAIN MODAL) */}
       {isTopicExpanded && createPortal(
-        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-4 md:p-8 animate-fadeIn">
+        <div className="fixed inset-0 z-[9999999] bg-slate-955/90 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 animate-fadeIn">
           <div className="bg-slate-900 border border-indigo-500/30 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-955">

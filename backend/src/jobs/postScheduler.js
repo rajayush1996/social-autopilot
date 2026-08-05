@@ -46,30 +46,42 @@ export async function syncScheduledPostsToQueue() {
  */
 export async function checkAndTriggerAutoPilotSchedules() {
   const now = new Date();
-  const currentHours = String(now.getHours()).padStart(2, '0');
-  const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-  const currentTimeOfDay = `${currentHours}:${currentMinutes}`;
+  const currentHours = now.getHours();
+  const currentMinutes = now.getMinutes();
+  const nowTotalMinutes = currentHours * 60 + currentMinutes;
   
   const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   const currentDay = dayNames[now.getDay()];
+  const todayDateString = now.toDateString();
 
   try {
     const matchingSchedules = await prisma.automationSchedule.findMany({
       where: {
         isActive: true,
-        timeOfDay: currentTimeOfDay,
         daysOfWeek: { has: currentDay },
+      },
+      include: {
+        user: true,
       },
     });
 
     for (const sched of matchingSchedules) {
-      // Skip if triggered in the last 2 minutes to prevent duplicate runs
-      if (sched.lastRunAt && (now.getTime() - new Date(sched.lastRunAt).getTime() < 120000)) {
-        continue;
-      }
+      if (!sched.user || sched.user.autopilotEnabled === false) continue;
 
-      logger.info(`⏰ [CronScheduler] Executing Auto-Pilot Schedule "${sched.name}" at ${currentTimeOfDay} (${currentDay})...`);
-      await ScheduleService.runScheduleNow(sched.id, sched.userId);
+      // Parse schedule target time (e.g. "09:00" -> 9 * 60 = 540 total minutes)
+      const [hStr, mStr] = (sched.timeOfDay || '09:00').split(':');
+      const targetTotalMinutes = (parseInt(hStr, 10) || 9) * 60 + (parseInt(mStr, 10) || 0);
+
+      // Check if current time is at or past the scheduled timeOfDay for today
+      if (nowTotalMinutes >= targetTotalMinutes) {
+        // Skip if already executed today
+        if (sched.lastRunAt && new Date(sched.lastRunAt).toDateString() === todayDateString) {
+          continue;
+        }
+
+        logger.info(`⏰ [CronScheduler] Executing Auto-Pilot Schedule "${sched.name}" (${sched.id}) for user ${sched.userId}...`);
+        await ScheduleService.runScheduleNow(sched.id, sched.userId);
+      }
     }
   } catch (err) {
     logger.error(`[CronScheduler] Error checking Auto-Pilot schedules: ${err.message}`);

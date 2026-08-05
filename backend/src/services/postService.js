@@ -269,14 +269,15 @@ export class PostService {
   /**
    * Log AI generation history.
    */
-  static async logAiGeneration({ userId, prompt, generatedContent, modelUsed = 'gemini-1.5-flash', tokensUsed = 120 }) {
+  static async logAiGeneration({ userId, prompt, generatedContent, generatedText, modelUsed = 'openai-gpt-4o', tokensUsed = 120 }) {
+    const textToSave = generatedText || (typeof generatedContent === 'object' ? JSON.stringify(generatedContent) : String(generatedContent || ''));
     return prisma.aIGenerationLog.create({
       data: {
         userId,
-        prompt,
-        generatedContent: typeof generatedContent === 'object' ? JSON.stringify(generatedContent) : String(generatedContent),
-        modelUsed,
-        tokensUsed,
+        prompt: prompt || 'AI Content Generation',
+        generatedText: textToSave,
+        modelUsed: modelUsed || 'openai-gpt-4o',
+        tokensUsed: tokensUsed || 0,
       },
     });
   }

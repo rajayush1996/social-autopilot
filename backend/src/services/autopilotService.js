@@ -38,15 +38,34 @@ export class AutopilotService {
           continue;
         }
 
-        // 3. Check context
-        const context = user.brandContext || 'General business tips, motivation, and industry insights.';
-        logger.info(`[AutopilotService] Generating autopilot update for user "${user.id}" based on brand context...`);
+        // 3. Check context & query past 30 days posts memory to prevent 1-month repetition loops
+        const context = user.brandContext || 'Daily product case studies, startup teardowns, customer problem solving, and business growth insights.';
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        // 4. Generate post tailored text
+        const recentPosts = await prisma.post.findMany({
+          where: {
+            userId: user.id,
+            createdAt: { gte: thirtyDaysAgo },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { content: true },
+        });
+
+        const recentMemory = recentPosts
+          .map((p, idx) => `[30-Day Past Post #${idx + 1}]: ${p.content.substring(0, 120)}`)
+          .join('\n');
+
+        logger.info(`[AutopilotService] Generating autopilot update for user "${user.id}" with 30-day anti-repetition memory...`);
+
+        // 4. Generate post tailored text with anti-repetition memory engine
         const aiResult = await generatePostContent({
-          prompt: `Based on this company context: "${context}". Write a fresh, engaging daily social media update. Do not repeat greeting templates, stay concise.`,
+          prompt: `Generate a fresh, unique daily social media post for context: "${context}". Ensure a new story/case study if product teardowns are requested.`,
           platform: 'GENERAL',
           tone: 'ENGAGING',
+          brandContext: context,
+          contentSummary: recentMemory ? `PAST 30-DAY COVERED DISPATCHES (STRICTLY DO NOT REPEAT):\n${recentMemory}` : undefined,
         });
 
         if (!aiResult || !aiResult.content) {

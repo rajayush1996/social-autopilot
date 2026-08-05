@@ -39,6 +39,7 @@ enum AITone {
   EDUCATIONAL
   PROMOTIONAL
   HUMOROUS
+  STORYTELLING
 }
 
 model User {
@@ -171,6 +172,7 @@ model AutomationSchedule {
   targetPlatforms SocialPlatform[] @default([LINKEDIN, X])
   tone            AITone?          @default(ENGAGING)
   topicPrompt     String?
+  campaignMemory  Json?
   lastRunAt       DateTime?
   nextRunAt       DateTime?
   createdAt       DateTime         @default(now())

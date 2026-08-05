@@ -8,15 +8,17 @@ export const TTL = {
   LONG: 600,         // 10 minutes (for schedules list)
   VERY_LONG: 1800,   // 30 minutes (for user profiles, social accounts)
   DAY: 86400,        // 24 hours (for static feature configs)
+  WEEK: 604800,      // 7 days (for structured campaign memory buffer)
 };
 
 export const CACHE_KEYS = {
   // User Profile & Credits
   USER_PROFILE: (userId) => `app:user:${userId}:profile`,
   
-  // Auto-Pilot Schedules
+  // Auto-Pilot Schedules & Campaign Memory
   USER_SCHEDULES: (userId) => `app:user:${userId}:schedules`,
   SCHEDULE_DETAIL: (scheduleId) => `app:schedule:${scheduleId}`,
+  CAMPAIGN_MEMORY: (scheduleId) => `app:campaign:${scheduleId}:memory`,
   
   // Posts & Queue History
   USER_POSTS_LIST: (userId, filter = 'ALL') => `app:user:${userId}:posts:${filter}`,

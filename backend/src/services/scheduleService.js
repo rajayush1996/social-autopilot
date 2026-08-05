@@ -3,6 +3,7 @@ import FeatureConfigService from './featureConfigService.js';
 import PostService from './postService.js';
 import UserService from './userService.js';
 import { generatePostContent } from './aiService.js';
+import CampaignMemoryService from './campaignMemoryService.js';
 import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
 import logger from '../utils/logger.js';
@@ -91,6 +92,7 @@ export class ScheduleService {
           : ['LINKEDIN', 'X'],
         tone: tone || 'ENGAGING',
         topicPrompt: topicPrompt || '',
+        campaignMemory: CampaignMemoryService.getDefaultMemory(null, name || 'Automated Daily Pulse'),
       },
     });
     await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
@@ -106,33 +108,22 @@ export class ScheduleService {
       throw new Error('Schedule not found or unauthorized.');
     }
 
-    const {
-      name,
-      daysOfWeek,
-      timeOfDay,
-      timezone,
-      repeatType,
-      isActive,
-      targetPlatforms,
-      tone,
-      topicPrompt,
-    } = data;
-
     const updated = await prisma.automationSchedule.update({
       where: { id },
       data: {
-        ...(name !== undefined && { name }),
-        ...(daysOfWeek !== undefined && { daysOfWeek }),
-        ...(timeOfDay !== undefined && { timeOfDay }),
-        ...(timezone !== undefined && { timezone }),
-        ...(repeatType !== undefined && { repeatType }),
-        ...(isActive !== undefined && { isActive: !!isActive }),
-        ...(targetPlatforms !== undefined && { targetPlatforms }),
-        ...(tone !== undefined && { tone }),
-        ...(topicPrompt !== undefined && { topicPrompt }),
+        ...(data.name && { name: data.name }),
+        ...(data.daysOfWeek && { daysOfWeek: data.daysOfWeek }),
+        ...(data.timeOfDay && { timeOfDay: data.timeOfDay }),
+        ...(data.timezone && { timezone: data.timezone }),
+        ...(data.repeatType && { repeatType: data.repeatType }),
+        ...(data.isActive !== undefined && { isActive: !!data.isActive }),
+        ...(data.targetPlatforms && { targetPlatforms: data.targetPlatforms }),
+        ...(data.tone && { tone: data.tone }),
+        ...(data.topicPrompt !== undefined && { topicPrompt: data.topicPrompt }),
       },
     });
     await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
+    await CacheService.del(CACHE_KEYS.CAMPAIGN_MEMORY(id));
     return updated;
   }
 
@@ -168,6 +159,7 @@ export class ScheduleService {
       where: { id },
     });
     await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
+    await CacheService.del(CACHE_KEYS.CAMPAIGN_MEMORY(id));
     return deleted;
   }
 
@@ -193,16 +185,32 @@ export class ScheduleService {
     
     logger.info(`[ScheduleService] 🚀 Running schedule "${schedule.name}" (${schedule.id}) for user ${userId}...`);
 
-    // Generate AI content
+    // Fetch Structured Campaign Memory from Redis Cache (O(1) ~1ms)
+    const memoryContract = await CampaignMemoryService.getCampaignMemory(schedule.id, schedule.name);
+
+    // Format memory JSON into clean AI exclusion directives
+    const excludedBrands = memoryContract?.aiExclusionRules?.doNotRepeatBrands || [];
+    const memorySummaryStr = excludedBrands.length
+      ? `EXCLUDED BRANDS (STRICTLY DO NOT REPEAT): ${excludedBrands.join(', ')}`
+      : undefined;
+
+    // Generate AI content with Structured Memory Contract
     const aiResult = await generatePostContent({
-      prompt: `Schedule: "${schedule.name}". Context: "${context}". Write a compelling social media post.`,
+      prompt: `Schedule: "${schedule.name}". Context: "${context}". Write a compelling, unique social media post.`,
       platform: schedule.targetPlatforms[0] || 'GENERAL',
       tone: schedule.tone || 'ENGAGING',
+      brandContext: context,
+      contentSummary: memorySummaryStr,
     });
 
     if (!aiResult || !aiResult.content) {
       throw new Error('Failed to generate AI post content.');
     }
+
+    // Dual-sync update to Campaign Memory (PostgreSQL DB + Redis Cache)
+    await CampaignMemoryService.updateCampaignMemory(schedule.id, {
+      hookText: aiResult.content.split('\n')[0] || '',
+    });
 
     // Calculate exact target scheduled timestamp using schedule's timeOfDay (e.g. 09:00 AM)
     const targetScheduledAt = (() => {

@@ -31,6 +31,7 @@ import CONFIG from '@/config';
 import { useToast } from '@/context/ToastContext';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import LiquidUploadButton from '@/components/LiquidUploadButton';
+import CarouselSlideDeck from '@/components/CarouselSlideDeck';
 import PlatformIcon from '@/components/PlatformIcon';
 import {
   getPlatformDefinition,
@@ -68,6 +69,7 @@ const PRESET_PROMPTS = [
 ];
 
 const TONE_OPTIONS = [
+  { value: 'STORYTELLING', label: 'Storytelling', hint: 'Story Case Study & Product Breakdown' },
   { value: 'ENGAGING', label: 'Engaging', hint: 'Engaging & Conversational' },
   { value: 'PROFESSIONAL', label: 'Professional', hint: 'Professional Business' },
   { value: 'CASUAL', label: 'Casual', hint: 'Casual & Friendly' },
@@ -686,15 +688,16 @@ export default function ComposerPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Char Length</label>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Char Length (Body)</label>
                     <select
                       value={contentLength}
                       onChange={(e) => setContentLength(e.target.value)}
                       className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="CONCISE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Concise (~100-250 chars)</option>
-                      <option value="BALANCED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Balanced (~250-600 chars)</option>
-                      <option value="DETAILED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Detailed (~600-1500 chars)</option>
+                      <option value="CONCISE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Concise (~100-300 chars)</option>
+                      <option value="BALANCED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Balanced (~400-1000 chars)</option>
+                      <option value="DETAILED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Detailed (~1000-2500 chars)</option>
+                      <option value="LONG_FORM" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Long-Form Story (~3000-6000 chars)</option>
                     </select>
                   </div>
                 </div>
@@ -888,13 +891,21 @@ export default function ComposerPage() {
                             </div>
                           </div>
 
-                          <textarea
-                            value={generatedDrafts[platform]}
-                            onChange={(e) => handleTextChange(platform, e.target.value)}
-                            placeholder={`Generated text for ${platform} will appear here...`}
-                            rows={5}
-                            className="w-full bg-transparent border-none p-0 text-xs text-slate-200 focus:outline-none leading-relaxed resize-none"
-                          />
+                          {formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform])) ? (
+                            <CarouselSlideDeck
+                              text={generatedDrafts[platform]}
+                              onTextChange={(newText) => handleTextChange(platform, newText)}
+                              platformLabel={platformDefinition.label}
+                            />
+                          ) : (
+                            <textarea
+                              value={generatedDrafts[platform]}
+                              onChange={(e) => handleTextChange(platform, e.target.value)}
+                              placeholder={`Generated text for ${platform} will appear here...`}
+                              rows={5}
+                              className="w-full bg-transparent border-none p-0 text-xs text-slate-200 focus:outline-none leading-relaxed resize-none"
+                            />
+                          )}
 
                           {mediaFileUrl && (
                             <div className="rounded-xl overflow-hidden border border-slate-850 max-h-48 bg-slate-900 flex items-center justify-center p-1">
