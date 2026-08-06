@@ -668,7 +668,7 @@ export function SchedulingDispatcher() {
 
       {/* CREATE / EDIT SCHEDULE MODAL (PORTAL TO DOCUMENT.BODY) */}
       {isModalOpen && portalMounted && createPortal(
-        <div className="fixed inset-0 z-[99990] bg-slate-955/85 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn pointer-events-auto">
+        <div className="fixed inset-0 z-[99990] bg-slate-950/70 dark:bg-slate-955/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn pointer-events-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-[96vw] xl:max-w-[1550px] w-full p-6 sm:p-8 md:p-10 shadow-2xl space-y-6 relative my-auto border-indigo-500/20 max-h-[94vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-850 pb-4 shrink-0">
