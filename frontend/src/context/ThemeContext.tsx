@@ -15,7 +15,7 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -31,7 +31,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
         document.documentElement.classList.remove('light', 'theme-light');
       }
     } else {
-      document.documentElement.classList.add('dark', 'theme-dark');
+      // Default to Light Mode on first visit
+      setTheme('light');
+      document.documentElement.classList.add('light', 'theme-light');
+      document.documentElement.classList.remove('dark', 'theme-dark');
     }
   }, []);
 

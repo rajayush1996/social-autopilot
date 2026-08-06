@@ -8,6 +8,37 @@ import { ToastProvider } from '../context/ToastContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import ApiService from '@/services/apiService';
 import { User } from '@/lib/api';
+import { Sparkles } from 'lucide-react';
+
+function MinimalSaaSPageLoader({ message = 'Loading workspace...' }: { message?: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[var(--bg-app)] transition-colors duration-200">
+      {/* Top Thin Blue Progress Bar */}
+      <div className="fixed top-0 left-0 right-0 h-1 bg-[var(--bg-input)] overflow-hidden">
+        <div className="h-full bg-[#2563EB] w-1/3 animate-pulse" />
+      </div>
+
+      {/* Clean SaaS Loader Badge */}
+      <div className="flex flex-col items-center text-center space-y-3.5 max-w-xs mx-auto p-6">
+        <div className="relative flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-[#2563EB]/10 border border-[#2563EB]/20 flex items-center justify-center text-[#2563EB]">
+            <Sparkles className="w-6 h-6 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Clean Typography */}
+        <div className="space-y-1">
+          <h2 className="text-sm font-bold text-[var(--text-primary)] tracking-tight">
+            Social AutoPilot
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] font-medium">
+            {message}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,17 +72,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
-  const showSidebar = mounted && hasToken && !isAuthPage;
+
+  if (!mounted) {
+    return (
+      <ThemeProvider>
+        <ToastProvider>
+          <MinimalSaaSPageLoader message="Loading workspace..." />
+        </ToastProvider>
+      </ThemeProvider>
+    );
+  }
+
+  const showSidebar = hasToken && !isAuthPage;
 
   if (!showSidebar) {
     return (
       <ThemeProvider>
         <ToastProvider>
           <div 
-            className={`min-h-screen text-slate-100 font-sans relative overflow-hidden transition-colors ${
+            className={`min-h-screen text-[var(--text-primary)] font-sans relative overflow-hidden transition-colors bg-[var(--bg-app)] ${
               isAuthPage 
-                ? 'flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/20 via-slate-955 to-slate-955' 
-                : 'bg-slate-955'
+                ? 'flex items-center justify-center' 
+                : ''
             }`}
             suppressHydrationWarning
           >
@@ -71,9 +113,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <div className="min-h-full flex bg-slate-955 text-slate-100 overflow-hidden font-sans w-screen h-screen" suppressHydrationWarning>
+        <div className="min-h-full flex bg-[var(--bg-app)] text-[var(--text-primary)] overflow-hidden font-sans w-screen h-screen" suppressHydrationWarning>
           <Sidebar />
-          <div className="flex-1 h-screen flex flex-col overflow-hidden bg-slate-950">
+          <div className="flex-1 h-screen flex flex-col overflow-hidden bg-[var(--bg-app)]">
             {/* Top Navigation Header with Sunlight/Moon theme switcher */}
             <Header userName={user?.name || 'Creator'} userRole={user?.role} />
             

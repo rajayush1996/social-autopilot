@@ -202,6 +202,8 @@ export interface Post {
   publishedAt: string | null;
   aiGenerated: boolean;
   aiPrompt: string | null;
+  tone?: string | null;
+  formatStyle?: string | null;
   createdAt: string;
   updatedAt: string;
   socialPostLogs?: SocialPostLog[];

@@ -66,25 +66,25 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="sticky top-0 left-0 h-screen w-64 bg-slate-900 border-r border-slate-800 text-slate-100 flex flex-col justify-between p-4 z-40">
+    <aside className="sticky top-0 left-0 h-screen w-64 bg-[var(--bg-card)] border-r border-[var(--border-color)] text-[var(--text-primary)] flex flex-col justify-between p-4 z-40 transition-colors">
       <div>
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-2 py-4 mb-6">
-          <div className="bg-indigo-600 p-2 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
-            <Sparkles className="h-6 w-6 text-white animate-pulse" />
+          <div className="bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-2.5 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
+            <Sparkles className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-tight tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">
+            <h1 className="font-extrabold text-base leading-tight tracking-tight text-[var(--text-primary)]">
               {CONFIG.APP_NAME}
             </h1>
-            <span className="text-[10px] text-indigo-400 font-semibold uppercase tracking-widest">
+            <span className="text-[10px] text-[#0284C7] dark:text-[#38BDF8] font-bold uppercase tracking-wider block">
               {CONFIG.APP_SUBTITLE}
             </span>
           </div>
         </div>
 
         {/* Navigation Items */}
-        <nav className="space-y-1">
+        <nav className="space-y-1.5">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -92,17 +92,19 @@ export function Sidebar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 group relative ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-900/30'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
+                    ? 'bg-[#2563EB]/15 text-[#2563EB] dark:text-[#60A5FA] font-bold border border-[#2563EB]/30 shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] font-medium'
                 }`}
               >
-                <Icon className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-100'}`} />
-                <span className="text-sm font-medium">{link.name}</span>
                 {isActive && (
-                  <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#2563EB] rounded-r-full" />
                 )}
+                <Icon className={`h-4.5 w-4.5 transition-transform duration-200 group-hover:scale-105 ${
+                  isActive ? 'text-[#2563EB] dark:text-[#60A5FA]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'
+                }`} />
+                <span className="text-xs">{link.name}</span>
               </Link>
             );
           })}
@@ -110,14 +112,14 @@ export function Sidebar() {
       </div>
 
       {/* Footer Profile & Credit Badge */}
-      <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-md">
+      <div className="bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-3.5 flex flex-col gap-3 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 font-bold">
-            <UserIcon className="h-5 w-5" />
+          <div className="w-9 h-9 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-[#2563EB] dark:text-[#38BDF8] font-bold shadow-xs">
+            <UserIcon className="h-4.5 w-4.5" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-xs font-semibold text-slate-200 truncate">{userName}</p>
-            <span className="inline-block text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-0.5 rounded-full font-bold uppercase">
+            <p className="text-xs font-bold text-[var(--text-primary)] truncate">{userName}</p>
+            <span className="inline-block text-[9px] bg-[#2563EB]/10 text-[#2563EB] dark:text-[#38BDF8] border border-[#2563EB]/20 px-2 py-0.5 rounded-full font-extrabold uppercase">
               {plan} PLAN
             </span>
           </div>
@@ -125,21 +127,21 @@ export function Sidebar() {
 
         <button
           onClick={handleLogout}
-          className="w-full py-2 bg-slate-900 hover:bg-rose-950/15 text-slate-405 hover:text-rose-400 border border-slate-800/80 hover:border-rose-900/30 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5"
+          className="w-full py-1.5 bg-[var(--bg-card)] hover:bg-rose-500/10 text-[var(--text-secondary)] hover:text-rose-500 border border-[var(--border-color)] hover:border-rose-500/30 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5"
         >
           <LogOut className="h-3.5 w-3.5" />
           Log Out
         </button>
 
-        <div className="border-t border-slate-800/80 pt-3 flex items-center justify-between">
-          <span className="text-xs text-slate-400 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+        <div className="border-t border-[var(--border-color)] pt-2.5 flex items-center justify-between">
+          <span className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5 font-semibold">
+            <Sparkles className="h-3.5 w-3.5 text-[#2563EB] dark:text-[#38BDF8]" />
             AI Credits
           </span>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
             credits !== null && credits <= 2 
-              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse'
-              : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+              ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30 animate-pulse'
+              : 'bg-[#2563EB]/15 text-[#2563EB] dark:text-[#60A5FA] border border-[#2563EB]/30'
           }`}>
             {credits !== null ? `${credits} left` : 'Loading...'}
           </span>

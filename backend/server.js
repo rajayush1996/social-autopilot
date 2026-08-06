@@ -116,6 +116,7 @@ const __dirname = path.dirname(__filename);
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 import notificationRoutes from './src/routes/notificationRoutes.js';
+import placeholderRoutes from './src/routes/placeholderRoutes.js';
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -124,6 +125,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/placeholders', placeholderRoutes);
 
 // Error Handling Middlewares (Must be last)
 import http from 'http';

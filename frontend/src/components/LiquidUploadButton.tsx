@@ -265,21 +265,21 @@ export default function LiquidUploadButton({
           )}
         </div>
       ) : (
-        /* STATE 2: Initial Dropzone Button */
+        /* STATE 2: Initial Clean Dashed Dropzone Button */
         <label
           htmlFor="liquid-media-upload-input"
-          className="relative group w-full min-h-[140px] rounded-3xl border-2 border-dashed border-indigo-500/30 hover:border-indigo-500/80 bg-gradient-to-r from-slate-950 via-indigo-955/40 to-slate-955 flex flex-col items-center justify-center p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-indigo-950/30 overflow-hidden"
+          className="relative group w-full min-h-[140px] rounded-3xl border-2 border-dashed border-[var(--border-color)] hover:border-[#2563EB] bg-[var(--bg-input)] hover:bg-[#2563EB]/5 flex flex-col items-center justify-center p-6 cursor-pointer transition-all duration-300 shadow-xs overflow-hidden"
         >
           <div className="relative z-10 flex flex-col items-center text-center space-y-2">
-            <div className="p-3.5 rounded-2xl bg-indigo-600/20 text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-md">
+            <div className="p-3.5 rounded-2xl bg-[#2563EB]/10 text-[#2563EB] dark:text-[#60A5FA] group-hover:scale-110 group-hover:bg-[#2563EB] group-hover:text-white transition-all duration-300 shadow-sm">
               <Upload className="h-6 w-6" />
             </div>
             <div>
-              <span className="text-sm font-extrabold text-slate-100 group-hover:text-indigo-300 transition-colors block">
+              <span className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[#2563EB] dark:group-hover:text-[#60A5FA] transition-colors block">
                 Click or Drop Media File to Preview
               </span>
-              <p className="text-xs text-slate-400 font-medium mt-1">
-                Preview your image or video first before uploading to R2 Cloud
+              <p className="text-xs text-[var(--text-secondary)] font-medium mt-1">
+                Supports High-Resolution Images (PNG, JPG, WEBP) & Video (MP4, MOV)
               </p>
             </div>
           </div>

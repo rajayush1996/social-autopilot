@@ -48,8 +48,15 @@ export function toUnicodeItalic(text) {
 export function convertMarkdownToUnicode(text) {
   if (!text) return text;
   
+  // Protect {{placeholder}} tags from being transformed to unicode bold/italic before replacement
+  const placeholders = [];
+  const protectedText = text.replace(/\{\{[^}]+\}\}/g, (match) => {
+    placeholders.push(match);
+    return `PHVAL${placeholders.length - 1}TAG`;
+  });
+
   // Convert **bold** or __bold__ to Unicode Bold
-  let converted = text.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (match, p1, p2) => {
+  let converted = protectedText.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (match, p1, p2) => {
     const inner = p1 || p2;
     return toUnicodeBold(inner);
   });
@@ -58,6 +65,16 @@ export function convertMarkdownToUnicode(text) {
   converted = converted.replace(/\*(.*?)\*|_(.*?)_/g, (match, p1, p2) => {
     const inner = p1 || p2;
     return toUnicodeItalic(inner);
+  });
+
+  // Restore {{placeholder}} tags (whether standard, boldified, or italicized token)
+  placeholders.forEach((ph, idx) => {
+    const token = `PHVAL${idx}TAG`;
+    const boldToken = toUnicodeBold(token);
+    const italicToken = toUnicodeItalic(token);
+    converted = converted.replaceAll(token, ph)
+                         .replaceAll(boldToken, ph)
+                         .replaceAll(italicToken, ph);
   });
 
   return converted;

@@ -246,36 +246,41 @@ export default function SocialAccountsPage() {
     },
   ];
 
+  const isSandboxEnabled = process.env.NEXT_PUBLIC_ENABLE_SANDBOX === 'true';
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300">
+          <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
             Social Platforms Connection
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-[var(--text-secondary)] mt-1 text-sm font-medium">
             Link and manage your credentials for Instagram, Facebook Pages, LinkedIn, and X/Twitter.
           </p>
         </div>
 
-        {/* Sandbox Toggle */}
-        <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-2xl">
-          <label className="text-xs font-semibold text-slate-300 cursor-pointer select-none" htmlFor="simulate-toggle">
-            Sandbox Simulation Mode
-          </label>
-          <input
-            type="checkbox"
-            id="simulate-toggle"
-            checked={simulateMode}
-            onChange={(e) => setSimulateMode(e.target.checked)}
-            className="accent-indigo-600 h-4 w-4 cursor-pointer"
-          />
-        </div>
+        {/* Sandbox Toggle (Controlled via NEXT_PUBLIC_ENABLE_SANDBOX in .env) */}
+        {isSandboxEnabled && (
+          <div className="flex items-center gap-3 bg-[var(--bg-card)] border border-[var(--border-color)] px-4 py-2.5 rounded-xl shadow-xs">
+            <label className="text-xs font-semibold text-[var(--text-secondary)] cursor-pointer select-none flex items-center gap-1.5" htmlFor="simulate-toggle">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Developer Sandbox Mode
+            </label>
+            <input
+              type="checkbox"
+              id="simulate-toggle"
+              checked={simulateMode}
+              onChange={(e) => setSimulateMode(e.target.checked)}
+              className="accent-[#2563EB] h-4 w-4 cursor-pointer"
+            />
+          </div>
+        )}
       </div>
 
       {/* Cards list */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {platforms
           .filter((plt) => allowedPlatforms.includes(plt.id))
           .map((plt) => {
@@ -287,61 +292,61 @@ export default function SocialAccountsPage() {
           return (
             <div 
               key={plt.id} 
-              className={`bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 relative overflow-hidden backdrop-blur-md hover:border-slate-700/80 ${
-                isLinked ? 'ring-1 ring-indigo-500/20' : ''
+              className={`bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 shadow-sm hover:border-[#2563EB]/40 ${
+                isLinked ? 'ring-1 ring-[#2563EB]/30' : ''
               }`}
             >
               {/* Card Header Top */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`p-3 bg-gradient-to-br ${plt.color} rounded-2xl text-white shadow-lg`}>
-                    <Icon className="h-6 w-6" />
+                  <div className={`p-3 bg-gradient-to-br ${plt.color} rounded-xl text-white shadow-md`}>
+                    <Icon className="h-5 w-5" />
                   </div>
                   <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
                     isLinked 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                      : 'bg-slate-955 text-slate-400 border-slate-800'
+                      ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                      : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
                   }`}>
                     {isLinked ? (
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse shadow-sm shadow-emerald-400/60" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse shadow-xs" />
                     ) : (
-                      <span className="w-2 h-2 rounded-full bg-slate-600 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
                     )}
                     {isLinked ? `${platformAccounts.length} Connected` : 'Unlinked'}
                   </span>
                 </div>
 
-                <h2 className="text-lg font-bold text-slate-100">{plt.name}</h2>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">{plt.desc}</p>
+                <h2 className="text-base font-bold text-[var(--text-primary)]">{plt.name}</h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-1.5 leading-relaxed font-medium">{plt.desc}</p>
               </div>
 
               {/* Connected details or button */}
-              <div className="mt-8 pt-4 border-t border-slate-800/60 space-y-3">
+              <div className="mt-6 pt-4 border-t border-[var(--border-color)] space-y-3">
                 {isLinked ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {platformAccounts.map((linkedAccount) => {
                       const isOrg = linkedAccount.accountType === 'ORGANIZATION';
                       const isAccLoading = actionLoading === linkedAccount.id;
 
                       return (
-                        <div key={linkedAccount.id} className="bg-slate-950/70 border border-slate-800/60 rounded-2xl p-3 space-y-2">
+                        <div key={linkedAccount.id} className="bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-3 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2.5 overflow-hidden">
                               {linkedAccount.avatarUrl ? (
-                                <img src={linkedAccount.avatarUrl} alt={linkedAccount.username} className="w-8 h-8 rounded-xl object-cover border border-slate-800 shrink-0" />
+                                <img src={linkedAccount.avatarUrl} alt={linkedAccount.username} className="w-8 h-8 rounded-xl object-cover border border-[var(--border-color)] shrink-0" />
                               ) : (
                                 <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-xs shrink-0 ${
-                                  isOrg ? 'bg-purple-600/20 border-purple-500/30 text-purple-400' : 'bg-indigo-600/20 border-indigo-500/30 text-indigo-400'
+                                  isOrg ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-500' : 'bg-[#2563EB]/10 border-[#2563EB]/20 text-[#2563EB]'
                                 }`}>
                                   {isOrg ? <Building2 className="w-4 h-4" /> : <User className="w-4 h-4" />}
                                 </div>
                               )}
                               <div className="overflow-hidden">
-                                <p className="text-xs font-semibold text-slate-200 truncate">{linkedAccount.username}</p>
+                                <p className="text-xs font-bold text-[var(--text-primary)] truncate">{linkedAccount.username}</p>
                                 <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border inline-flex items-center gap-1 mt-0.5 ${
                                   isOrg
-                                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
-                                    : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                                    ? 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20'
+                                    : 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20'
                                 }`}>
                                   {isOrg ? <Building2 className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
                                   {isOrg ? 'Company Page' : 'Personal'}
@@ -352,7 +357,7 @@ export default function SocialAccountsPage() {
                             <button
                               onClick={() => handleDisconnect(linkedAccount.id, plt.name)}
                               disabled={isAccLoading}
-                              className="p-2 bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/40 text-slate-400 hover:text-rose-400 rounded-xl transition-all cursor-pointer"
+                              className="p-2 bg-[var(--bg-card)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-secondary)] hover:text-rose-500 rounded-xl transition-all cursor-pointer"
                               title="Disconnect Account"
                             >
                               {isAccLoading ? (
@@ -370,7 +375,7 @@ export default function SocialAccountsPage() {
                   <button
                     onClick={() => handleConnect(plt.id)}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all duration-300 active:scale-95 shadow-md shadow-indigo-500/10 hover:shadow-indigo-500/20 disabled:opacity-50 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 shadow-md shadow-blue-500/10 disabled:opacity-50 cursor-pointer"
                   >
                     {isLoading ? (
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

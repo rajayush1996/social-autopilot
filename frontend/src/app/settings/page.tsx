@@ -78,13 +78,13 @@ export default function AutopilotSettingsPage() {
   const isPremium = user?.plan === 'PREMIUM';
 
   return (
-    <div className="space-y-10 animate-fadeIn">
+    <div className="space-y-8 animate-fadeIn">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">
+        <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
           OmniSync Engine Settings
         </h1>
-        <p className="text-slate-400 mt-1">
+        <p className="text-[var(--text-secondary)] mt-1 text-sm font-medium">
           Configure daily autonomous AI post generation, brand niche context, and recurring alarm dispatches.
         </p>
       </div>
@@ -94,15 +94,15 @@ export default function AutopilotSettingsPage() {
         
         {/* Main Autopilot Brand & Engine Form */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-6 shadow-xl">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6 shadow-sm">
             
-            <div className="flex items-center justify-between pb-4 border-b border-slate-850">
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
               <div>
-                <h2 className="text-md font-bold flex items-center gap-2 text-slate-100">
-                  <Settings className="h-5 w-5 text-indigo-400" />
+                <h2 className="text-md font-bold flex items-center gap-2 text-[var(--text-primary)]">
+                  <Settings className="h-5 w-5 text-[#2563EB]" />
                   OmniSync Engine Controls
                 </h2>
-                <span className="text-[10px] text-slate-400 font-semibold">
+                <span className="text-[10px] text-[var(--text-secondary)] font-semibold">
                   Enable or disable automated daily publishing cycles
                 </span>
               </div>
@@ -111,23 +111,23 @@ export default function AutopilotSettingsPage() {
               <button
                 type="button"
                 onClick={() => setAutopilotEnabled(!autopilotEnabled)}
-                className="focus:outline-none transition-transform active:scale-95 text-indigo-400 cursor-pointer"
+                className="focus:outline-none transition-transform active:scale-95 text-[#2563EB] cursor-pointer"
               >
                 {autopilotEnabled ? (
-                  <ToggleRight className="h-11 w-11 text-emerald-400" />
+                  <ToggleRight className="h-11 w-11 text-emerald-500" />
                 ) : (
-                  <ToggleLeft className="h-11 w-11 text-slate-600" />
+                  <ToggleLeft className="h-11 w-11 text-[var(--text-secondary)]" />
                 )}
               </button>
             </div>
 
             {/* Locked feature warning for Free Plan */}
             {autopilotEnabled && !isPremium && (
-              <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex gap-3 text-amber-400">
+              <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex gap-3 text-amber-500">
                 <ShieldAlert className="h-5 w-5 shrink-0" />
                 <div className="text-xs space-y-1">
                   <p className="font-bold">Pro Premium Feature Notice</p>
-                  <p className="text-amber-400/80">
+                  <p className="opacity-90">
                     The Autopilot daily recurring posting feature requires a **PREMIUM** subscription tier. Your daily queue runs will be paused until you upgrade.
                   </p>
                 </div>
@@ -136,8 +136,8 @@ export default function AutopilotSettingsPage() {
 
             <form onSubmit={handleSaveSettings} className="space-y-5">
               <div>
-                <label className="text-xs text-slate-300 font-bold block mb-1.5 flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4 text-indigo-400" />
+                <label className="text-xs text-[var(--text-primary)] font-bold block mb-1.5 flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4 text-[#2563EB]" />
                   Brand / Company Niche & Context Setup
                 </label>
                 <textarea
@@ -145,9 +145,9 @@ export default function AutopilotSettingsPage() {
                   onChange={(e) => setBrandContext(e.target.value)}
                   placeholder="Define your niche, target demographics, product offerings, tone of voice, and keywords (e.g. 'We are a boutique coffee shop in Chicago specializing in single-origin cold brews...')"
                   rows={6}
-                  className="w-full bg-slate-950 border border-slate-850 rounded-2xl px-4 py-3 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 leading-relaxed font-sans"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans"
                 />
-                <span className="text-[10px] text-slate-500 block mt-1.5 leading-normal">
+                <span className="text-[10px] text-[var(--text-secondary)] block mt-1.5 leading-normal font-medium">
                   💡 The Autopilot AI Agent consumes this context to formulate daily relevant updates across your connected accounts.
                 </span>
               </div>

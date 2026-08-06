@@ -246,7 +246,8 @@ CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
     ? 'Include 8 to 12 niche industry hashtags at the end.'
     : 'Include 3 to 5 targeted hashtags at the end.'
 }
-8. Output ONLY the ready-to-publish post content without meta-commentary, quotation marks, or prompt headers.`;
+8. LINK & TAG MANDATE: If the user prompt mentions a website URL, link, or custom tag value (such as www.google.com or {{link}}), you MUST include that exact URL link or tag in the final post content (preferably near the CTA at the end).
+9. Output ONLY the ready-to-publish post content without meta-commentary, quotation marks, or prompt headers.`;
 
     const completion = await openai.chat.completions.create({
       model: model,

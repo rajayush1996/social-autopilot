@@ -397,7 +397,16 @@ export const approvePostViaEmail = async (req, res) => {
       await enqueuePostJob({ postId, scheduledAt: post.scheduledAt });
     }
 
+    let textToDisplay = post.content || '';
+    try {
+      if (textToDisplay.trim().startsWith('{')) {
+        const parsed = JSON.parse(textToDisplay);
+        textToDisplay = parsed.LINKEDIN || parsed.INSTAGRAM || parsed.FACEBOOK || parsed.X || parsed.content || textToDisplay;
+      }
+    } catch (e) {}
+
     const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const formattedDate = post.scheduledAt ? new Date(post.scheduledAt).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) : 'Immediate Release';
 
     return res.status(200).send(`
       <!DOCTYPE html>
@@ -406,21 +415,23 @@ export const approvePostViaEmail = async (req, res) => {
         <meta charset="utf-8">
         <title>Post Approved Successfully - OmniSync</title>
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; text-align: center; padding: 60px 20px; }
-          .card { max-width: 520px; margin: 0 auto; background: #111827; border: 1px solid #10b981; border-radius: 24px; padding: 40px; box-shadow: 0 20px 40px rgba(16, 185, 129, 0.2); }
-          .icon { font-size: 48px; margin-bottom: 16px; }
-          h1 { color: #34d399; font-size: 22px; margin: 0 0 12px 0; }
-          p { color: #9ca3af; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
-          .post-preview { background: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 16px; text-align: left; font-size: 13px; color: #e5e7eb; margin-bottom: 28px; max-height: 150px; overflow-y: auto; white-space: pre-wrap; }
-          .btn { display: inline-block; background: #4f46e5; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; padding: 12px 28px; border-radius: 12px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4); }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #0f172a; text-align: center; padding: 60px 20px; margin: 0; }
+          .card { max-width: 540px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 24px; padding: 40px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05); }
+          .icon-badge { width: 56px; height: 56px; background: #eff6ff; border: 1px solid #bfdbfe; color: #2563eb; font-size: 28px; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; }
+          h1 { color: #0f172a; font-size: 22px; font-weight: 800; margin: 0 0 10px 0; tracking-tight; }
+          p { color: #475569; font-size: 14px; line-height: 1.6; margin-bottom: 24px; font-weight: 500; }
+          .post-preview { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; text-align: left; font-size: 13px; color: #1e293b; margin-bottom: 24px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; }
+          .meta-slot { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 10px 16px; border-radius: 10px; margin-bottom: 28px; display: block; }
+          .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25); transition: all 0.2s; }
         </style>
       </head>
       <body>
         <div class="card">
-          <div class="icon">🎉</div>
-          <h1>Post Approved & Scheduled!</h1>
-          <p>Your post content has been approved and queued for automated publishing across your target social channels.</p>
-          <div class="post-preview">${post.content}</div>
+          <div class="icon-badge">⚡</div>
+          <h1>Post Approved & Queued!</h1>
+          <p>Your post content has been verified and queued for automated release across your target social channels.</p>
+          <div class="post-preview">${textToDisplay}</div>
+          <div class="meta-slot">📅 Scheduled Slot: ${formattedDate}</div>
           <a href="${appUrl}/posts" class="btn">View in Dashboard 🚀</a>
         </div>
       </body>

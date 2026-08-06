@@ -10,7 +10,7 @@ import UserService from './userService.js';
 import SocialAccountService from './socialAccountService.js';
 import SocialAdapterFactory from './social/socialAdapterFactory.js';
 import { emitAccountStatusChange } from './socketService.js';
-import { encrypt } from '../utils/encryption.js';
+import { encrypt, decrypt } from '../utils/encryption.js';
 
 const JWT_SECRET = config.jwt.secret;
 const JWT_REFRESH_SECRET = config.jwt.refreshSecret;
@@ -309,7 +309,7 @@ export class AuthService {
   /**
    * Connect mock social account for simulation.
    */
-  static async connectMockAccount({ userIdInput, platform, platformAccountId, username = 'mock_user', accountType = 'PERSONAL', avatarUrl = null, accessToken }) {
+  static async connectMockAccount({ userIdInput, platform, platformAccountId, username = 'mock_user', accountType = 'PERSONAL', avatarUrl = null, accessToken, forceOverride = false }) {
     if (!platform) {
       throw ApiError.badRequest('Field "platform" is required.');
     }
@@ -319,6 +319,25 @@ export class AuthService {
     const platformLower = platform.toLowerCase();
 
     await UserService.ensureUserExists(userId);
+
+    // Production Safety Guard: If user has an active REAL Meta/LinkedIn OAuth account, do NOT overwrite it in mock testing unless forceOverride is explicitly true!
+    if (!forceOverride) {
+      const existingAccount = await prisma.socialAccount.findFirst({
+        where: { userId, platform: platformUpper, isActive: true }
+      });
+      if (existingAccount && existingAccount.accessToken) {
+        let decToken = '';
+        try {
+          decToken = decrypt(existingAccount.accessToken);
+        } catch (e) {
+          decToken = existingAccount.accessToken || '';
+        }
+        if (decToken.startsWith('EAA') || decToken.startsWith('AQ') || existingAccount.accountType === 'BUSINESS') {
+          logger.info(`[connectMockAccount] Safety Guard: Active Real OAuth account exists for ${platformUpper}. Preserving production credentials.`);
+          return existingAccount;
+        }
+      }
+    }
 
     const accountId = platformAccountId || (accountType === 'ORGANIZATION' ? `urn:li:organization:mock_${Date.now()}` : `id_${platformLower}_${Date.now()}`);
 

@@ -24,7 +24,13 @@ import {
   SlidersHorizontal,
   ChevronRight,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Edit2,
+  Trash2,
+  Link2,
+  Tag as TagIcon,
+  Globe,
+  Ticket
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -38,6 +44,7 @@ import {
   getPlatformDefinitions,
   PLATFORM_REGISTRY,
   type PlatformId,
+  type PlatformDefinition,
 } from '@/config/platforms';
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
@@ -123,6 +130,184 @@ export default function ComposerPage() {
   // Fullscreen Preview Popup State
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
   const [portalMounted, setPortalMounted] = useState(false);
+
+  // Progressive Disclosure Advanced Options Accordion State
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Custom User Placeholders & Values State (Clean default placeholders with backend sync)
+  type UserPlaceholder = { id: string; name: string; value: string };
+  const [savedPlaceholders, setSavedPlaceholders] = useState<UserPlaceholder[]>([
+    { id: 'def_1', name: 'link', value: '' },
+    { id: 'def_2', name: 'name', value: '' },
+    { id: 'def_3', name: 'website', value: '' },
+    { id: 'def_4', name: 'promo_code', value: '' },
+    { id: 'def_5', name: 'author_name', value: '' },
+  ]);
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  const [showDropdownPopover, setShowDropdownPopover] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tagNameInput, setTagNameInput] = useState('');
+  const [tagCategoryInput, setTagCategoryInput] = useState<'link' | 'text' | 'website' | 'code' | 'author' | 'cta'>('link');
+  const [tagValueInput, setTagValueInput] = useState('');
+
+  // Fetch persisted placeholders from backend API on mount
+  useEffect(() => {
+    const fetchPlaceholders = async () => {
+      try {
+        const res = await ApiService.get('/api/placeholders');
+        if (res.data && Array.isArray(res.data.placeholders) && res.data.placeholders.length > 0) {
+          setSavedPlaceholders(res.data.placeholders);
+          const map: Record<string, string> = {};
+          res.data.placeholders.forEach((p: UserPlaceholder) => {
+            if (p.value) map[p.name.toUpperCase()] = p.value;
+          });
+          setVariableValues(map);
+        }
+      } catch (err) {
+        console.warn('[Composer] Could not fetch placeholders from backend:', err);
+      }
+    };
+    fetchPlaceholders();
+  }, []);
+
+  // Sync placeholders to backend API
+  const syncPlaceholders = async (newList: UserPlaceholder[]) => {
+    setSavedPlaceholders(newList);
+    const map: Record<string, string> = {};
+    newList.forEach((p) => {
+      if (p.value) map[p.name.toUpperCase()] = p.value;
+    });
+    setVariableValues(map);
+    try {
+      await ApiService.post('/api/placeholders', { placeholders: newList });
+    } catch (err) {
+      console.warn('[Composer] Could not sync placeholders to backend:', err);
+    }
+  };
+
+  // RESTful Delete Placeholder Handler
+  const handleDeletePlaceholder = async (item: UserPlaceholder) => {
+    const updated = savedPlaceholders.filter(p => p.id !== item.id);
+    setSavedPlaceholders(updated);
+    toast.success(`Deleted {{${item.name}}}`);
+    try {
+      await ApiService.delete(`/api/placeholders/${item.id}`);
+    } catch (err) {
+      await syncPlaceholders(updated);
+    }
+  };
+
+  // RESTful Save/Update Placeholder Handler
+  const handleSavePlaceholder = async (cleanKey: string, value: string) => {
+    if (editingId) {
+      const updated = savedPlaceholders.map(item => item.id === editingId ? { ...item, name: cleanKey, value } : item);
+      setSavedPlaceholders(updated);
+      toast.success(`Updated {{${cleanKey}}}`);
+      setEditingId(null);
+      try {
+        await ApiService.put(`/api/placeholders/${editingId}`, { name: cleanKey, value });
+      } catch (err) {
+        await syncPlaceholders(updated);
+      }
+    } else {
+      const newItem: UserPlaceholder = { id: Date.now().toString(), name: cleanKey, value };
+      const updated = [...savedPlaceholders, newItem];
+      setSavedPlaceholders(updated);
+      toast.success(`Added {{${cleanKey}}}`);
+      try {
+        await ApiService.post('/api/placeholders', { placeholders: updated });
+      } catch (err) {
+        await syncPlaceholders(updated);
+      }
+    }
+  };
+
+  const getPlaceholderIcon = (name: string) => {
+    const key = name.toLowerCase();
+    if (key.includes('link') || key.includes('url')) return <Link2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />;
+    if (key.includes('web') || key.includes('site') || key.includes('domain')) return <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
+    if (key.includes('code') || key.includes('promo') || key.includes('coupon')) return <Ticket className="w-3.5 h-3.5 text-amber-400 shrink-0" />;
+    if (key.includes('author') || key.includes('user') || key.includes('creator')) return <UserIcon className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
+    if (key.includes('cta')) return <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />;
+    return <TagIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />;
+  };
+
+  const toUnicodeBold = (text: string): string => {
+    if (!text) return '';
+    const normalUpper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const boldUpper = ['𝗔','𝗕','𝗖','𝗗','𝗘','𝗙','𝗚','𝗛','𝗜','𝗝','𝗞','𝗟','𝗠','𝗡','𝗢','𝗣','𝗤','𝗥','𝗦','𝗧','𝗨','𝗩','𝗪','𝗫','𝗬','𝗭'];
+    const normalLower = 'abcdefghijklmnopqrstuvwxyz';
+    const boldLower = ['𝗮','𝗯','𝗰','𝗱','𝗲','𝗳','𝗴','𝗵','𝗶','𝗷','𝗸','𝗹','𝗺','𝗻','𝗼','𝗽','𝗾','𝗿','𝘀','𝘁','𝘂','𝘃','𝘄','𝘅','𝘆','𝘇'];
+    const normalDigit = '0123456789';
+    const boldDigit = ['𝟬','𝟭','𝟮','𝟯','𝟰','𝟱','𝟲','𝟳','𝟴','𝟵'];
+
+    return text
+      .split('')
+      .map((char) => {
+        const uIdx = normalUpper.indexOf(char);
+        if (uIdx !== -1) return boldUpper[uIdx];
+        const lIdx = normalLower.indexOf(char);
+        if (lIdx !== -1) return boldLower[lIdx];
+        const dIdx = normalDigit.indexOf(char);
+        if (dIdx !== -1) return boldDigit[dIdx];
+        return char;
+      })
+      .join('');
+  };
+
+  const toAsciiSimple = (str: string): string => {
+    if (!str) return '';
+    const boldUpper = ['𝗔','𝗕','𝗖','𝗗','𝗘','𝗙','𝗚','𝗛','𝗜','𝗝','𝗞','𝗟','𝗠','𝗡','𝗢','𝗣','𝗤','𝗥','𝗦','𝗧','𝗨','𝗩','𝗪','𝗫','𝗬','𝗭'];
+    const boldLower = ['𝗮','𝗯','𝗰','𝗱','𝗲','𝗳','𝗴','𝗵','𝗶','𝗷','𝗸','𝗹','𝗺','𝗻','𝗼','𝗽','𝗾','𝗿','𝘀','𝘁','𝘂','𝘃','𝘄','𝘅','𝘆','𝘇'];
+    const boldDigit = ['𝟬','𝟭','𝟮','𝟯','𝟰','𝟱','𝟲','𝟳','𝟴','𝟵'];
+
+    let res = str;
+    boldUpper.forEach((b, i) => { res = res.replaceAll(b, String.fromCharCode(65 + i)); });
+    boldLower.forEach((b, i) => { res = res.replaceAll(b, String.fromCharCode(97 + i)); });
+    boldDigit.forEach((b, i) => { res = res.replaceAll(b, String.fromCharCode(48 + i)); });
+    return res.toLowerCase();
+  };
+
+  const formatTagValueForPlatform = (phName: string, rawVal: string, platform: PlatformKey): { formattedVal: string; labelWithPrefix: string } => {
+    const val = rawVal.trim();
+    const key = phName.toLowerCase();
+
+    // 1. LINK / WEBSITE / CTA -> Visual 🔗 emoji highlight for Instagram, clean URL for LinkedIn/X/Facebook
+    if (key.includes('link') || key.includes('url') || key.includes('web') || key.includes('site') || key.includes('cta')) {
+      const formattedUrl = val.startsWith('http://') || val.startsWith('https://') ? val : `https://${val}`;
+      const formattedVal = platform === 'INSTAGRAM' ? `🔗 ${formattedUrl}` : formattedUrl;
+      return {
+        formattedVal,
+        labelWithPrefix: formattedVal,
+      };
+    }
+
+    // 2. PROMO CODE / COUPON -> Visual 🎟️ emoji highlight + Unicode Bold for LinkedIn/Facebook
+    if (key.includes('code') || key.includes('promo') || key.includes('coupon')) {
+      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? `🎟️ ${toUnicodeBold(val)}` : `🎟️ ${val}`;
+      return {
+        formattedVal,
+        labelWithPrefix: formattedVal,
+      };
+    }
+
+    // 3. AUTHOR / CREATOR -> Visual ✍️ emoji highlight + Unicode Bold for LinkedIn/Facebook
+    if (key.includes('author') || key.includes('creator') || key.includes('user')) {
+      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? `✍️ ${toUnicodeBold(val)}` : `✍️ ${val}`;
+      return {
+        formattedVal,
+        labelWithPrefix: formattedVal,
+      };
+    }
+
+    // 4. BRAND NAME / TEXT -> Unicode Bold for LinkedIn/Facebook
+    const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
+    return {
+      formattedVal,
+      labelWithPrefix: formattedVal,
+    };
+  };
 
   useEffect(() => {
     setPortalMounted(true);
@@ -333,8 +518,18 @@ export default function ComposerPage() {
     setGenerating(true);
     setAiLimitReached(false);
     try {
+      // Substitute dynamic variable values in topic prompt before sending to AI
+      let finalTopic = topic;
+      savedPlaceholders.forEach((ph) => {
+        const key = ph.name.toUpperCase();
+        const rawVal = (variableValues[key] || ph.value || '').trim();
+        if (rawVal) {
+          finalTopic = finalTopic.replaceAll(new RegExp(`\\{\\{${ph.name}\\}\\}`, 'gi'), rawVal);
+        }
+      });
+
       const generated: any = await ApiService.generateAiContent(
-        topic,
+        finalTopic,
         tone,
         platforms,
         {
@@ -349,7 +544,64 @@ export default function ComposerPage() {
         const draftMap = generated.adaptedPosts || generated;
         setGeneratedDrafts(
           platforms.reduce<Record<string, string>>((drafts, platform) => {
-            drafts[platform] = draftMap[platform] || generated[platform] || generated.content || '';
+            let draft = draftMap[platform] || generated[platform] || generated.content || '';
+
+            // Universal Fail-Safe Link Unpacker: converts [anchor](url) or [anchor](www.url) into clean direct https://url
+            draft = draft.replace(/\[([^\]]+)\]\(((?:https?:\/\/|www\.)[^\s)]+)\)/gi, (m: any, g1: any, g2: string) => g2.startsWith('www.') ? `https://${g2}` : g2);
+
+            // Strip raw markdown stars for Instagram & X so raw **stars** don't show up in captions
+            if (platform === 'INSTAGRAM' || platform === 'X') {
+              draft = draft.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1');
+            }
+
+            // 1. In-place substitution of placeholder tags (both standard ASCII {{tag}} and Unicode bold {{𝘁𝗮𝗴}})
+            savedPlaceholders.forEach((ph) => {
+              const key = ph.name.toUpperCase();
+              const rawVal = (variableValues[key] || ph.value || '').trim();
+              const phKey = ph.name.toLowerCase();
+              const isUrlTag = phKey.includes('link') || phKey.includes('url') || phKey.includes('web') || phKey.includes('site') || phKey.includes('cta');
+
+              if (rawVal) {
+                const { formattedVal } = formatTagValueForPlatform(ph.name, rawVal, platform);
+                draft = draft.replaceAll(new RegExp(`\\{\\{${ph.name}\\}\\}`, 'gi'), formattedVal);
+                // Also clean up any bracketed unicode bold tags left by markdown conversion (e.g. {{𝗽𝗿𝗼𝗺𝗼_𝗰𝗼𝗱𝗲}})
+                draft = draft.replace(/\{\{[^}]+\}\}/g, (match: string) => {
+                  return match.toLowerCase().includes(ph.name.toLowerCase()) ? formattedVal : match;
+                });
+
+                // Format plain text promo codes, authors, and brand names as Unicode bold for LinkedIn & Facebook
+                if (!isUrlTag && (platform === 'LINKEDIN' || platform === 'FACEBOOK')) {
+                  const boldVal = toUnicodeBold(rawVal);
+                  if (draft.includes(rawVal) && !draft.includes(boldVal)) {
+                    draft = draft.replaceAll(rawVal, boldVal);
+                  }
+                }
+              }
+            });
+
+            // 2. GUARANTEE PRESERVATION: Use toAsciiSimple so Unicode bold values (e.g. 𝗦𝗔𝗩𝗘𝟮𝟬) match ASCII (SAVE20)!
+            savedPlaceholders.forEach((ph) => {
+              const key = ph.name.toUpperCase();
+              const rawVal = (variableValues[key] || ph.value || '').trim();
+              const tagInPrompt = topic.toLowerCase().includes(`{{${ph.name.toLowerCase()}}}`);
+
+              const asciiDraft = toAsciiSimple(draft);
+              const asciiVal = toAsciiSimple(rawVal);
+              const cleanVal = rawVal.replace(/^https?:\/\//i, '').trim();
+              const asciiCleanVal = toAsciiSimple(cleanVal);
+
+              const isAlreadyPresent = asciiDraft.includes(asciiVal) || (asciiCleanVal && asciiDraft.includes(asciiCleanVal));
+
+              if (rawVal && tagInPrompt && !isAlreadyPresent) {
+                const { labelWithPrefix } = formatTagValueForPlatform(ph.name, rawVal, platform);
+                draft += `\n\n${labelWithPrefix}`;
+              }
+            });
+
+            // Final Fail-Safe: Strip any leftover un-replaced {{...}} tags so no raw brackets leak to post
+            draft = draft.replace(/\{\{[^}]+\}\}/g, '').trim();
+
+            drafts[platform] = draft;
             return drafts;
           }, {})
         );
@@ -373,7 +625,13 @@ export default function ComposerPage() {
     let hasAnyDraft = false;
 
     platforms.forEach((p) => {
-      const draftText = generatedDrafts[p] || topic;
+      let draftText = generatedDrafts[p] || topic;
+      // Substitute variable values in final post payload
+      Object.entries(variableValues).forEach(([key, val]) => {
+        if (val.trim()) {
+          draftText = draftText.replaceAll(`{{${key}}}`, val.trim());
+        }
+      });
       if (draftText) {
         platformDraftMap[p] = draftText;
         hasAnyDraft = true;
@@ -443,27 +701,45 @@ export default function ComposerPage() {
     (platform) => getPlatformDefinition(platform).requiresMedia
   );
 
+  if (!initialChecked) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3.5 animate-fadeIn">
+        <div className="w-10 h-10 rounded-xl bg-[#2563EB]/10 border border-[#2563EB]/20 flex items-center justify-center text-[#2563EB]">
+          <Sparkles className="w-5 h-5 animate-pulse" />
+        </div>
+        <div className="text-center space-y-0.5">
+          <p className="text-xs font-bold text-[var(--text-primary)]">
+            Loading workspace...
+          </p>
+          <p className="text-[11px] text-[var(--text-secondary)]">
+            Verifying connected channels & Smart Tags
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-12 animate-fadeIn">
       {/* Header with Mode Selector */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-900">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--border-color)]">
         <div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-200 tracking-tight">
+          <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
             Post Composer
           </h1>
-          <p className="text-slate-400 text-xs mt-1">
+          <p className="text-[var(--text-secondary)] text-xs mt-1 font-medium">
             Create, optimize, and schedule social media content across platforms.
           </p>
         </div>
 
         {/* Clean Mode Switcher Tabs */}
-        <div className="inline-flex p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl gap-1.5 backdrop-blur-md shrink-0">
+        <div className="inline-flex p-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl gap-1.5 shrink-0 shadow-xs">
           <button
             onClick={() => setComposerMode('SINGLE')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all duration-200 flex items-center gap-2 ${
               composerMode === 'SINGLE'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/40'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                ? 'bg-[#2563EB] text-white shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] font-medium'
             }`}
           >
             <PenTool className="h-4 w-4" />
@@ -504,24 +780,24 @@ export default function ComposerPage() {
             <div className="lg:col-span-7 space-y-6">
               
               {/* Prompt Input Card */}
-              <div className="bg-slate-900/50 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-850">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#2563EB] flex items-center gap-2">
                     <Sparkles className="h-4 w-4" />
                     1. Enter Topic or AI Prompt
                   </h2>
-                  <span className="text-[10px] text-slate-500 font-semibold">Step 1 of 3</span>
+                  <span className="text-[10px] text-[var(--text-secondary)] font-semibold">Step 1 of 3</span>
                 </div>
 
                 {/* Input Source Mode Switcher */}
-                <div className="flex items-center gap-2 bg-slate-955 p-1 rounded-xl border border-slate-850">
+                <div className="flex items-center gap-2 bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-color)]">
                   <button
                     type="button"
                     onClick={() => setInputSource('PROMPT')}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       inputSource === 'PROMPT'
-                        ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     💬 Custom Topic / Prompt
@@ -529,10 +805,10 @@ export default function ComposerPage() {
                   <button
                     type="button"
                     onClick={() => setInputSource('URL')}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       inputSource === 'URL'
-                        ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     🔗 Repurpose Blog / Article URL
@@ -541,79 +817,256 @@ export default function ComposerPage() {
 
                 {inputSource === 'URL' ? (
                   <div className="space-y-2">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Article / Blog Post URL</label>
+                    <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Article / Blog Post URL</label>
                     <input
                       type="url"
                       value={articleUrl}
                       onChange={(e) => setArticleUrl(e.target.value)}
                       placeholder="https://yourblog.com/posts/scaling-productivity"
-                      className="w-full bg-slate-955 border border-slate-850 rounded-2xl px-4 py-3 text-slate-200 text-xs focus:outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] transition-colors"
                     />
                     <textarea
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
                       placeholder="Additional instructions for repurposing (optional)..."
                       rows={2}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-2xl px-4 py-2 text-slate-200 text-xs focus:outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600 leading-relaxed resize-none"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] transition-colors leading-relaxed resize-none"
                     />
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Prompt Header Toolbar with Dropdown */}
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <PenTool className="w-3.5 h-3.5 text-indigo-400" />
+                    {/* Prompt Header Toolbar with Single Custom Dropdown Popover */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap relative">
+                      <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                        <PenTool className="w-3.5 h-3.5 text-[#2563EB]" />
                         Prompt Text
                       </label>
 
-                      {/* Universal Dynamic Variable Dropdown */}
-                      <select
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            insertPlaceholderAtCursor(e.target.value);
-                            e.target.value = '';
-                          }
-                        }}
-                        className="bg-slate-955 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 text-[11px] font-bold rounded-xl px-2.5 py-1 outline-none cursor-pointer hover:border-indigo-500/60 transition-all shadow-sm"
-                        title="Insert dynamic links or variables at cursor position"
-                      >
-                        <option value="">+ Insert Placeholder ▾</option>
-                        <option value="{{PRODUCT_LINK}}">🔗 {"{{PRODUCT_LINK}}"}</option>
-                        <option value="{{PRODUCT_NAME}}">🏷️ {"{{PRODUCT_NAME}}"}</option>
-                        <option value="{{WEBSITE_URL}}">🌐 {"{{WEBSITE_URL}}"}</option>
-                        <option value="{{PROMO_CODE}}">🎟️ {"{{PROMO_CODE}}"}</option>
-                        <option value="{{CTA_LINK}}">⚡ {"{{CTA_LINK}}"}</option>
-                      </select>
+                      {/* Single Dropdown Popover Trigger */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDropdownPopover(!showDropdownPopover);
+                            setEditingId(null);
+                          }}
+                          className="bg-[var(--bg-input)] hover:bg-[#2563EB]/10 text-[#2563EB] dark:text-[#60A5FA] border border-[var(--border-color)] hover:border-[#2563EB] text-[11px] font-bold rounded-xl px-3 py-1.5 transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                        >
+                          <span>✨ Smart Tags ▾</span>
+                          {savedPlaceholders.length > 0 && (
+                            <span className="bg-[#2563EB] text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold">
+                              {savedPlaceholders.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Custom Dropdown List Popover Panel */}
+                        {showDropdownPopover && (
+                          <div className="absolute right-0 top-full mt-2 w-84 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl z-50 p-3 space-y-2.5 animate-fadeIn">
+                            <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+                              <span className="text-xs font-bold text-[#2563EB] dark:text-[#60A5FA] uppercase tracking-wider flex items-center gap-1">
+                                ✨ Smart Tags
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDropdownPopover(false);
+                                  setEditingId(null);
+                                  setTagNameInput('');
+                                  setTagValueInput('');
+                                  setShowAddModal(true);
+                                }}
+                                className="text-[10px] bg-[#2563EB]/10 text-[#2563EB] hover:bg-[#2563EB] hover:text-white px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                <span>➕ Add Custom</span>
+                              </button>
+                            </div>
+
+                            {/* Placeholders List View (Click anywhere on row to select & insert!) */}
+                            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-0.5">
+                              {savedPlaceholders.map((item) => (
+                                <div
+                                  key={item.id}
+                                  onClick={() => {
+                                    insertPlaceholderAtCursor(`{{${item.name}}}`);
+                                    toast.success(`Inserted {{${item.name}}}`);
+                                    setShowDropdownPopover(false);
+                                  }}
+                                  className="flex items-center justify-between bg-[var(--bg-input)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/40 rounded-xl px-3 py-2 transition-all text-xs cursor-pointer group"
+                                  title="Click to insert into prompt text"
+                                >
+                                  <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                    {getPlaceholderIcon(item.name)}
+                                    <span className="font-mono font-bold text-[#2563EB] dark:text-[#60A5FA] text-[11px] group-hover:underline">
+                                      {`{{${item.name}}}`}
+                                    </span>
+                                    <span className="text-[var(--text-secondary)] text-[10px] truncate font-medium">
+                                      {item.value ? `(${item.value})` : '(No value set)'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingId(item.id);
+                                        setTagNameInput(item.name);
+                                        setTagValueInput(item.value);
+                                        setShowDropdownPopover(false);
+                                        setShowAddModal(true);
+                                      }}
+                                      className="p-1 text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[var(--bg-card)] rounded-md transition-all cursor-pointer"
+                                      title="Edit tag name or value"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeletePlaceholder(item)}
+                                      className="p-1 text-[var(--text-secondary)] hover:text-rose-500 hover:bg-rose-500/10 rounded-md transition-all cursor-pointer"
+                                      title="Delete tag"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <textarea
                       ref={promptTextareaRef}
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
-                      placeholder="What would you like to post about? Type @ or use the Insert Placeholder dropdown to attach dynamic links (e.g. 'Promote {{PRODUCT_NAME}} using link {{PRODUCT_LINK}}')"
+                      placeholder="What would you like to post about?..."
                       rows={4}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-2xl px-4 py-3 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/60 transition-colors placeholder:text-slate-600 leading-relaxed resize-none"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-sm focus:outline-none focus:border-[#2563EB] transition-colors leading-relaxed resize-none"
                     />
 
-                    {/* Quick Insert Pills */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Variables:</span>
-                      {[
-                        { label: '🔗 Link', tag: '{{PRODUCT_LINK}}' },
-                        { label: '🏷️ Name', tag: '{{PRODUCT_NAME}}' },
-                        { label: '🌐 Website', tag: '{{WEBSITE_URL}}' },
-                        { label: '🎟️ Code', tag: '{{PROMO_CODE}}' },
-                      ].map((item, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => insertPlaceholderAtCursor(item.tag)}
-                          className="text-[10px] bg-slate-955 hover:bg-indigo-950/40 text-indigo-400 hover:text-indigo-300 border border-slate-850 hover:border-indigo-500/40 font-mono font-medium px-2 py-0.5 rounded-md transition-all active:scale-95"
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
+                    {/* Centered Popup Modal for Adding / Editing Custom Placeholder */}
+                    {portalMounted && showAddModal && createPortal(
+                      <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl relative">
+                          <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+                            <span className="text-sm font-bold text-[#2563EB] dark:text-[#60A5FA] uppercase tracking-wider flex items-center gap-2">
+                              {editingId ? 'Edit Tag' : 'Add Custom Tag'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddModal(false);
+                                setEditingId(null);
+                              }}
+                              className="text-slate-400 hover:text-slate-200 text-sm font-bold cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              if (!tagNameInput.trim()) return;
+                              const cleanKey = tagNameInput.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                              handleSavePlaceholder(cleanKey, tagValueInput.trim());
+                              setTagNameInput('');
+                              setTagValueInput('');
+                              setShowAddModal(false);
+                            }}
+                            className="space-y-4"
+                          >
+                            {/* Tag Type Selector */}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase block">
+                                Type
+                              </label>
+                              <div className="grid grid-cols-3 gap-2">
+                                {[
+                                  { id: 'link', label: '🔗 Link', defaultName: 'link' },
+                                  { id: 'text', label: '🏷️ Name', defaultName: 'name' },
+                                  { id: 'website', label: '🌐 Website', defaultName: 'website' },
+                                  { id: 'code', label: '🎟️ Promo Code', defaultName: 'promo_code' },
+                                  { id: 'author', label: '✍️ Author', defaultName: 'author_name' },
+                                  { id: 'cta', label: '⚡ CTA', defaultName: 'cta_link' },
+                                ].map((type) => (
+                                  <button
+                                    key={type.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setTagCategoryInput(type.id as any);
+                                      if (!editingId && !tagNameInput) {
+                                        setTagNameInput(type.defaultName);
+                                      }
+                                    }}
+                                    className={`py-2 px-2 rounded-xl text-[11px] font-bold border text-center transition-all cursor-pointer ${
+                                      tagCategoryInput === type.id
+                                        ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-sm'
+                                        : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-[#2563EB]/50'
+                                    }`}
+                                  >
+                                    {type.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Tag Name Input */}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase block">
+                                Tag Name
+                              </label>
+                              <input
+                                type="text"
+                                value={tagNameInput}
+                                onChange={(e) => setTagNameInput(e.target.value)}
+                                placeholder="e.g. link or author"
+                                className="w-full text-xs bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3.5 py-2.5 outline-none focus:border-[#2563EB] font-mono"
+                                autoFocus
+                              />
+                            </div>
+
+                            {/* Replacement Value Input */}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-[var(--text-secondary)] uppercase block">
+                                Value
+                              </label>
+                              <input
+                                type="text"
+                                value={tagValueInput}
+                                onChange={(e) => setTagValueInput(e.target.value)}
+                                placeholder="e.g. https://google.com"
+                                className="w-full text-xs bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3.5 py-2.5 outline-none focus:border-[#2563EB]"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-color)]">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAddModal(false);
+                                  setEditingId(null);
+                                }}
+                                className="px-4 py-2 bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] rounded-xl text-xs font-bold transition-all cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                disabled={!tagNameInput.trim()}
+                                className="px-5 py-2 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 cursor-pointer shadow-md"
+                              >
+                                {editingId ? 'Save Edit' : 'Add Tag'}
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>,
+                      document.body
+                    )}
 
                     {/* Magic Enhance Prompt Bar */}
                     <div className="flex items-center justify-between gap-2 pt-1">
@@ -646,16 +1099,17 @@ export default function ComposerPage() {
                 )}
 
                 {/* Platform & Tone Selectors */}
-                <div className="space-y-4 pt-2 border-t border-slate-850/60">
+                <div className="space-y-4 pt-3 border-t border-[var(--border-color)]">
+                  {/* Target Channels Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Target Channels</label>
+                      <label className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Target Channels</label>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-mono font-bold text-slate-500">
+                        <span className="text-[10px] font-mono font-bold text-[var(--text-secondary)]">
                           {platforms.length} of {selectablePlatforms.length}
                         </span>
-                        <span className="text-slate-700">·</span>
-                        <a href="/accounts" className="text-[10px] text-indigo-400 hover:underline font-semibold flex items-center gap-1">
+                        <span className="text-[var(--border-color)]">·</span>
+                        <a href="/accounts" className="text-[10px] text-[#2563EB] hover:underline font-semibold flex items-center gap-1">
                           Connect Accounts <ChevronRight className="h-3 w-3" />
                         </a>
                       </div>
@@ -670,9 +1124,9 @@ export default function ComposerPage() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {selectablePlatforms.map((platform) => {
+                        {selectablePlatforms.map((platform: PlatformDefinition) => {
                           const isConnected = connectedPlatforms.includes(platform.id);
-                          const active = platforms.includes(platform.id) && isConnected;
+                          const active = platforms.includes(platform.id as PlatformKey) && isConnected;
 
                           return (
                             <button
@@ -680,31 +1134,45 @@ export default function ComposerPage() {
                               type="button"
                               onClick={() => togglePlatform(platform.id)}
                               aria-pressed={active}
-                              className={`inline-flex items-center gap-2 py-1.5 pl-2.5 pr-3.5 rounded-full border text-[11px] font-extrabold tracking-wide transition-all duration-200 cursor-pointer ${
+                              className={`inline-flex items-center gap-2 py-1.5 pl-3 pr-3.5 rounded-xl text-[11px] font-bold tracking-wide transition-all duration-200 cursor-pointer border ${
                                 active
-                                  ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                                  : isConnected
-                                  ? 'bg-slate-955 text-slate-400 border-slate-850 hover:border-slate-750 hover:text-slate-200'
-                                  : 'bg-slate-955/50 text-slate-600 border-slate-850/60 hover:text-slate-400'
+                                  ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md'
+                                  : 'bg-[var(--bg-input)] text-[var(--text-primary)] border-[var(--border-color)] hover:border-[#2563EB]/50'
                               }`}
                               title={
-                                isConnected
-                                  ? active
-                                    ? `${platform.label} Selected & Ready`
-                                    : `Click to select ${platform.label}`
+                                loadingAccounts
+                                  ? `Verifying ${platform.label}...`
+                                  : isConnected
+                                  ? `${platform.label} Connected (Ready to publish)`
                                   : `${platform.label} Not Connected - Click to connect in Social Accounts`
                               }
                             >
+                              {/* Explicit Green (Connected) vs Red (Disconnected) Status Dot */}
                               <span
-                                className={`w-2 h-2 rounded-full shrink-0 ${
-                                  active
-                                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400/60'
+                                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                  loadingAccounts
+                                    ? 'bg-amber-400 animate-pulse'
                                     : isConnected
-                                    ? 'bg-slate-500'
-                                    : 'bg-slate-700'
+                                    ? 'bg-emerald-400 shadow-xs shadow-emerald-400 animate-pulse'
+                                    : 'bg-rose-500 shadow-xs shadow-rose-500'
                                 }`}
                               />
-                              {platform.label}
+                              <span>{platform.label}</span>
+
+                              {/* Red / Green Status Badge */}
+                              <span
+                                className={`text-[9px] px-1.5 py-0.2 rounded-md font-extrabold uppercase ${
+                                  active
+                                    ? isConnected
+                                      ? 'bg-emerald-400/20 text-emerald-200'
+                                      : 'bg-rose-400/30 text-rose-100'
+                                    : isConnected
+                                    ? 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400'
+                                    : 'bg-rose-500/10 text-rose-500 dark:text-rose-400'
+                                }`}
+                              >
+                                {isConnected ? 'Active' : 'Offline'}
+                              </span>
                             </button>
                           );
                         })}
@@ -712,10 +1180,11 @@ export default function ComposerPage() {
                     )}
                   </div>
 
+                  {/* Tone Selector */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Tone</label>
-                      <span className="text-[10px] text-slate-500 font-semibold shrink-0">Applied to every selected channel</span>
+                      <label className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Tone</label>
+                      <span className="text-[10px] text-[var(--text-secondary)] font-semibold shrink-0">Applied to every selected channel</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {TONE_OPTIONS.map((toneOption) => {
@@ -728,10 +1197,10 @@ export default function ComposerPage() {
                             onClick={() => setTone(toneOption.value)}
                             aria-pressed={active}
                             title={toneOption.hint}
-                            className={`py-1.5 px-3.5 rounded-full border text-[11px] font-extrabold tracking-wide transition-all duration-300 ${
+                            className={`py-1.5 px-3.5 rounded-xl text-[11px] font-bold tracking-wide transition-all duration-200 cursor-pointer ${
                               active
-                                ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                                : 'bg-slate-955 text-slate-500 border-slate-850 hover:border-slate-750 hover:text-slate-300'
+                                ? 'bg-[#2563EB] text-white shadow-xs'
+                                : 'bg-[var(--bg-input)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-color)] hover:border-[#2563EB]/40'
                             }`}
                           >
                             {toneOption.label}
@@ -742,108 +1211,125 @@ export default function ComposerPage() {
                   </div>
                 </div>
 
-                {/* Advanced Formatting Controls (Emoji Density, Hashtag Strategy, Format Style, Character Length) */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-850/60">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Emoji Density</label>
-                    <select
-                      value={emojiDensity}
-                      onChange={(e) => setEmojiDensity(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="NONE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">None (0 Emojis)</option>
-                      <option value="LOW" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Subtle (1-2 Emojis)</option>
-                      <option value="MEDIUM" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Balanced (3-5 Emojis)</option>
-                      <option value="HIGH" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Vibrant (Heavy Emojis)</option>
-                    </select>
-                  </div>
+                {/* Tweak A: Progressive Disclosure Accordion (Hide Emoji, Hashtags, Format Style & Length) */}
+                <div className="pt-2 border-t border-[var(--border-color)]">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center justify-between w-full py-2.5 px-3.5 bg-[var(--bg-input)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-xl text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer shadow-xs"
+                  >
+                    <span className="flex items-center gap-2">
+                      <SlidersHorizontal className="h-4 w-4 text-[#2563EB]" />
+                      Advanced Formatting Settings ⚙️ (Emoji, Hashtags, Format & Length)
+                    </span>
+                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${showAdvanced ? 'rotate-90 text-[#2563EB]' : ''}`} />
+                  </button>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Hashtags</label>
-                    <select
-                      value={hashtagCount}
-                      onChange={(e) => setHashtagCount(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="NONE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">0 Tags (No Hashtags)</option>
-                      <option value="FEW_3" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">3 Tags (Minimal Focus)</option>
-                      <option value="MODERATE_5" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">5 Tags (Standard Reach)</option>
-                      <option value="GROWTH_8" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">8 Tags (Growth Boost)</option>
-                      <option value="VIRAL_12" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">12 Tags (Viral Maximum)</option>
-                    </select>
-                  </div>
+                  {showAdvanced && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3.5 mt-2 animate-fadeIn">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Emoji Density</label>
+                        <select
+                          value={emojiDensity}
+                          onChange={(e) => setEmojiDensity(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-[var(--text-primary)] text-[11px] font-medium focus:outline-none focus:border-[#2563EB]"
+                        >
+                          <option value="NONE">None (0 Emojis)</option>
+                          <option value="LOW">Subtle (1-2 Emojis)</option>
+                          <option value="MEDIUM">Balanced (3-5 Emojis)</option>
+                          <option value="HIGH">Vibrant (Heavy Emojis)</option>
+                        </select>
+                      </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Format Style</label>
-                    <select
-                      value={formatStyle}
-                      onChange={(e) => setFormatStyle(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="SINGLE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Standard Post</option>
-                      <option value="THREAD" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Numbered Thread (1/ 2/)</option>
-                      <option value="CAROUSEL" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Slide-by-Slide Outline</option>
-                    </select>
-                  </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Hashtags</label>
+                        <select
+                          value={hashtagCount}
+                          onChange={(e) => setHashtagCount(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-[var(--text-primary)] text-[11px] font-medium focus:outline-none focus:border-[#2563EB]"
+                        >
+                          <option value="NONE">0 Tags (No Hashtags)</option>
+                          <option value="FEW_3">3 Tags (Minimal Focus)</option>
+                          <option value="MODERATE_5">5 Tags (Standard Reach)</option>
+                          <option value="GROWTH_8">8 Tags (Growth Boost)</option>
+                          <option value="VIRAL_12">12 Tags (Viral Maximum)</option>
+                        </select>
+                      </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Char Length (Body)</label>
-                    <select
-                      value={contentLength}
-                      onChange={(e) => setContentLength(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-2.5 py-1.5 text-slate-300 text-[11px] font-medium focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="CONCISE" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Concise (~100-300 chars)</option>
-                      <option value="BALANCED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Balanced (~400-1000 chars)</option>
-                      <option value="DETAILED" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Detailed (~1000-2500 chars)</option>
-                      <option value="LONG_FORM" className="bg-slate-900 text-slate-100 dark:bg-slate-900 dark:text-slate-100">Long-Form Story (~3000-6000 chars)</option>
-                    </select>
-                  </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Format Style</label>
+                        <select
+                          value={formatStyle}
+                          onChange={(e) => setFormatStyle(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-[var(--text-primary)] text-[11px] font-medium focus:outline-none focus:border-[#2563EB]"
+                        >
+                          <option value="SINGLE">Standard Post</option>
+                          <option value="THREAD">Numbered Thread (1/ 2/)</option>
+                          <option value="CAROUSEL">Slide-by-Slide Outline</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Char Length</label>
+                        <select
+                          value={contentLength}
+                          onChange={(e) => setContentLength(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-[var(--text-primary)] text-[11px] font-medium focus:outline-none focus:border-[#2563EB]"
+                        >
+                          <option value="CONCISE">Concise (~100-300 chars)</option>
+                          <option value="BALANCED">Balanced (~400-1000 chars)</option>
+                          <option value="DETAILED">Detailed (~1000-2500 chars)</option>
+                          <option value="LONG_FORM">Long-Form Story (~3000-6000 chars)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
+                {/* Tweak C: Prominent Bold Primary CTA Button */}
                 <button
                   type="button"
                   onClick={handleAIGenerate}
                   disabled={generating || (inputSource === 'PROMPT' ? !topic : !articleUrl) || platforms.length === 0}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl font-bold text-xs transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-950/30 cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-extrabold text-xs transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-500/20 cursor-pointer"
                 >
                   {generating ? (
                     <>
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Generating AI Drafts...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate AI Post Drafts
+                      <Sparkles className="h-4 w-4 text-white" />
+                      ✨ Generate Post Preview
                     </>
                   )}
                 </button>
 
                 {platforms.length === 0 && (
-                  <p className="text-[11px] text-amber-400 text-center font-bold mt-2 flex items-center justify-center gap-1.5 animate-fadeIn">
+                  <p className="text-[11px] text-amber-500 text-center font-bold mt-2 flex items-center justify-center gap-1.5 animate-fadeIn">
                     <Info className="h-3.5 w-3.5 shrink-0" />
                     Please select at least one target channel to generate content.
                   </p>
                 )}
               </div>
 
-              {/* Media Attachment Dropzone */}
-              <div className="bg-slate-900/50 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-850">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
+              {/* Section 2: Media Attachment Dropzone */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#2563EB] flex items-center gap-2">
                     <Upload className="h-4 w-4" />
                     2. Attach Media (Optional)
                   </h2>
-                  <span className="text-[10px] text-slate-500 font-semibold">Step 2 of 3</span>
+                  <span className="text-[10px] text-[var(--text-secondary)] font-semibold">Step 2 of 3</span>
                 </div>
 
                 {mediaRequiredPlatforms.length > 0 && (
-                  <div className="bg-pink-950/20 border border-pink-500/20 rounded-xl p-3 flex items-start gap-2.5">
-                    <PlatformIcon platform={mediaRequiredPlatforms[0]} className="h-[18px] w-[18px] text-pink-400 shrink-0 mt-0.5" />
+                  <div className="bg-pink-500/10 border border-pink-500/30 rounded-xl p-3 flex items-start gap-2.5">
+                    <PlatformIcon platform={mediaRequiredPlatforms[0]} className="h-[18px] w-[18px] text-pink-500 shrink-0 mt-0.5" />
                     <div className="text-[11px] leading-relaxed">
-                      <span className="font-bold text-pink-300">Media recommended for {mediaRequiredPlatforms.map((platform) => getPlatformDefinition(platform).label).join(', ')}: </span>
-                      <span className="text-slate-400">
+                      <span className="font-bold text-pink-500 dark:text-pink-400">Media recommended for {mediaRequiredPlatforms.map((platform: string) => getPlatformDefinition(platform).label).join(', ')}: </span>
+                      <span className="text-[var(--text-secondary)]">
                         {mediaFileUrl
                           ? 'Media asset uploaded and ready for every selected channel that supports it.'
                           : 'Add an image or video to improve visual-first channel performance.'}
@@ -870,45 +1356,50 @@ export default function ComposerPage() {
                 />
               </div>
 
-              {/* Publish / Schedule Control Card */}
-              <div className="bg-slate-900/50 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-850">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
+              {/* Section 3: Publish / Schedule Options */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#2563EB] flex items-center gap-2">
                     <Send className="h-4 w-4" />
                     3. Publish Options
                   </h2>
-                  <span className="text-[10px] text-slate-500 font-semibold">Step 3 of 3</span>
+                  <span className="text-[10px] text-[var(--text-secondary)] font-semibold">Step 3 of 3</span>
                 </div>
 
-                <div className="flex items-center gap-3 bg-slate-955 p-1 rounded-xl border border-slate-850">
+                {/* Segmented Control Toggle Tabs */}
+                <div className="flex items-center p-1 bg-[var(--bg-input)] rounded-xl border border-[var(--border-color)]">
                   <button
                     type="button"
                     onClick={() => setPublishNow(true)}
-                    className={`flex-1 py-2 text-center rounded-lg text-xs font-bold transition-all duration-300 ${
-                      publishNow ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                    className={`flex-1 py-2 text-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      publishNow
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    Publish Now
+                    ⚡ Publish Now
                   </button>
                   <button
                     type="button"
                     onClick={() => setPublishNow(false)}
-                    className={`flex-1 py-2 text-center rounded-lg text-xs font-bold transition-all duration-300 ${
-                      !publishNow ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                    className={`flex-1 py-2 text-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      !publishNow
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    Schedule Date & Time
+                    🗓️ Schedule for Later
                   </button>
                 </div>
 
                 {!publishNow && (
                   <div className="space-y-1.5 pt-1 animate-fadeIn">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Target Date & Time</label>
+                    <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Target Date & Time</label>
                     <input
                       type="datetime-local"
                       value={scheduledDate}
                       onChange={(e) => setScheduledDate(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-850 rounded-xl px-4 py-2.5 text-slate-200 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:border-[#2563EB]"
                     />
                   </div>
                 )}
@@ -917,17 +1408,17 @@ export default function ComposerPage() {
                   type="button"
                   onClick={handleSchedulePost}
                   disabled={submitting || (!publishNow && !scheduledDate) || platforms.length === 0}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-950/30 cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-bold text-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md cursor-pointer"
                 >
                   {submitting ? (
                     <>
                       <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Dispatching Campaign...
+                      {publishNow ? 'Publishing Campaign Now...' : 'Scheduling Campaign...'}
                     </>
                   ) : (
                     <>
                       <Send className="h-4 w-4" />
-                      {publishNow ? 'Publish Campaign Now' : 'Schedule One-Time Release'}
+                      {publishNow ? '🚀 Publish Campaign Now' : '🗓️ Schedule Campaign'}
                     </>
                   )}
                 </button>
@@ -960,7 +1451,7 @@ export default function ComposerPage() {
                     <p className="text-slate-500 text-xs font-medium">Select at least one channel above</p>
                   </div>
                 ) : (
-                  platforms.map((platform) => {
+                  platforms.map((platform: PlatformKey) => {
                     const platformDefinition = getPlatformDefinition(platform);
                     const charCount = getCharCount(platform);
 
@@ -1083,7 +1574,7 @@ export default function ComposerPage() {
                     ? 'grid-cols-1 lg:grid-cols-2 w-full'
                     : 'grid-cols-1 lg:grid-cols-3 w-full'
                 }`}>
-                  {platforms.map((platform) => {
+                  {platforms.map((platform: PlatformKey) => {
                     const platformDefinition = getPlatformDefinition(platform);
                     const charCount = getCharCount(platform);
 

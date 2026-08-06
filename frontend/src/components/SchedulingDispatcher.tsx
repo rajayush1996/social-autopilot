@@ -82,10 +82,12 @@ export function SchedulingDispatcher() {
 
   // Form Fields
   const [formName, setFormName] = useState<string>('Daily Autopilot Dispatch');
-  const [formTime, setFormTime] = useState<string>('09:00');
-  const [formDays, setFormDays] = useState<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI']);
+  const [formTime, setFormTime] = useState<string>('20:00');
+  const [formTimezone, setFormTimezone] = useState<string>('Asia/Kolkata');
+  const [formApprovalLead, setFormApprovalLead] = useState<string>('2_HOURS');
+  const [formDays, setFormDays] = useState<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
   const [formRepeat, setFormRepeat] = useState<string>('WEEKLY');
-  const [formPlatforms, setFormPlatforms] = useState<('INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK')[]>(['LINKEDIN', 'X', 'FACEBOOK']);
+  const [formPlatforms, setFormPlatforms] = useState<('INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK')[]>(['LINKEDIN']);
   const [formTone, setFormTone] = useState<string>('ENGAGING');
   const [formTopic, setFormTopic] = useState<string>('');
   const [formEmojiDensity, setFormEmojiDensity] = useState<string>('MEDIUM');
@@ -280,10 +282,13 @@ export function SchedulingDispatcher() {
   const handleOpenAddModal = () => {
     setEditingSchedule(null);
     setFormName('Daily Growth Dispatcher');
-    setFormTime('09:00');
-    setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI']);
+    setFormTime('20:00');
+    setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat('WEEKLY');
-    setFormPlatforms(['LINKEDIN', 'X', 'FACEBOOK', 'INSTAGRAM']);
+    const initialConnected = connectedPlatforms.length > 0
+      ? (connectedPlatforms.filter(p => ['LINKEDIN', 'INSTAGRAM', 'FACEBOOK', 'X'].includes(p)) as any)
+      : ['LINKEDIN'];
+    setFormPlatforms(initialConnected.length > 0 ? initialConnected : ['LINKEDIN']);
     setFormTone('ENGAGING');
     setFormTopic('');
     setFormEmojiDensity('MEDIUM');
@@ -298,10 +303,11 @@ export function SchedulingDispatcher() {
   const handleOpenEditModal = (sched: AutomationSchedule) => {
     setEditingSchedule(sched);
     setFormName(sched.name);
-    setFormTime(sched.timeOfDay || '09:00');
-    setFormDays(sched.daysOfWeek || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
+    setFormTime(sched.timeOfDay || '20:00');
+    setFormDays(sched.daysOfWeek || ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat(sched.repeatType || 'WEEKLY');
-    setFormPlatforms((sched.targetPlatforms as ('INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK')[]) || ['LINKEDIN', 'X', 'FACEBOOK', 'INSTAGRAM']);
+    const savedPlatforms = (sched.targetPlatforms as ('INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK')[]) || [];
+    setFormPlatforms(savedPlatforms.length > 0 ? savedPlatforms : ['LINKEDIN']);
     setFormTone(sched.tone || 'ENGAGING');
     setFormTopic(sched.topicPrompt || '');
     setFormEmojiDensity('MEDIUM');
@@ -358,8 +364,6 @@ export function SchedulingDispatcher() {
       return 'UTC';
     }
   };
-
-  const [formTimezone, setFormTimezone] = useState<string>(getLocalBrowserTimezone());
 
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -730,37 +734,52 @@ export function SchedulingDispatcher() {
                   />
                 </div>
 
-                {/* Timing & Repeat Mode */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Timing & Timezone & Lead Time Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                        Execution Time (24h)
-                      </label>
-                      <span className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full" title="Detected Local Browser Timezone">
-                        🌐 {formTimezone}
-                      </span>
-                    </div>
+                    <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                      Target Release Time (24h)
+                    </label>
                     <input
                       type="time"
                       required
                       value={formTime}
                       onChange={(e) => setFormTime(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono font-bold"
                     />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                      Schedule Mode
+                      Timezone
                     </label>
                     <select
-                      value={formRepeat}
-                      onChange={(e) => setFormRepeat(e.target.value)}
-                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                      value={formTimezone}
+                      onChange={(e) => setFormTimezone(e.target.value)}
+                      className="w-full bg-slate-955 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
                     >
-                      <option value="WEEKLY" className="bg-slate-900 text-slate-100">Repeat Weekly (Recurring)</option>
-                      <option value="ONCE" className="bg-slate-900 text-slate-100">Run Once (Single Batch)</option>
+                      <option value="Asia/Kolkata">Asia/Kolkata (IST - UTC+5:30)</option>
+                      <option value="UTC">UTC (Universal Coordinated Time)</option>
+                      <option value="America/New_York">America/New_York (EST/EDT)</option>
+                      <option value="Europe/London">Europe/London (GMT/BST)</option>
+                      <option value="Asia/Dubai">Asia/Dubai (GST - UTC+4)</option>
+                      <option value="Asia/Singapore">Asia/Singapore (SGT - UTC+8)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider block flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" /> Email Review Lead Time
+                    </label>
+                    <select
+                      value={formApprovalLead}
+                      onChange={(e) => setFormApprovalLead(e.target.value)}
+                      className="w-full bg-slate-955 border border-indigo-500/30 rounded-xl px-3 py-2 text-xs text-indigo-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="2_HOURS">2 Hours Before Target Release</option>
+                      <option value="1_HOUR">1 Hour Before Target Release</option>
+                      <option value="4_HOURS">4 Hours Before Target Release</option>
+                      <option value="IMMEDIATE">Immediate Generation</option>
                     </select>
                   </div>
                 </div>

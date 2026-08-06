@@ -35,6 +35,25 @@ export interface AutomationSchedule {
  */
 export class ApiService {
   /**
+   * Generic HTTP passthrough helpers
+   */
+  static async get<T = any>(url: string, config?: any) {
+    return apiClient.get<T>(url, config);
+  }
+
+  static async post<T = any>(url: string, data?: any, config?: any) {
+    return apiClient.post<T>(url, data, config);
+  }
+
+  static async put<T = any>(url: string, data?: any, config?: any) {
+    return apiClient.put<T>(url, data, config);
+  }
+
+  static async delete<T = any>(url: string, config?: any) {
+    return apiClient.delete<T>(url, config);
+  }
+
+  /**
    * Fetch system dispatcher status (Admin setting check)
    */
   static async getDispatcherStatus(): Promise<{ dispatcherEnabled: boolean }> {

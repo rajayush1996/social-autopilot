@@ -45,6 +45,11 @@ export async function getValidAccessToken(userId, platform) {
     return decryptedAccessToken;
   }
 
+  // Check if token is expired or expires within the next 5 minutes (300 seconds)
+  const isExpired = account.expiresAt
+    ? new Date(account.expiresAt).getTime() - Date.now() < 5 * 60 * 1000
+    : false;
+
   if (!isExpired) {
     logger.info(`[TokenManager] Existing token for ${platformUpper} is valid until ${account.expiresAt}.`);
     return decryptedAccessToken;
