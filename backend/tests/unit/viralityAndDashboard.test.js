@@ -217,4 +217,44 @@ describe('⚡ Virality Intelligence & Dashboard Unit Tests', () => {
       assert.strictEqual(res.success, true);
     });
   });
+
+  // SCENARIO 8: Multi-Tier Caching (In-Memory RAM + Redis Fallback)
+  describe('Scenario 8: Multi-Tier Caching Engine', () => {
+    test('Should set and get cached value seamlessly via CacheService', async () => {
+      const CacheService = (await import('../../src/services/cacheService.js')).default;
+      const testKey = 'user:profile:test_123';
+      const testData = { name: 'Ayush', plan: 'ENTERPRISE', credits: 500 };
+
+      await CacheService.set(testKey, testData, 60);
+      const cached = await CacheService.get(testKey);
+
+      assert.deepStrictEqual(cached, testData);
+
+      await CacheService.del(testKey);
+      const afterDel = await CacheService.get(testKey);
+      assert.strictEqual(afterDel, null);
+    });
+
+    test('Should execute remember pattern and cache result on miss', async () => {
+      const CacheService = (await import('../../src/services/cacheService.js')).default;
+      const testKey = 'dashboard:summary:test_456';
+      let fetchCount = 0;
+
+      const fetcher = async () => {
+        fetchCount++;
+        return { totalReach: 15000, viralRate: '4.8%' };
+      };
+
+      const result1 = await CacheService.remember(testKey, 60, fetcher);
+      assert.strictEqual(result1.totalReach, 15000);
+      assert.strictEqual(fetchCount, 1);
+
+      // Second call must hit cache without incrementing fetchCount
+      const result2 = await CacheService.remember(testKey, 60, fetcher);
+      assert.strictEqual(result2.totalReach, 15000);
+      assert.strictEqual(fetchCount, 1);
+
+      await CacheService.del(testKey);
+    });
+  });
 });

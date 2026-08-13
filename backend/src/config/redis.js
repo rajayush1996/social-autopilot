@@ -31,8 +31,13 @@ let redisClient = null;
 
 /**
  * Get or create Singleton IORedis connection instance.
+ * Returns null if running in Native PostgreSQL mode.
  */
 export function getRedisClient() {
+  if (config.queue?.driver === 'postgres') {
+    return null;
+  }
+
   if (!redisClient) {
     if (config.redis.url) {
       const isTlsUrl = config.redis.url.startsWith('rediss://') || config.redis.url.includes('upstash.io');
@@ -60,8 +65,14 @@ export function getRedisClient() {
  * Health check helper to verify Redis server connection.
  */
 export async function checkRedisConnection() {
+  if (config.queue?.driver === 'postgres') {
+    logger.info('🛡️ Redis Connection Check Skipped (Running in Native PostgreSQL Mode).');
+    return false;
+  }
+
   try {
     const client = getRedisClient();
+    if (!client) return false;
     const pong = await client.ping();
     if (pong === 'PONG') {
       logger.info('✅ Redis ping test passed (PONG).');
