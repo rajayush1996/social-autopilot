@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Sparkles, RefreshCw, Wand2, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 
+import ApiService from '@/services/apiService';
+
 export function CampaignCreativeStudio({ 
   onImageClick,
   onDurationChange
@@ -21,12 +23,23 @@ export function CampaignCreativeStudio({
     { day: 3, url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800', prompt: 'Growth charts going upward' },
   ]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setGeneratingBatch(true);
-    // Agar BATCH hai toh background job simulate hogi, agar SINGLE hai toh turant 1 image banegi
-    setTimeout(() => {
+    try {
+      const days = generationType === 'BATCH' ? selectedDays : 1;
+      const res = await ApiService.generateBatchAssets({
+        totalDays: days,
+        themeStyle: visualStyle,
+        topicPrompt: 'Social Campaign Graphics',
+      });
+      if (res?.assets && res.assets.length > 0) {
+        setBatchAssets(res.assets);
+      }
+    } catch (e) {
+      console.warn('Batch asset gen fallback:', e);
+    } finally {
       setGeneratingBatch(false);
-    }, generationType === 'BATCH' ? 3000 : 1500);
+    }
   };
 
   const scrollSlider = (direction: 'left' | 'right') => {

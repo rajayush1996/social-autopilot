@@ -29,6 +29,10 @@ export const config = {
     password: process.env.REDIS_PASSWORD || undefined,
   },
 
+  queue: {
+    driver: (process.env.QUEUE_DRIVER || (process.env.DISABLE_REDIS === 'true' ? 'postgres' : 'redis')).toLowerCase(), // 'redis' | 'postgres'
+  },
+
   openai: {
     apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY || process.env.OPENAI_KEY,
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -86,6 +90,11 @@ export const config = {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || 'info@omnisyncapp.com',
+  },
+  flux: {
+    apiKey: process.env.FLUX_API_KEY || process.env.FAL_KEY || process.env.TOGETHER_API_KEY || '',
+    apiUrl: process.env.FLUX_API_URL || 'https://queue.fal.run/fal-ai/flux/schnell',
+    provider: process.env.FLUX_PROVIDER || 'fal', // 'fal' | 'together' | 'replicate'
   },
 };
 

@@ -106,7 +106,14 @@ export default function ComposerPage() {
   const generatedDrafts = reduxComposer.generatedDrafts;
 
   const setComposerMode = (mode: 'SINGLE' | 'RECURRING') => dispatch(setComposerModeAction(mode));
-  const setTopic = (val: string) => dispatch(setTopicAction(val));
+  const setTopic = (val: string | ((prev: string) => string)) => {
+    if (typeof val === 'function') {
+      const next = val(reduxComposer.topic);
+      dispatch(setTopicAction(next));
+    } else {
+      dispatch(setTopicAction(val));
+    }
+  };
   const setTone = (val: string) => dispatch(setToneAction(val));
   const setInputSource = (src: 'PROMPT' | 'URL') => dispatch(setInputSourceAction(src));
   const setArticleUrl = (val: string) => dispatch(setArticleUrlAction(val));
@@ -154,6 +161,8 @@ export default function ComposerPage() {
   const [tagCategoryInput, setTagCategoryInput] = useState<'link' | 'text' | 'website' | 'code' | 'author' | 'cta'>('link');
   const [tagValueInput, setTagValueInput] = useState('');
 
+  const [trendingHashtags, setTrendingHashtags] = useState<Array<{ tag: string; reachMultiplier: string }>>([]);
+
   useEffect(() => {
     const fetchPlaceholders = async () => {
       try {
@@ -170,7 +179,53 @@ export default function ComposerPage() {
         console.warn('[Composer] Could not fetch placeholders from backend:', err);
       }
     };
+
+    const fetchTrendingTags = async () => {
+      try {
+        const res = await ApiService.getTrendingHashtags();
+        if (res?.hashtags) {
+          setTrendingHashtags(res.hashtags);
+        }
+      } catch (e) {
+        console.warn('[Composer] Could not fetch trending tags:', e);
+      }
+    };
+
     fetchPlaceholders();
+    fetchTrendingTags();
+
+    // Check URL query parameters for 1-Click loops
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const hookParam = params.get('hook');
+      const tagsParam = params.get('tags');
+      const scheduleTimeParam = params.get('scheduleTime');
+
+      if (hookParam) {
+        setTopic(hookParam);
+        dispatch(setTopicAction(hookParam));
+        toast.info('🪄 Viral Hook loaded into composer!');
+      }
+
+      if (tagsParam) {
+        setTopic((prev) => {
+          const newTopic = prev ? `${prev}\n\n${tagsParam}` : tagsParam;
+          dispatch(setTopicAction(newTopic));
+          return newTopic;
+        });
+        toast.info('🏷️ Trending hashtags appended!');
+      }
+
+      if (scheduleTimeParam === 'today-peak') {
+        setPublishMode('SCHEDULE');
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        setScheduledDate(`${yyyy}-${mm}-${dd}T17:45`);
+        toast.info('⚡ Auto-filled with Today 5:45 PM Peak Window!');
+      }
+    }
   }, []);
 
   const syncPlaceholders = async (newList: UserPlaceholder[]) => {
@@ -743,6 +798,28 @@ export default function ComposerPage() {
                     }}
                     getPlaceholderIcon={getPlaceholderIcon}
                   />
+
+                  {/* 1-Click Trending Hashtags Strip */}
+                  {trendingHashtags.length > 0 && (
+                    <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-1 custom-scrollbar">
+                      <span className="text-[10px] font-extrabold text-[var(--text-secondary)] uppercase shrink-0">🔥 Trending:</span>
+                      {trendingHashtags.map((t, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const newTopic = topic ? `${topic} ${t.tag}` : t.tag;
+                            setTopic(newTopic);
+                            dispatch(setTopicAction(newTopic));
+                          }}
+                          className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 shrink-0 cursor-pointer transition-all shadow-xs"
+                          title={`Reach multiplier: ${t.reachMultiplier}`}
+                        >
+                          + {t.tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
                     <div className="space-y-3">

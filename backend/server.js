@@ -123,6 +123,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 import notificationRoutes from './src/routes/notificationRoutes.js';
 import placeholderRoutes from './src/routes/placeholderRoutes.js';
+import analyticsRoutes from './src/routes/analyticsRoutes.js';
+import campaignRoutes from './src/routes/campaignRoutes.js';
+import dashboardRoutes from './src/routes/dashboardRoutes.js';
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -132,6 +135,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/placeholders', placeholderRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error Handling Middlewares (Must be last)
 import http from 'http';
@@ -144,17 +150,20 @@ app.use(globalErrorHandler);
 const server = http.createServer(app);
 initSocket(server);
 
-// Start Server & Initialize BullMQ Worker & Scheduler Sync
+// Start Server & Initialize Queue Worker & Scheduler Sync
 server.listen(PORT, async () => {
   logger.info(`🚀 Social Autopilot Server & Socket.io listening on http://localhost:${PORT}`);
   
   // Database and Redis connection checks
   await checkDatabaseConnection();
-  await checkRedisConnection();
+  if (process.env.QUEUE_DRIVER === 'redis' || (!process.env.QUEUE_DRIVER && process.env.REDIS_URL)) {
+    await checkRedisConnection();
+  }
 
-  // Initialize BullMQ Worker & 60-Second Automated Scheduler Loop
+  // Initialize Worker based on Environment Driver (Redis BullMQ vs Native PostgreSQL)
   try {
-    initPostWorker();
+    const QueueManager = (await import('./src/queues/queueManager.js')).default;
+    await QueueManager.initWorker();
     startCronSchedulerLoop();
   } catch (queueErr) {
     logger.warn(`[Scheduler Init Warning] ${queueErr.message}`);

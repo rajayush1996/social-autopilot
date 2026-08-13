@@ -324,8 +324,13 @@ export function initPostWorker() {
     logger.error(`[BullMQ Worker] ❌ Job ${job?.id} failed with error: ${err.message}`);
   });
 
+  let lastWorkerErrorLogTime = 0;
   postWorker.on('error', (err) => {
-    logger.warn(`[BullMQ Worker Warning] ${err.message}`);
+    const now = Date.now();
+    if (now - lastWorkerErrorLogTime > 60000) {
+      lastWorkerErrorLogTime = now;
+      logger.warn(`[BullMQ Worker Warning] ${err.message} (Throttled for 60s to prevent spam)`);
+    }
   });
 
   return postWorker;

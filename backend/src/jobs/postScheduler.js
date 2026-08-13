@@ -6,8 +6,11 @@ import ScheduleService from '../services/scheduleService.js';
 import logger from '../utils/logger.js';
 import { refreshExpiringTokens } from './tokenRefreshJob.js';
 
+import { processPostPublishing } from '../workers/postWorker.js';
+
 /**
  * Synchronize overdue or un-enqueued scheduled posts from DB into BullMQ queue.
+ * Automatically falls back to direct publishing if Redis/BullMQ free tier limit is reached.
  */
 export async function syncScheduledPostsToQueue() {
   const now = new Date();
@@ -27,16 +30,30 @@ export async function syncScheduledPostsToQueue() {
       return { syncedCount: 0 };
     }
 
-    logger.info(`[PostScheduler] 🚀 Found ${pendingPosts.length} due/overdue post(s). Dispatching to BullMQ...`);
+    logger.info(`[PostScheduler] 🚀 Found ${pendingPosts.length} due/overdue post(s). Dispatching...`);
 
+    let successCount = 0;
     for (const post of pendingPosts) {
-      await enqueuePostJob({
+      const queueRes = await enqueuePostJob({
         postId: post.id,
         publishNow: true,
       });
+
+      // If Redis is full (e.g. Upstash quota exceeded) or unavailable, fallback directly to direct DB publishing
+      if (!queueRes || !queueRes.success) {
+        logger.warn(`[PostScheduler] Redis Queue full/unavailable. Executing direct PostgreSQL publish fallback for Post: ${post.id}`);
+        try {
+          await processPostPublishing(post.id);
+          successCount++;
+        } catch (directErr) {
+          logger.error(`[PostScheduler] Direct publish failed for ${post.id}: ${directErr.message}`);
+        }
+      } else {
+        successCount++;
+      }
     }
 
-    return { syncedCount: pendingPosts.length };
+    return { syncedCount: successCount };
   } catch (error) {
     logger.error(`[PostScheduler] Error syncing scheduled posts: ${error.message}`);
     return { error: error.message };

@@ -487,6 +487,127 @@ export class ApiService {
     const response = await apiClient.post('/api/admin/plan-features', { matrix });
     return response.data?.data;
   }
+
+  /**
+   * 🔬 Diagnoses post virality score, hook critique, and improved viral hook.
+   */
+  static async diagnosePost(payload: { content: string; platform?: string; metrics?: Record<string, any> }): Promise<{
+    success: boolean;
+    viralityScore: number;
+    breakdown: {
+      hookScore: number;
+      hookCritique: string;
+      readabilityScore: number;
+      readabilityCritique: string;
+      ctaScore: number;
+      ctaCritique: string;
+    };
+    viralFixes: string[];
+    improvedViralHook: string;
+    platform: string;
+  }> {
+    const response = await apiClient.post('/api/analytics/diagnose-post', payload);
+    return response.data;
+  }
+
+  /**
+   * 🕒 Fetch Follower Prime-Time Radar & Golden Windows.
+   */
+  static async getAudiencePeakTimes(): Promise<{
+    success: boolean;
+    lastUpdated: string;
+    slots: Record<string, Array<{ time: string; timeFormatted: string; confidence: string; label: string }>>;
+    activePrimeWindow: {
+      platform: string;
+      time: string;
+      timeFormatted: string;
+      reachMultiplier: string;
+      message: string;
+    };
+  }> {
+    const response = await apiClient.get('/api/analytics/audience-peak-times');
+    return response.data;
+  }
+
+  /**
+   * 🏷️ Fetch High-Yield Trending Hashtags with reach multipliers.
+   */
+  static async getTrendingHashtags(): Promise<{
+    success: boolean;
+    hashtags: Array<{ tag: string; reachMultiplier: string; engagementRate: string; category: string }>;
+  }> {
+    const response = await apiClient.get('/api/analytics/trending-hashtags');
+    return response.data;
+  }
+
+  /**
+   * 📊 Fetch Aggregated Dashboard Summary (real DB stats, queue, accounts).
+   */
+  static async getDashboardSummary(): Promise<{
+    success: boolean;
+    stats: {
+      totalPublished: number;
+      totalScheduled: number;
+      totalFailed: number;
+      activeChannelsCount: number;
+      aiCreditsRemaining: number;
+      estimatedHoursSaved: number;
+    };
+    accounts: SocialAccount[];
+    upcomingQueue: Post[];
+    recentActivity: Post[];
+  }> {
+    const response = await apiClient.get('/api/analytics/dashboard-summary');
+    return response.data;
+  }
+
+  /**
+   * 🎨 Generate Multi-Day Themed Batch Assets for Visual Campaigns.
+   */
+  static async generateBatchAssets(payload: {
+    totalDays?: number;
+    themeStyle?: string;
+    topicPrompt?: string;
+  }): Promise<{
+    success: boolean;
+    totalDays: number;
+    themeStyle: string;
+    assets: Array<{ day: number; id: string; name: string; url: string; prompt: string; themeStyle: string }>;
+  }> {
+    const response = await apiClient.post('/api/campaigns/generate-batch-assets', payload);
+    return response.data;
+  }
+
+  /**
+   * ⚡ Omni-Prompt Batch Drafts Generator for Dashboard
+   */
+  static async omniGenerate(payload: {
+    prompt: string;
+    platform?: string;
+    count?: number;
+  }): Promise<{
+    success: boolean;
+    prompt: string;
+    drafts: string[];
+  }> {
+    const response = await apiClient.post('/api/dashboard/omni-generate', payload);
+    return response.data;
+  }
+
+  /**
+   * Alias for quick AI post generation
+   */
+  static async generateAiPost(payload: {
+    prompt: string;
+    platform?: string;
+    tone?: string;
+  }): Promise<{ content: string }> {
+    const result = await this.generateAiContent(payload.prompt, payload.tone || 'ENGAGING', [payload.platform || 'LINKEDIN']);
+    const r = result as any;
+    return {
+      content: r?.adaptedPosts?.[payload.platform || 'LINKEDIN'] || r?.content || '',
+    };
+  }
 }
 
 export default ApiService;
