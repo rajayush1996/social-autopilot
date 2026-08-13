@@ -216,15 +216,67 @@ export class ScheduleService {
       hookText: aiResult.content.split('\n')[0] || '',
     });
 
-    // Calculate exact target scheduled timestamp using schedule's timeOfDay (e.g. 09:00 AM)
+    // Calculate exact target scheduled timestamp using schedule's timeOfDay (e.g. 20:00) and timezone (e.g. Asia/Kolkata)
     const targetScheduledAt = (() => {
-      const [hStr, mStr] = (schedule.timeOfDay || '09:00').split(':');
-      const target = new Date();
-      target.setHours(parseInt(hStr, 10) || 9, parseInt(mStr, 10) || 0, 0, 0);
-      if (target <= new Date()) {
-        target.setDate(target.getDate() + 1); // Set for tomorrow at target time if today's slot passed
+      const timeOfDay = schedule.timeOfDay || '09:00';
+      const tz = schedule.timezone || 'UTC';
+      const [hStr, mStr] = timeOfDay.split(':');
+      const targetH = parseInt(hStr, 10) || 0;
+      const targetM = parseInt(mStr, 10) || 0;
+      const now = new Date();
+
+      try {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+        });
+        const parts = formatter.formatToParts(now);
+        const partMap = {};
+        parts.forEach(p => { partMap[p.type] = p.value; });
+
+        const year = parseInt(partMap.year, 10);
+        const month = parseInt(partMap.month, 10) - 1;
+        const day = parseInt(partMap.day, 10);
+
+        const guessUtc = new Date(Date.UTC(year, month, day, targetH, targetM, 0));
+
+        const tzCheck = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric',
+          second: 'numeric',
+          hour12: false,
+        });
+
+        const checkParts = tzCheck.formatToParts(guessUtc);
+        const cMap = {};
+        checkParts.forEach(p => { cMap[p.type] = p.value; });
+        let cH = parseInt(cMap.hour, 10);
+        if (cH === 24) cH = 0;
+        const cM = parseInt(cMap.minute, 10);
+        const cDay = parseInt(cMap.day, 10);
+
+        const guessTotalMin = (cDay * 24 * 60) + (cH * 60) + cM;
+        const desiredTotalMin = (day * 24 * 60) + (targetH * 60) + targetM;
+        const diffMin = desiredTotalMin - guessTotalMin;
+
+        const finalTarget = new Date(guessUtc.getTime() + diffMin * 60 * 1000);
+
+        if (finalTarget <= now) {
+          finalTarget.setDate(finalTarget.getDate() + 1);
+        }
+        return finalTarget;
+      } catch (e) {
+        const target = new Date();
+        target.setHours(targetH, targetM, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return target;
       }
-      return target;
     })();
 
     let post;

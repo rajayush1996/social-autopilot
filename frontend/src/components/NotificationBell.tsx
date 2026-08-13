@@ -99,9 +99,9 @@ export default function NotificationBell() {
         onClick={() => setIsOpen(!isOpen)}
         aria-label="View Notifications"
         title="Notifications"
-        className="relative group p-2.5 rounded-2xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/80 text-slate-200 transition-all duration-300 active:scale-95 shadow-sm cursor-pointer"
+        className="relative group h-10 w-10 rounded-xl bg-[var(--bg-input)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 text-[var(--text-primary)] transition-all active:scale-95 shadow-xs cursor-pointer flex items-center justify-center"
       >
-        <Bell className="h-5 w-5 text-slate-300 group-hover:rotate-12 transition-transform duration-300" />
+        <Bell className="h-4.5 w-4.5 text-[var(--text-primary)] group-hover:rotate-12 transition-transform duration-300" />
 
         {/* Unread Counter Badge */}
         {unreadCount > 0 && (
@@ -113,14 +113,14 @@ export default function NotificationBell() {
 
       {/* Notification Dropdown Drawer */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl z-50 overflow-hidden animate-fadeIn backdrop-blur-3xl">
+        <div className="absolute right-0 mt-3 w-85 sm:w-[410px] rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl z-50 overflow-hidden animate-fadeIn backdrop-blur-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-955/80">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-extrabold text-slate-100">Notifications</span>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+            <div className="flex items-center gap-2.5">
+              <span className="text-sm font-extrabold text-[var(--text-primary)]">Notifications</span>
               {unreadCount > 0 && (
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  {unreadCount} new
+                <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20">
+                  {unreadCount} unread
                 </span>
               )}
             </div>
@@ -130,30 +130,35 @@ export default function NotificationBell() {
                 <button
                   type="button"
                   onClick={handleMarkAllAsRead}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  className="px-3 py-1.5 text-xs text-[#2563EB] dark:text-[#60A5FA] bg-[#2563EB]/10 hover:bg-[#2563EB]/20 border border-[#2563EB]/20 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs active:scale-95"
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
-                  Mark all read
+                  <span>Mark all read</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 cursor-pointer"
+                className="h-8 w-8 rounded-xl bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-primary)] hover:text-rose-500 transition-all cursor-pointer flex items-center justify-center group shadow-xs"
+                title="Close notifications"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4 transition-transform group-hover:scale-110" />
               </button>
             </div>
           </div>
 
           {/* List Body */}
-          <div className="max-h-96 overflow-y-auto custom-scrollbar divide-y divide-slate-850">
+          <div className="max-h-96 overflow-y-auto custom-scrollbar">
             {notifications.length === 0 ? (
-              <div className="p-8 text-center space-y-2">
-                <Bell className="h-8 w-8 text-slate-600 mx-auto" />
-                <p className="text-xs text-slate-400 font-bold">No notifications yet</p>
-                <p className="text-[11px] text-slate-500">Post updates and system alerts will appear here.</p>
+              <div className="p-10 text-center space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] flex items-center justify-center text-[var(--text-secondary)] mx-auto mb-3 shadow-xs">
+                  <Bell className="h-6 w-6" />
+                </div>
+                <p className="text-sm font-extrabold text-[var(--text-primary)]">No notifications yet</p>
+                <p className="text-xs text-[var(--text-secondary)] font-medium max-w-xs mx-auto">
+                  Post dispatch updates, BullMQ queue tasks, and AI compactor alerts will appear here.
+                </p>
               </div>
             ) : (
               notifications.map((item) => {
@@ -165,28 +170,50 @@ export default function NotificationBell() {
                   <div
                     key={item.id}
                     onClick={() => !item.read && handleMarkAsRead(item.id)}
-                    className={`p-4 transition-colors flex items-start gap-3 cursor-pointer ${
-                      !item.read ? 'bg-indigo-950/20 hover:bg-indigo-950/30' : 'hover:bg-slate-850/40 opacity-75'
+                    className={`p-4 transition-all duration-200 flex items-start gap-3.5 cursor-pointer border-b border-[var(--border-color)] ${
+                      !item.read 
+                        ? 'bg-[#2563EB]/5 hover:bg-[#2563EB]/10 border-l-4 border-l-[#2563EB]' 
+                        : 'hover:bg-[var(--bg-input)]/60 opacity-80'
                     }`}
                   >
+                    {/* Icon Badge */}
                     <div className="mt-0.5 shrink-0">
-                      {isSuccess && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
-                      {isError && <AlertTriangle className="h-5 w-5 text-rose-400" />}
-                      {isWarning && <AlertTriangle className="h-5 w-5 text-amber-400" />}
-                      {!isSuccess && !isError && !isWarning && <Info className="h-5 w-5 text-indigo-400" />}
+                      {isSuccess && (
+                        <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      )}
+                      {isError && (
+                        <div className="p-2 bg-rose-500/10 text-rose-500 rounded-xl border border-rose-500/20">
+                          <AlertTriangle className="h-4 w-4" />
+                        </div>
+                      )}
+                      {isWarning && (
+                        <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl border border-amber-500/20">
+                          <AlertTriangle className="h-4 w-4" />
+                        </div>
+                      )}
+                      {!isSuccess && !isError && !isWarning && (
+                        <div className="p-2 bg-[#2563EB]/10 text-[#2563EB] rounded-xl border border-[#2563EB]/20">
+                          <Info className="h-4 w-4" />
+                        </div>
+                      )}
                     </div>
 
+                    {/* Notification Message Content */}
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className={`text-xs font-extrabold ${!item.read ? 'text-slate-100' : 'text-slate-300'}`}>
+                        <span className={`text-sm font-extrabold ${!item.read ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                           {item.title}
                         </span>
-                        {!item.read && <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />}
+                        {!item.read && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB] shrink-0 shadow-xs shadow-blue-500 animate-pulse" />
+                        )}
                       </div>
 
-                      <p className="text-xs text-slate-400 leading-relaxed font-normal">{item.message}</p>
+                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-normal">{item.message}</p>
 
-                      <span className="text-[10px] text-slate-500 block font-mono">
+                      <span className="text-[11px] text-[var(--text-secondary)] block font-semibold opacity-75 mt-1">
                         {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -194,6 +221,11 @@ export default function NotificationBell() {
                 );
               })
             )}
+          </div>
+
+          {/* Footer Bar */}
+          <div className="px-5 py-3 border-t border-[var(--border-color)] bg-[var(--bg-input)]/40 text-center text-xs text-[var(--text-secondary)] font-semibold">
+            Real-time WebSocket Push Active
           </div>
         </div>
       )}

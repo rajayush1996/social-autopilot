@@ -25,6 +25,7 @@ import {
 import ApiService from '@/services/apiService';
 import { User, SocialAccount } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import LoadingScreen from '@/components/LoadingScreen';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -147,10 +148,10 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Loading user profile & account settings...</p>
-      </div>
+      <LoadingScreen 
+        message="Loading profile & security settings..." 
+        subMessage="Fetching AI credits, active plan, and team permissions"
+      />
     );
   }
 

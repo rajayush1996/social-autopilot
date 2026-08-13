@@ -25,19 +25,49 @@ import {
   Play,
   Sliders,
   Sun,
-  Moon
+  Moon,
+  Globe
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
 import { Post, SocialAccount, User } from '@/lib/api';
 import { useTheme } from '@/context/ThemeContext';
 import { formatDateTime } from '@/utils/date';
+import DashboardWidgets from '@/components/DashboardWidgets';
+import UserProfileDropdown from '@/components/UserProfileDropdown';
 
 interface AutopilotReport {
   userId: string;
   status: 'SUCCESS' | 'SKIPPED' | 'FAILED';
   postId?: string;
   reason?: string;
+}
+
+// Crisp Brand SVG Icons
+function LinkedInBrandIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...props}>
+      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+    </svg>
+  );
+}
+
+function XBrandIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...props}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+  );
+}
+
+function InstagramBrandIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
 }
 
 export default function Home() {
@@ -97,70 +127,92 @@ export default function Home() {
 
   // Render static empty loader during hydration
   if (!isClient) {
-    return <div className="min-h-screen bg-slate-955" />;
+    return <div className="min-h-screen bg-[var(--bg-app)]" />;
   }
 
-  // --- PUBLIC LANDING VIEW FOR GUEST TRAFFIC ---
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-indigo-500/30 overflow-x-hidden relative">
+  // --- CLEAN PUBLIC & LOGGED-IN LANDING PAGE ---
+  return (
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-indigo-500/30 overflow-x-hidden relative">
         {/* Glow Accent Circles */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[600px] bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-650/15 via-indigo-950/5 to-transparent -z-10 blur-3xl pointer-events-none" />
         <div className="absolute top-[400px] -left-[200px] w-[500px] h-[500px] bg-purple-900/5 rounded-full -z-10 blur-3xl pointer-events-none" />
         <div className="absolute top-[800px] -right-[200px] w-[500px] h-[500px] bg-indigo-900/5 rounded-full -z-10 blur-3xl pointer-events-none" />
 
         {/* Top Navbar */}
-        <header className="border-b border-[var(--border-color)] bg-[var(--bg-card)] sticky top-0 z-50 transition-colors">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            {/* Logo */}
+        {/* High-End Glassmorphism Navbar */}
+        <header className="border-b border-[var(--border-color)] bg-[var(--bg-card)]/85 backdrop-blur-2xl sticky top-0 z-50 transition-colors py-1">
+          <div className="max-w-7xl mx-auto px-6 md:px-8 py-3.5 flex items-center justify-between">
+            {/* Logo Badge & Title */}
             <div className="flex items-center gap-3">
-              <div className="bg-[#2563EB] p-2 rounded-xl text-white shadow-md shadow-blue-500/10">
-                <Sparkles className="h-5 w-5" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                <Sparkles className="h-5 w-5 animate-pulse" />
               </div>
               <div>
-                <span className="font-extrabold text-sm tracking-tight text-[var(--text-primary)] uppercase block">OmniSync</span>
-                <span className="text-[9px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider block -mt-0.5">Autonomous Social AI</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-base tracking-tight text-[var(--text-primary)] uppercase">OmniSync</span>
+                  <span className="bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/25 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">v2.0 AI</span>
+                </div>
+                <span className="text-xs text-[var(--text-secondary)] font-medium block -mt-0.5">Autonomous Social AI</span>
               </div>
             </div>
 
-            {/* Navigation links */}
-            <nav className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-xs text-[var(--text-secondary)] hover:text-[#2563EB] font-medium transition-all">Features</a>
-              <a href="#autopilot" className="text-xs text-[var(--text-secondary)] hover:text-[#2563EB] font-medium transition-all">AI Engine</a>
-              <a href="#pricing" className="text-xs text-[var(--text-secondary)] hover:text-[#2563EB] font-medium transition-all">Pricing</a>
+            {/* Pill Navigation Links */}
+            <nav className="hidden md:flex items-center gap-1 bg-[var(--bg-input)] p-1.5 rounded-2xl border border-[var(--border-color)]">
+              <a href="#features" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">Architecture</a>
+              <a href="#autopilot" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">AI Compactor</a>
+              <a href="#pricing" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">Pricing Tiers</a>
             </nav>
 
-            {/* CTA Buttons & Sleek Theme Switcher */}
+            {/* Action Bar & Theme Switcher */}
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleTheme}
                 type="button"
                 aria-label="Toggle Theme"
                 title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[#2563EB] transition-all text-xs font-semibold shadow-xs"
+                className="h-10 px-3.5 rounded-xl bg-[var(--bg-input)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 text-[var(--text-primary)] transition-all text-xs font-extrabold shadow-xs cursor-pointer flex items-center justify-center gap-2"
               >
                 {theme === 'dark' ? (
                   <>
-                    <Sun className="h-3.5 w-3.5 text-amber-400" />
-                    <span className="text-[11px] font-bold">Light</span>
+                    <Sun className="h-4 w-4 text-amber-400" />
+                    <span className="text-xs font-bold">Light</span>
                   </>
                 ) : (
                   <>
-                    <Moon className="h-3.5 w-3.5 text-[#2563EB]" />
-                    <span className="text-[11px] font-bold">Dark</span>
+                    <Moon className="h-4 w-4 text-[#2563EB]" />
+                    <span className="text-xs font-bold">Dark</span>
                   </>
                 )}
               </button>
 
-              <Link href="/login" className="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-3 py-2">
-                Sign In
-              </Link>
-              <Link 
-                href="/signup" 
-                className="text-xs font-bold text-white bg-[#2563EB] hover:bg-blue-600 px-4 py-2 rounded-xl transition-all shadow-md shadow-blue-500/20"
-              >
-                Get Started
-              </Link>
+              {isLoggedIn ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="h-10 px-4 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+                  >
+                    <Zap className="h-4 w-4" />
+                    <span>Go to Dashboard</span>
+                  </Link>
+
+                  {/* High-End User Profile Avatar Dropdown Menu */}
+                  <UserProfileDropdown />
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="h-10 px-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] hover:bg-[#2563EB]/10 hover:border-[#2563EB]/30 text-[var(--text-primary)] hover:text-[#2563EB] text-xs font-extrabold flex items-center justify-center transition-all shadow-xs">
+                    Sign In
+                  </Link>
+
+                  <Link 
+                    href="/signup" 
+                    className="h-10 px-5 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Get Started</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -183,83 +235,116 @@ export default function Home() {
             Connect your social accounts, set your brand niche, and let OpenAI automatically generate, format, schedule, and publish high-converting organic posts on Redis queues.
           </p>
 
+          {/* Multi-Channel Network Badges Strip (Drital Hub Style in Electric Blue) */}
+          <div className="pt-6 pb-2">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-[#2563EB] mb-4">
+              Seamlessly Connect & Schedule Across All Networks
+            </p>
+            <div className="flex flex-wrap justify-center gap-3 max-w-4xl mx-auto">
+              {[
+                { name: 'Facebook', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30' },
+                { name: 'Instagram', color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/30' },
+                { name: 'X (Twitter)', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-input)] border-[var(--border-color)]' },
+                { name: 'LinkedIn', color: 'text-[#0a66c2]', bg: 'bg-[#0a66c2]/10 border-[#0a66c2]/30' },
+                { name: 'YouTube', color: 'text-rose-600', bg: 'bg-rose-500/10 border-rose-500/30' },
+                { name: 'Threads', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-input)] border-[var(--border-color)]' },
+                { name: 'Pinterest', color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/30' },
+                { name: 'Reddit', color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/30' },
+                { name: 'Bluesky', color: 'text-sky-500', bg: 'bg-sky-500/10 border-sky-500/30' },
+                { name: 'Mastodon', color: 'text-indigo-500', bg: 'bg-indigo-500/10 border-indigo-500/30' },
+              ].map((channel, cIdx) => (
+                <div
+                  key={cIdx}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border ${channel.bg} transition-all duration-300 hover:scale-105 shadow-xs cursor-pointer group`}
+                >
+                  <span className={`text-xs font-black ${channel.color}`}>
+                    {channel.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <Link 
-              href="/signup"
-              className="px-6 py-3.5 rounded-2xl bg-[#2563EB] hover:bg-blue-600 text-white font-bold text-sm shadow-xl shadow-blue-500/25 transition-all flex items-center gap-2 group"
+              href={isLoggedIn ? "/composer" : "/signup"}
+              className="px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-sm shadow-xl shadow-blue-500/30 transition-all flex items-center gap-2 group cursor-pointer"
             >
-              Start Free OmniSync
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              <span>{isLoggedIn ? "Launch AI Composer Studio" : "Start Free OmniSync"}</span>
+              <ArrowRight className="h-4.5 w-4.5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link 
-              href="/login"
-              className="px-6 py-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] font-semibold text-sm transition-all flex items-center gap-2"
+              href={isLoggedIn ? "/profile" : "/login"}
+              className="px-8 py-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-[var(--bg-input)] hover:border-[#2563EB] text-[var(--text-primary)] font-bold text-sm transition-all flex items-center gap-2 cursor-pointer shadow-xs"
             >
-              <Play className="h-3.5 w-3.5 fill-[#2563EB] text-[#2563EB]" />
-              Live Workspace Demo
+              <Play className="h-4 w-4 fill-[#2563EB] text-[#2563EB]" />
+              <span>{isLoggedIn ? "Account Profile" : "Live Workspace Demo"}</span>
             </Link>
           </div>
 
           {/* Interactive Floating Preview Card */}
-          <div className="max-w-4xl mx-auto pt-12 md:pt-16">
-            <div className="relative p-2 bg-slate-900/30 border border-slate-800/80 rounded-3xl backdrop-blur-md shadow-2xl shadow-slate-950/50 group overflow-hidden">
-              <div className="bg-slate-950/80 border border-slate-850 rounded-2xl p-6 md:p-8 text-left space-y-6">
+          <div className="max-w-6xl mx-auto pt-12 md:pt-16">
+            <div className="relative p-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-md shadow-2xl group overflow-hidden">
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 md:p-8 text-left space-y-6">
                 {/* Simulated Header */}
-                <div className="flex items-center justify-between pb-4 border-b border-slate-900">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-blue-500/20">
                       SA
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-200 block">Workspace Console</span>
-                      <span className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider block">Autopilot active</span>
+                      <span className="text-sm font-extrabold text-[var(--text-primary)] block">Workspace Console</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider block">Autopilot Active</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-800" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-800" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-800" />
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-rose-500/40" />
+                    <span className="w-3 h-3 rounded-full bg-amber-500/40" />
+                    <span className="w-3 h-3 rounded-full bg-emerald-500/40" />
                   </div>
                 </div>
 
                 {/* Simulated Post adaptation */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* LinkedIn адаптер */}
-                  <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-3 hover:border-slate-700/80 transition-all duration-300">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#0a66c2]/10 p-1.5 rounded-lg text-[#0a66c2]">
-                        <span className="text-xs font-black">in</span>
+                  <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-3 hover:border-slate-700/80 transition-all duration-300 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="bg-[#0a66c2]/10 p-2 rounded-xl text-[#0a66c2]">
+                        <LinkedInBrandIcon className="w-4 h-4 text-[#0a66c2]" />
                       </div>
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">LinkedIn post</span>
+                      <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">LinkedIn post</span>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                    <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
                       💡 Systemizing your workflow isn&apos;t about spending more hours—it&apos;s about building leverage. Here is how our team scales organic outreach...
                     </p>
                   </div>
 
                   {/* X адаптер */}
-                  <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-3 hover:border-slate-700/80 transition-all duration-300">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-slate-800 p-1.5 rounded-lg text-slate-100">
-                        <span className="text-[9px] font-black">𝕏</span>
+                  <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-3 hover:border-slate-700/80 transition-all duration-300 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="bg-[var(--bg-input)] p-2 rounded-xl text-[var(--text-primary)] border border-[var(--border-color)]">
+                        <XBrandIcon className="w-4 h-4 text-[var(--text-primary)]" />
                       </div>
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">X Tweet</span>
+                      <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">X Tweet</span>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                    <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
                       Stop overthinking your content strategy. Focus on consistency, leverage AI for compaction, and schedule everything ahead. Simplicity scales. 🚀
                     </p>
                   </div>
 
                   {/* Instagram адаптер */}
-                  <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 space-y-3 hover:border-slate-700/80 transition-all duration-300">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#e1306c]/10 p-1.5 rounded-lg text-[#e1306c]">
-                        <span className="text-[10px] font-black">📷</span>
+                  <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-3 hover:border-slate-700/80 transition-all duration-300 shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="bg-[#e1306c]/10 p-2 rounded-xl text-[#e1306c]">
+                        <InstagramBrandIcon className="w-4 h-4 text-[#e1306c]" />
                       </div>
-                      <span className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Instagram image</span>
+                      <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">Instagram image</span>
                     </div>
-                    <div className="h-20 bg-slate-900 rounded-lg flex items-center justify-center border border-slate-850">
-                      <span className="text-[9px] text-slate-500 font-bold">Mock Up Image Preview</span>
+                    <div className="h-24 bg-[var(--bg-input)] rounded-xl flex items-center justify-center border border-[var(--border-color)]">
+                      <span className="text-xs text-[var(--text-secondary)] font-bold">Mock Up Image Preview</span>
                     </div>
                   </div>
                 </div>
@@ -270,76 +355,76 @@ export default function Home() {
 
         {/* Feature Grid */}
         <section id="features" className="max-w-7xl mx-auto px-6 py-20 border-t border-[var(--border-color)] space-y-16">
-          <div className="text-center max-w-xl mx-auto space-y-3">
-            <h2 className="text-xs font-bold text-[#2563EB] uppercase tracking-widest">Application Architecture</h2>
-            <p className="text-2xl sm:text-3xl font-black text-[var(--text-primary)]">Full-Stack Autopilot Capabilities</p>
-            <p className="text-xs text-[var(--text-secondary)]">A detailed breakdown of the features and modules integrated into this system</p>
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h2 className="text-sm font-extrabold text-[#2563EB] uppercase tracking-widest">Everything You Need To Scale</h2>
+            <p className="text-3xl sm:text-4xl font-extrabold text-[var(--text-primary)] tracking-tight">Full-Stack Social Autopilot Capabilities</p>
+            <p className="text-base text-[var(--text-secondary)] font-medium leading-relaxed">Manage all your social media accounts in one powerful dashboard with AI-driven content compaction and automated scheduling</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Feature 1 */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm hover:border-[#2563EB]/40 transition-all duration-300">
-              <div className="bg-[#2563EB]/10 p-3 rounded-xl text-[#2563EB] w-fit mb-4">
-                <Brain className="h-6 w-6" />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-7 shadow-sm hover:border-[#2563EB] hover:shadow-xl transition-all duration-300 group">
+              <div className="bg-[#2563EB]/10 group-hover:bg-[#2563EB] p-4 rounded-2xl text-[#2563EB] group-hover:text-white transition-all w-fit mb-5">
+                <Brain className="h-7 w-7" />
               </div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)] mb-2">Rolling Memory Compactor</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Prevents repetitive posts. Our background compaction engine gathers recently published content and feeds it through GPT-4o-mini to build a rolling memory summary of topics, tone, and hooks to avoid.
+              <h3 className="font-extrabold text-lg text-[var(--text-primary)] mb-2.5">Anti-Repetitive Memory Engine</h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+                Prevents duplicate posts. Our AI compaction engine analyzes recently published content to maintain brand tone while generating fresh, original ideas every single day.
               </p>
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm hover:border-emerald-500/40 transition-all duration-300">
-              <div className="bg-emerald-500/10 p-3 rounded-xl text-emerald-500 w-fit mb-4">
-                <Users className="h-6 w-6" />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-7 shadow-sm hover:border-[#2563EB] hover:shadow-xl transition-all duration-300 group">
+              <div className="bg-emerald-500/10 group-hover:bg-emerald-500 p-4 rounded-2xl text-emerald-500 group-hover:text-white transition-all w-fit mb-5">
+                <Users className="h-7 w-7" />
               </div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)] mb-2">Adaptive Multi-Channel Composer</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Enter a single campaign topic and adapt it instantly for Instagram captions (rich emojis and hashtags), LinkedIn posts (mobile thought leadership structure), or concise X tweets and threads.
+              <h3 className="font-extrabold text-lg text-[var(--text-primary)] mb-2.5">Multi-Channel Adaptive Composer</h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+                Enter a single prompt topic and adapt it instantly for Instagram (emojis & hashtags), LinkedIn (thought leadership), X (tweets & threads), or Facebook.
               </p>
             </div>
 
             {/* Feature 3 */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm hover:border-cyan-500/40 transition-all duration-300">
-              <div className="bg-cyan-500/10 p-3 rounded-xl text-cyan-500 w-fit mb-4">
-                <ShieldCheck className="h-6 w-6" />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-7 shadow-sm hover:border-[#2563EB] hover:shadow-xl transition-all duration-300 group">
+              <div className="bg-cyan-500/10 group-hover:bg-cyan-500 p-4 rounded-2xl text-cyan-500 group-hover:text-white transition-all w-fit mb-5">
+                <ShieldCheck className="h-7 w-7" />
               </div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)] mb-2">AES-256-GCM Encryption</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                SaaS-grade database security. Access tokens, refresh tokens, and rolling AI memory summaries are encrypted with native authenticated encryption algorithms using a SHA-256 derived key before write operations.
+              <h3 className="font-extrabold text-lg text-[var(--text-primary)] mb-2.5">AES-256-GCM Bank Security</h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+                SaaS-grade database encryption. Social OAuth tokens and account credentials are encrypted with native authenticated AES algorithms before saving.
               </p>
             </div>
 
             {/* Feature 4 */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm hover:border-amber-500/40 transition-all duration-300">
-              <div className="bg-amber-500/10 p-3 rounded-xl text-amber-500 w-fit mb-4">
-                <Clock className="h-6 w-6" />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-7 shadow-sm hover:border-[#2563EB] hover:shadow-xl transition-all duration-300 group">
+              <div className="bg-amber-500/10 group-hover:bg-amber-500 p-4 rounded-2xl text-amber-500 group-hover:text-white transition-all w-fit mb-5">
+                <Clock className="h-7 w-7" />
               </div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)] mb-2">BullMQ & Redis Background Workers</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Asynchronous posting pipeline. Schedules and dispatches publication tasks without blocking thread execution. Implements retry logic and logs detailed platform responses directly to database logs.
+              <h3 className="font-extrabold text-lg text-[var(--text-primary)] mb-2.5">BullMQ & Redis Scheduler</h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+                Asynchronous posting queue pipeline. Automatically dispatches your queued publications at peak engagement slots without missing a single post.
               </p>
             </div>
 
             {/* Feature 5 */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm hover:border-blue-500/40 transition-all duration-300">
-              <div className="bg-blue-500/10 p-3 rounded-xl text-blue-500 w-fit mb-4">
-                <Sliders className="h-6 w-6" />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-7 shadow-sm hover:border-[#2563EB] hover:shadow-xl transition-all duration-300 group">
+              <div className="bg-[#2563EB]/10 group-hover:bg-[#2563EB] p-4 rounded-2xl text-[#2563EB] group-hover:text-white transition-all w-fit mb-5">
+                <Sliders className="h-7 w-7" />
               </div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)] mb-2">RBAC Control Center</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Role-Based Access Control. Segregates regular users from admin dashboards. Allows administrators to define feature premium statuses, trigger on-demand autopilot generation cycles, and adjust tier quotas.
+              <h3 className="font-extrabold text-lg text-[var(--text-primary)] mb-2.5">Team & Agency Control</h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+                Role-Based Access Control. Manage multiple client workspaces, set approval permissions, and trigger on-demand autopilot cycles seamlessly.
               </p>
             </div>
 
             {/* Feature 6 */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm hover:border-rose-500/40 transition-all duration-300">
-              <div className="bg-rose-550/10 p-3 rounded-xl text-rose-500 w-fit mb-4">
-                <Layers className="h-6 w-6" />
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-7 shadow-sm hover:border-[#2563EB] hover:shadow-xl transition-all duration-300 group">
+              <div className="bg-rose-500/10 group-hover:bg-rose-500 p-4 rounded-2xl text-rose-500 group-hover:text-white transition-all w-fit mb-5">
+                <Layers className="h-7 w-7" />
               </div>
-              <h3 className="font-bold text-sm text-[var(--text-primary)] mb-2">Media Upload Pipeline</h3>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Fail-safe uploads. Standardizes image and video uploads to Cloudinary storage. Integrates clean local fallback simulators if credentials are offline, guaranteeing campaign submission never fails.
+              <h3 className="font-extrabold text-lg text-[var(--text-primary)] mb-2.5">Media Upload Pipeline</h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">
+                HD media uploads standardized to Cloudinary CDN storage. Attach high-resolution images and videos to make your social posts stand out.
               </p>
             </div>
           </div>
@@ -348,21 +433,21 @@ export default function Home() {
         {/* Pricing Section */}
         <section id="pricing" className="max-w-7xl mx-auto px-6 py-20 border-t border-[var(--border-color)] space-y-16">
           <div className="text-center max-w-xl mx-auto space-y-3">
-            <h2 className="text-xs font-bold text-[#2563EB] uppercase tracking-widest">Subscription Pricing</h2>
-            <p className="text-2xl sm:text-3xl font-black text-[var(--text-primary)]">Simple, transparent, developer-friendly tiers</p>
+            <h2 className="text-sm font-extrabold text-[#2563EB] uppercase tracking-widest">Subscription Pricing</h2>
+            <p className="text-3xl sm:text-4xl font-extrabold text-[var(--text-primary)] tracking-tight">Simple, transparent, developer-friendly tiers</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {/* Free plan */}
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-5 shadow-sm">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-8 space-y-6 shadow-sm">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-md text-[var(--text-primary)]">Starter Free</h3>
-                  <span className="text-[9px] text-[var(--text-secondary)] block uppercase font-bold">15 credits/month</span>
+                  <h3 className="font-extrabold text-xl text-[var(--text-primary)]">Starter Free</h3>
+                  <span className="text-xs text-[var(--text-secondary)] block uppercase font-bold mt-1">15 credits/month</span>
                 </div>
-                <span className="text-2xl font-black text-[var(--text-primary)]">$0</span>
+                <span className="text-3xl font-black text-[var(--text-primary)]">$0</span>
               </div>
-              <ul className="text-xs text-[var(--text-secondary)] space-y-2 leading-relaxed font-medium">
+              <ul className="text-sm text-[var(--text-secondary)] space-y-3 leading-relaxed font-medium">
                 <li>✔ Basic AI social post composer</li>
                 <li>✔ Connect up to 2 social accounts</li>
                 <li>✔ Manual post queuing and scheduling</li>
@@ -370,37 +455,59 @@ export default function Home() {
               </ul>
               <Link 
                 href="/signup"
-                className="block text-center w-full py-2.5 bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-primary)] rounded-xl text-xs font-bold transition-all"
+                className="w-full py-3.5 rounded-2xl bg-[var(--bg-input)] hover:bg-[#2563EB] hover:text-white border border-[var(--border-color)] text-[var(--text-primary)] font-bold text-sm text-center block transition-all shadow-xs cursor-pointer"
               >
                 Sign Up Free
               </Link>
             </div>
 
             {/* Premium plan */}
-            <div className="bg-[#2563EB]/5 border-2 border-[#2563EB]/40 rounded-2xl p-6 space-y-5 relative overflow-hidden shadow-md">
-              <div className="absolute top-3 right-3 bg-[#2563EB] text-white text-[8px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <div className="bg-[#2563EB]/5 border-2 border-[#2563EB] rounded-3xl p-8 space-y-6 relative overflow-hidden shadow-xl">
+              <div className="absolute top-4 right-4 bg-[#2563EB] text-white text-xs font-extrabold px-3.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
                 Popular
               </div>
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-bold text-md text-[var(--text-primary)]">Autopilot Premium</h3>
-                  <span className="text-[9px] text-[#2563EB] block uppercase font-bold">Unlimited credits</span>
+                  <h3 className="font-extrabold text-xl text-[var(--text-primary)]">Autopilot Premium</h3>
+                  <span className="text-xs text-[#2563EB] block uppercase font-extrabold mt-1">Unlimited credits</span>
                 </div>
-                <span className="text-2xl font-black text-[var(--text-primary)]">$29<span className="text-xs text-[var(--text-secondary)]">/mo</span></span>
+                <span className="text-3xl font-black text-[var(--text-primary)]">$29<span className="text-sm text-[var(--text-secondary)] font-semibold">/mo</span></span>
               </div>
-              <ul className="text-xs text-[var(--text-secondary)] space-y-2 leading-relaxed font-medium">
-                <li>✔ **Autonomous Daily Autopilot Posting**</li>
+              <ul className="text-sm text-[var(--text-secondary)] space-y-3 leading-relaxed font-medium">
+                <li>✔ <strong>Autonomous Daily Autopilot Posting</strong></li>
                 <li>✔ Connect unlimited social accounts</li>
                 <li>✔ Anti-repetitive Memory Compactor Engine</li>
                 <li>✔ HD media upload pipeline via Cloudinary</li>
               </ul>
               <Link 
                 href="/signup"
-                className="block text-center w-full py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20"
+                className="w-full py-3.5 rounded-2xl bg-[#2563EB] hover:bg-blue-600 text-white font-bold text-sm text-center block shadow-lg shadow-blue-500/25 transition-all cursor-pointer"
               >
                 Upgrade to Premium
               </Link>
             </div>
+          </div>
+        </section>
+
+        {/* High-Converting Electric Blue Bottom Conversion CTA Banner (Drital Hub Style) */}
+        <section className="max-w-7xl mx-auto px-6 py-12">
+          <div className="bg-gradient-to-r from-[#2563EB] via-blue-600 to-indigo-700 text-white rounded-3xl p-10 md:p-14 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="space-y-3 text-center md:text-left max-w-xl">
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
+                Automate Your Social Media & Save Hours Every Week
+              </h2>
+              <p className="text-blue-100 text-sm md:text-base font-medium leading-relaxed">
+                Connect your social channels today. Let AI format your posts, schedule content, and scale your organic presence automatically.
+              </p>
+            </div>
+
+            <Link
+              href="/signup"
+              className="px-8 py-4 bg-white text-[#2563EB] hover:bg-slate-100 font-extrabold text-sm rounded-2xl shadow-xl transition-all hover:scale-105 shrink-0 flex items-center gap-2 cursor-pointer"
+            >
+              <span>Get Started Free Now</span>
+              <ArrowRight className="h-4.5 w-4.5" />
+            </Link>
           </div>
         </section>
 
@@ -409,367 +516,4 @@ export default function Home() {
         </footer>
       </div>
     );
-  }
-
-  // --- SKELETON SHIMMER LOADING VIEW ---
-  if (loading) {
-    return (
-      <div className="space-y-8 pb-12 animate-fadeIn">
-        {/* Header Skeleton */}
-        <div className="flex justify-between items-center pb-6 border-b border-[var(--border-color)]">
-          <div className="space-y-2">
-            <div className="h-4 w-32 skeleton-shimmer" />
-            <div className="h-8 w-64 skeleton-shimmer" />
-          </div>
-          <div className="h-10 w-36 skeleton-shimmer" />
-        </div>
-
-        {/* 4 KPI Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-28 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 skeleton-shimmer" />
-          ))}
-        </div>
-
-        {/* Analytics & Feed Skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 space-y-6">
-            <div className="h-72 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 skeleton-shimmer" />
-            <div className="h-60 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 skeleton-shimmer" />
-          </div>
-          <div className="lg:col-span-4 space-y-6">
-            <div className="h-60 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 skeleton-shimmer" />
-            <div className="h-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 skeleton-shimmer" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- INTERNAL AUTHENTICATED CONSOLE DASHBOARD VIEW ---
-  const scheduledCount = posts.filter(p => p.status === 'SCHEDULED').length;
-  const publishedCount = posts.filter(p => p.status === 'PUBLISHED').length;
-  const connectedAccountsCount = accounts.length;
-  const isPremium = user?.plan === 'PREMIUM';
-
-  return (
-    <div className="space-y-8 pb-12 animate-fadeIn">
-      {/* Top Autopilot Telemetry Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-900">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">System Operational</span>
-          </div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-350 tracking-tight">
-            Console Overview
-          </h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Monitor and administer your autonomous content pipeline.
-          </p>
-        </div>
-
-        {/* Sync Trigger and Post Create Actions */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSyncScheduler}
-            disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800/80 rounded-2xl hover:bg-slate-850 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-all duration-300 active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            Sync Queue
-          </button>
-          
-          <Link
-            href="/composer"
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-2xl text-xs font-bold shadow-md shadow-indigo-950/20 active:scale-95 transition-all duration-300"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Create Campaign
-          </Link>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: AI Engine Credits */}
-        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[var(--text-secondary)] text-[11px] font-bold uppercase tracking-wider">AI Copilot</span>
-            <div className="p-2 bg-[#2563EB]/10 text-[#2563EB] rounded-xl">
-              <Sparkles className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{user?.aiCredits ?? 0}</p>
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-color)]">
-            <span className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider">Plan Quota</span>
-            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
-              isPremium 
-                ? 'bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20' 
-                : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)]'
-            }`}>
-              {user?.plan ?? 'FREE'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 2: Channels Linked */}
-        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[var(--text-secondary)] text-[11px] font-bold uppercase tracking-wider">Connected Accounts</span>
-            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl">
-              <Users className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{connectedAccountsCount}</p>
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-color)]">
-            <span className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider">Platforms</span>
-            <span className="text-[10px] text-[var(--text-secondary)] font-semibold">Instagram / LinkedIn / X</span>
-          </div>
-        </div>
-
-        {/* Card 3: Pending Queue */}
-        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[var(--text-secondary)] text-[11px] font-bold uppercase tracking-wider">Pending Scheduler</span>
-            <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl">
-              <Clock className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{scheduledCount}</p>
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-color)]">
-            <span className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider">Active Queue</span>
-            <span className="text-[10px] text-[var(--text-secondary)] font-semibold">BullMQ Worker</span>
-          </div>
-        </div>
-
-        {/* Card 4: Published Count */}
-        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[var(--text-secondary)] text-[11px] font-bold uppercase tracking-wider">Total Dispatched</span>
-            <div className="p-2 bg-[#6366F1]/10 text-[#6366F1] rounded-xl">
-              <CalendarCheck className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-[var(--text-primary)]">{publishedCount}</p>
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border-color)]">
-            <span className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider">Success Rate</span>
-            <span className="text-[10px] text-emerald-500 font-bold">100%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Data Visualization & Context Memories */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Column Left (SaaS Dashboard Analytics Charts & Feeds) */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* SVG Line Graph Card */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)] mb-6">
-              <div>
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">Campaign Traffic Performance</h3>
-                <span className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase block">Hourly telemetry overview</span>
-              </div>
-              <div className="flex items-center gap-1 bg-[var(--bg-input)] px-2 py-1 rounded-lg border border-[var(--border-color)] text-[10px] text-[#6366F1] font-bold">
-                <TrendingUp className="h-3.5 w-3.5" />
-                +24.8%
-              </div>
-            </div>
-
-            {/* Premium Hand-Drawn SVG Chart */}
-            <div className="w-full h-64 relative flex items-end justify-between px-2 pt-4">
-              <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-                <defs>
-                  {/* Graph Area Gradient */}
-                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
-                  </linearGradient>
-                  {/* Line Stroke Gradient */}
-                  <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#6366f1" />
-                    <stop offset="50%" stopColor="#818cf8" />
-                    <stop offset="100%" stopColor="#a78bfa" />
-                  </linearGradient>
-                </defs>
-
-                {/* Horizontal gridlines */}
-                <line x1="0" y1="50" x2="100%" y2="50" stroke="rgba(100, 116, 139, 0.2)" strokeWidth="1" strokeDasharray="4 4" />
-                <line x1="0" y1="120" x2="100%" y2="120" stroke="rgba(100, 116, 139, 0.2)" strokeWidth="1" strokeDasharray="4 4" />
-                <line x1="0" y1="190" x2="100%" y2="190" stroke="rgba(100, 116, 139, 0.2)" strokeWidth="1" strokeDasharray="4 4" />
-
-                {/* Main filled area path */}
-                <path
-                  d="M 0 240 C 80 180, 120 200, 200 120 C 280 40, 320 160, 400 90 C 480 20, 520 80, 600 60 L 600 240 Z"
-                  fill="url(#chartGradient)"
-                  className="w-full h-full"
-                  style={{ vectorEffect: 'non-scaling-stroke' }}
-                />
-                
-                {/* Main curve stroke path */}
-                <path
-                  d="M 0 240 C 80 180, 120 200, 200 120 C 280 40, 320 160, 400 90 C 480 20, 520 80, 600 60"
-                  fill="none"
-                  stroke="url(#lineGradient)"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  style={{ vectorEffect: 'non-scaling-stroke' }}
-                />
-
-                {/* Interactive telemetry dot */}
-                <circle cx="400" cy="90" r="5" fill="#a78bfa" stroke="var(--bg-main)" strokeWidth="2.5" className="animate-pulse" />
-              </svg>
-
-              {/* Chart Timeline Axis Labels */}
-              <div className="absolute bottom-0 left-0 w-full flex justify-between text-[8px] text-[var(--text-secondary)] font-bold uppercase px-2 pt-2 border-t border-[var(--border-color)]">
-                <span>08:00 AM</span>
-                <span>12:00 PM</span>
-                <span>04:00 PM</span>
-                <span>08:00 PM</span>
-                <span>Midnight</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Campaign Queue List */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
-              <div>
-                <h3 className="text-sm font-bold text-[var(--text-primary)]">Active Campaign Feed</h3>
-                <span className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase block">Scheduled & published logs</span>
-              </div>
-              <span className="text-[10px] bg-[#6366F1]/10 text-[#6366F1] border border-[#6366F1]/20 px-2.5 py-0.5 rounded-full font-bold uppercase">
-                {posts.length} Posts Total
-              </span>
-            </div>
-
-            {posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 text-center gap-2.5 border border-dashed border-[var(--border-color)] rounded-2xl">
-                <Clock className="h-7 w-7 text-[var(--text-secondary)]" />
-                <p className="text-xs text-[var(--text-secondary)] font-medium">No post campaigns queued yet.</p>
-                <Link href="/composer" className="text-[10px] text-[#6366F1] hover:underline font-bold uppercase transition-all">
-                  Create a Post Campaign
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
-                {posts.map((post) => (
-                  <div key={post.id} className="p-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl flex items-center justify-between gap-4 transition-all duration-200">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                          post.status === 'PUBLISHED' 
-                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                            : post.status === 'SCHEDULED'
-                            ? 'bg-[#6366F1]/10 text-[#6366F1] border border-[#6366F1]/20'
-                            : 'bg-slate-700/20 text-[var(--text-secondary)] border border-[var(--border-color)]'
-                        }`}>
-                          {post.status}
-                        </span>
-                        <span className="text-[9px] text-[var(--text-secondary)] font-semibold">
-                          {post.scheduledAt ? `${formatDateTime(post.scheduledAt)} UTC` : 'Instantly published'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-primary)] line-clamp-2 leading-relaxed font-medium">
-                        {post.content}
-                      </p>
-                    </div>
-                    {post.mediaUrls && post.mediaUrls.length > 0 && (
-                      <div className="w-12 h-12 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shrink-0 overflow-hidden flex items-center justify-center">
-                        {post.mediaType === 'VIDEO' ? (
-                          <span className="text-[10px] text-[#6366F1] font-bold">MP4</span>
-                        ) : (
-                          <img src={post.mediaUrls[0]} alt="Post thumbnail" className="w-full h-full object-cover" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Column Right (Autopilot status & memory constraints engines) */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* Autopilot Compact Control card */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm space-y-5">
-            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2 pb-3 border-b border-[var(--border-color)]">
-              <Zap className="h-4.5 w-4.5 text-[#6366F1] animate-pulse" />
-              Autopilot Engine Status
-            </h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3.5 bg-[var(--bg-input)] rounded-xl border border-[var(--border-color)]">
-                <div>
-                  <span className="text-[9px] text-[var(--text-secondary)] font-semibold uppercase block">Autopilot Flag</span>
-                  <span className="text-xs font-bold text-[var(--text-primary)]">
-                    {user?.autopilotEnabled ? 'ENABLED' : 'DISABLED'}
-                  </span>
-                </div>
-                <Link href="/settings" className="px-3.5 py-1.5 bg-[var(--bg-card)] hover:opacity-80 border border-[var(--border-color)] rounded-xl text-[10px] font-bold text-[var(--text-primary)] transition-all">
-                  Settings
-                </Link>
-              </div>
-
-              {/* Anti-Repetitive AI Compactor constraint memory display */}
-              <div className="bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-4 space-y-3">
-                <span className="text-[9px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">
-                  ⚙️ Compactor memory payload
-                </span>
-                
-                {user?.contentSummary ? (
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-[#6366F1] font-semibold leading-relaxed">
-                      Encrypted summary is stored in PostgreSQL. Decrypted payload injected into OpenAI instructions:
-                    </p>
-                    <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] text-[10px] text-[var(--text-primary)] font-medium font-mono leading-normal max-h-40 overflow-y-auto">
-                      {user.contentSummary}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 space-y-1.5">
-                    <Brain className="h-6 w-6 text-[var(--text-secondary)] mx-auto" />
-                    <p className="text-[9px] text-[var(--text-secondary)] leading-normal">
-                      No memory payload compiled yet. Publish posts to feed the Rolling Compactor Engine.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Social Platforms Connected Adapter list */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-[var(--text-primary)] pb-3 border-b border-[var(--border-color)]">
-              Adapters Status
-            </h3>
-
-            <div className="space-y-2.5">
-              {['INSTAGRAM', 'LINKEDIN', 'X'].map((platform) => {
-                const isConnected = accounts.some(a => a.platform.toUpperCase() === platform);
-                return (
-                  <div key={platform} className="p-3 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl flex items-center justify-between">
-                    <span className="text-xs font-bold text-[var(--text-primary)]">{platform}</span>
-                    <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                      isConnected 
-                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-                        : 'bg-slate-700/20 text-[var(--text-secondary)] border border-[var(--border-color)]'
-                    }`}>
-                      {isConnected ? 'Linked' : 'Offline'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
 }

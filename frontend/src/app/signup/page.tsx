@@ -68,18 +68,18 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="w-full max-w-md p-8 bg-slate-900/40 border border-slate-800/80 rounded-3xl backdrop-blur-lg shadow-2xl space-y-6 animate-fadeIn">
+    <div className="w-full max-w-md p-8 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-xl shadow-2xl space-y-6 animate-fadeIn">
       {/* Brand Header */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="bg-indigo-650/10 p-3 rounded-2xl border border-indigo-500/20 flex items-center justify-center shadow-lg">
-          <Sparkles className="h-8 w-8 text-indigo-400" />
+      <div className="flex flex-col items-center gap-3.5 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <Sparkles className="h-6 w-6 animate-pulse" />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-350">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
             Create Account
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Register and schedule your brand posts autonomously
+          <p className="text-sm text-[var(--text-secondary)] mt-1 font-medium">
+            Register and schedule your brand posts autonomously with OmniSync
           </p>
         </div>
       </div>
@@ -88,54 +88,54 @@ export default function SignupPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Name Field */}
         <div className="space-y-1.5">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
             Full Name
           </label>
           <div className="relative">
-            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Elon Musk"
               disabled={loading}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder:text-slate-650 focus:outline-none focus:border-indigo-650 transition-all"
+              className="w-full h-11 pl-11 pr-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
         </div>
 
         {/* Email Field */}
         <div className="space-y-1.5">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
             Email Address
           </label>
           <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
               disabled={loading}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder:text-slate-650 focus:outline-none focus:border-indigo-650 transition-all"
+              className="w-full h-11 pl-11 pr-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
         </div>
 
         {/* Password Field */}
         <div className="space-y-1.5">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={loading}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder:text-slate-650 focus:outline-none focus:border-indigo-650 transition-all"
+              className="w-full h-11 pl-11 pr-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
         </div>
@@ -148,11 +148,11 @@ export default function SignupPage() {
             checked={acceptedTerms}
             onChange={(e) => setAcceptedTerms(e.target.checked)}
             disabled={loading}
-            className="mt-0.5 rounded border-slate-800 bg-slate-950/60 text-indigo-600 focus:ring-indigo-650 accent-indigo-650 cursor-pointer"
+            className="mt-0.5 rounded border-[var(--border-color)] bg-[var(--bg-input)] text-[#2563EB] focus:ring-[#2563EB] accent-[#2563EB] cursor-pointer"
           />
-          <label htmlFor="terms" className="text-[11px] text-slate-400 leading-snug cursor-pointer select-none">
+          <label htmlFor="terms" className="text-xs text-[var(--text-secondary)] leading-snug cursor-pointer select-none font-medium">
             I agree to the{' '}
-            <Link href="/privacy" target="_blank" className="text-indigo-400 hover:text-indigo-300 font-semibold underline">
+            <Link href="/privacy" target="_blank" className="text-[#2563EB] dark:text-[#60A5FA] hover:underline font-extrabold">
               Privacy Policy & Terms
             </Link>
           </label>
@@ -162,21 +162,21 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-900/20 active:scale-98 flex items-center justify-center gap-2 mt-2"
+          className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white font-extrabold text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer active:scale-98 disabled:opacity-50"
         >
           {loading ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
-            'Sign Up'
+            'Create Account'
           )}
         </button>
       </form>
 
       {/* Switch to Login */}
       <div className="text-center pt-2">
-        <p className="text-xs text-slate-500">
+        <p className="text-sm text-[var(--text-secondary)] font-medium">
           Already have an account?{' '}
-          <Link href="/login" className="text-indigo-400 hover:text-indigo-350 font-semibold transition-all">
+          <Link href="/login" className="text-[#2563EB] dark:text-[#60A5FA] hover:underline font-extrabold transition-all">
             Sign In
           </Link>
         </p>

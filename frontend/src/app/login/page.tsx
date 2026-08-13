@@ -31,7 +31,7 @@ export default function LoginPage() {
           localStorage.setItem('refresh_token', data.refreshToken);
         }
         toast.success('Successfully logged in!');
-        router.push('/');
+        router.push('/dashboard');
       } else {
         toast.error('Login failed: Invalid server token response.');
       }
@@ -44,18 +44,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-md p-8 bg-slate-900/40 border border-slate-800/80 rounded-3xl backdrop-blur-lg shadow-2xl space-y-6 animate-fadeIn">
+    <div className="w-full max-w-md p-8 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-xl shadow-2xl space-y-6 animate-fadeIn">
       {/* Brand Header */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="bg-indigo-650/10 p-3 rounded-2xl border border-indigo-500/20 flex items-center justify-center shadow-lg">
-          <Sparkles className="h-8 w-8 text-indigo-400" />
+      <div className="flex flex-col items-center gap-3.5 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <Sparkles className="h-6 w-6 animate-pulse" />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-350">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
             Welcome Back
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Access your OmniSync social media publishing platform
+          <p className="text-sm text-[var(--text-secondary)] mt-1 font-medium">
+            Sign in to your OmniSync social media publishing platform
           </p>
         </div>
       </div>
@@ -64,36 +64,36 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Email Field */}
         <div className="space-y-1.5">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
             Email Address
           </label>
           <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
               disabled={loading}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder:text-slate-650 focus:outline-none focus:border-indigo-650 transition-all"
+              className="w-full h-11 pl-11 pr-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
         </div>
 
         {/* Password Field */}
         <div className="space-y-1.5">
-          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={loading}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder:text-slate-650 focus:outline-none focus:border-indigo-650 transition-all"
+              className="w-full h-11 pl-11 pr-4 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[#2563EB] transition-colors"
             />
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-900/20 active:scale-98 flex items-center justify-center gap-2 mt-2"
+          className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white font-extrabold text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer active:scale-98 disabled:opacity-50"
         >
           {loading ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -114,9 +114,9 @@ export default function LoginPage() {
 
       {/* Switch to Signup */}
       <div className="text-center pt-2">
-        <p className="text-xs text-slate-500">
-          New to Social Autopilot?{' '}
-          <Link href="/signup" className="text-indigo-400 hover:text-indigo-350 font-semibold transition-all">
+        <p className="text-sm text-[var(--text-secondary)] font-medium">
+          New to OmniSync?{' '}
+          <Link href="/signup" className="text-[#2563EB] dark:text-[#60A5FA] hover:underline font-extrabold transition-all">
             Create an account
           </Link>
         </p>

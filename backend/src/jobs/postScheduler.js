@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { prisma } from '../config/db.js';
 import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
@@ -181,6 +182,31 @@ export async function cleanupStuckPublishingPosts() {
 }
 
 /**
+ * Automated Jugaad: Self-Pinging Keep-Alive Worker
+ * Keeps Render/Railway free-tier servers awake 24/7 by pinging its own external URL.
+ */
+export function startSelfKeepAlivePinger() {
+  const targetUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || process.env.BACKEND_URL;
+  if (!targetUrl) {
+    logger.info('[SelfKeepAlive] No RENDER_EXTERNAL_URL / APP_URL set in env. Skipping external self-pinger.');
+    return;
+  }
+
+  const pingUrl = targetUrl.endsWith('/health') ? targetUrl : `${targetUrl.replace(/\/$/, '')}/health`;
+  logger.info(`🛰️ [SelfKeepAlive] Initializing 8-minute self-keep-alive pinger for: ${pingUrl}`);
+
+  // Ping every 8 minutes (Render sleeps after 15 mins)
+  setInterval(async () => {
+    try {
+      const res = await axios.get(pingUrl, { timeout: 15000 });
+      logger.info(`🛰️ [SelfKeepAlive] Self-ping successful! HTTP Status: ${res.status}`);
+    } catch (err) {
+      logger.warn(`🛰️ [SelfKeepAlive Warning] Ping failed: ${err.message}`);
+    }
+  }, 8 * 60 * 1000);
+}
+
+/**
  * Starts the 60-second automated Cron Scheduler Loop.
  */
 export function startCronSchedulerLoop() {
@@ -191,6 +217,7 @@ export function startCronSchedulerLoop() {
   checkAndTriggerAutoPilotSchedules();
   cleanupStuckPublishingPosts();
   refreshExpiringTokens();
+  startSelfKeepAlivePinger();
 
   // Polling loop every 60 seconds for posts/schedules
   setInterval(async () => {

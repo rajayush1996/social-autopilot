@@ -15,6 +15,7 @@ import ApiService from '@/services/apiService';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import { User } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import LoadingScreen from '@/components/LoadingScreen';
 
 export default function AutopilotSettingsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -68,10 +69,10 @@ export default function AutopilotSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Querying Autopilot engine configurations...</p>
-      </div>
+      <LoadingScreen 
+        message="Querying Autopilot engine configurations..." 
+        subMessage="Loading brand context, schedule slots, and AI generation parameters"
+      />
     );
   }
 

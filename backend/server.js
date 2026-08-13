@@ -11,7 +11,7 @@ import uploadRoutes from './src/routes/uploadRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import scheduleRoutes from './src/routes/scheduleRoutes.js';
 import { initPostWorker } from './src/workers/postWorker.js';
-import { startCronSchedulerLoop } from './src/jobs/postScheduler.js';
+import { startCronSchedulerLoop, syncScheduledPostsToQueue } from './src/jobs/postScheduler.js';
 import logger from './src/utils/logger.js';
 
 import helmet from 'helmet';
@@ -57,10 +57,16 @@ app.use(express.urlencoded({ extended: true }));
 // Request Tracing & Logging Middleware
 app.use(requestLogger);
 
-// Health Check Endpoint
+// Health Check & Keep-Alive Dispatch Endpoint (Pings keep Render awake & auto-sync due posts)
 app.get('/health', async (req, res) => {
   const dbConnected = await checkDatabaseConnection();
   const redisConnected = await checkRedisConnection();
+  
+  // Proactively trigger background sweep for any due posts on keep-alive ping
+  syncScheduledPostsToQueue().catch(err => {
+    logger.warn(`[Health Check Auto-Sync Warning] ${err.message}`);
+  });
+
   return res.json({
     status: dbConnected && redisConnected ? 'UP' : 'DEGRADED',
     service: 'OmniSync Platform Backend (BullMQ & Redis Enabled)',

@@ -164,9 +164,9 @@ export default function LiquidUploadButton({
 
       {/* STATE 1: Local Preview Ready (Before Upload or Uploading Progress) */}
       {activeDisplayUrl ? (
-        <div className="relative w-full rounded-3xl bg-slate-900/80 border border-slate-800 p-5 md:p-6 backdrop-blur-md space-y-4 shadow-xl">
+        <div className="relative w-full rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] p-5 md:p-6 backdrop-blur-md space-y-4 shadow-xl">
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-850">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
             <div className="flex items-center gap-2.5">
               {mediaType === 'VIDEO' ? (
                 <Film className="h-5 w-5 text-indigo-400 shrink-0" />
@@ -194,7 +194,7 @@ export default function LiquidUploadButton({
                 type="button"
                 onClick={handleRemove}
                 disabled={uploading}
-                className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer border border-slate-750"
+                className="p-1.5 rounded-xl bg-slate-100/60 hover:bg-rose-50 dark:bg-slate-800/60 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 border border-slate-200/80 hover:border-rose-200 dark:border-slate-700/60 dark:hover:border-rose-500/30 transition-all cursor-pointer"
                 title="Remove Media"
               >
                 <X className="h-4 w-4" />
@@ -203,7 +203,7 @@ export default function LiquidUploadButton({
           </div>
 
           {/* Instant Media Preview Area */}
-          <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-955 min-h-[200px] max-h-[320px] flex items-center justify-center p-2 shadow-inner">
+          <div className="relative rounded-2xl overflow-hidden border border-[var(--border-color)] bg-[var(--bg-input)] min-h-[200px] max-h-[320px] flex items-center justify-center p-2 shadow-inner">
             {mediaType === 'VIDEO' ? (
               <video src={activeDisplayUrl} controls className="max-h-[300px] rounded-xl object-contain w-full" />
             ) : (

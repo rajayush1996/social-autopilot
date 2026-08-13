@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   Link2, 
+  ExternalLink,
   Unlink, 
   CheckCircle2, 
   AlertCircle,
@@ -15,6 +16,8 @@ import CONFIG from '@/config';
 import { SocialAccount } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import { formatDate } from '@/utils/date';
+
+import LoadingScreen from '@/components/LoadingScreen';
 
 // Custom Instagram icon component
 function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -200,10 +203,10 @@ export default function SocialAccountsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Querying active OAuth profiles...</p>
-      </div>
+      <LoadingScreen 
+        message="Querying active OAuth profiles..." 
+        subMessage="Syncing connected social channels and token health"
+      />
     );
   }
 
@@ -375,14 +378,19 @@ export default function SocialAccountsPage() {
                   <button
                     onClick={() => handleConnect(plt.id)}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 shadow-md shadow-blue-500/10 disabled:opacity-50 cursor-pointer"
+                    className="btn btn-primary w-full shadow-md shadow-blue-500/10"
                   >
                     {isLoading ? (
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Connecting...
+                      </>
                     ) : (
-                      <Link2 className="h-3.5 w-3.5" />
+                      <>
+                        <ExternalLink className="h-4 w-4" />
+                        Connect {plt.name}
+                      </>
                     )}
-                    Connect Account
                   </button>
                 )}
               </div>

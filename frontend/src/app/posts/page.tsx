@@ -11,7 +11,8 @@ import {
   AlertCircle,
   RefreshCw,
   Edit3,
-  CheckCircle2
+  CheckCircle2,
+  X // Added X import for the new close button
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -20,6 +21,7 @@ import { useToast } from '@/context/ToastContext';
 import { formatDateTime, formatDate } from '@/utils/date';
 import CarouselSlideDeck, { parseCarouselSlides } from '@/components/CarouselSlideDeck';
 import socketClient from '@/utils/socket';
+import LoadingScreen from '@/components/LoadingScreen';
 
 // Custom Instagram icon component to avoid missing lucide exports
 function InstagramPlatformIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -217,10 +219,10 @@ export default function PostsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Querying queue records...</p>
-      </div>
+      <LoadingScreen 
+        message="Querying social queue & history..." 
+        subMessage="Loading published records, scheduled dispatches, and drafts"
+      />
     );
   }
 
@@ -273,7 +275,7 @@ export default function PostsPage() {
                 {/* Post Card Header */}
                 <div className="flex items-center justify-between mb-3.5">
                   {/* Status Badge */}
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                  <span className={`text-xs font-bold px-3 py-1 rounded-md border uppercase tracking-wider ${
                     post.status === 'PUBLISHED'
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                       : post.status === 'PUBLISHING'
@@ -290,7 +292,7 @@ export default function PostsPage() {
                   {/* Platforms list */}
                   <div className="flex items-center gap-1.5">
                     {post.targetPlatforms.map(plt => (
-                      <div key={plt} className="p-1 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-center">
+                      <div key={plt} className="p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg flex items-center justify-center">
                         {getPlatformIcon(plt)}
                       </div>
                     ))}
@@ -307,18 +309,18 @@ export default function PostsPage() {
 
                       {/* Tone Badge */}
                       {post.tone && (
-                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 flex items-center gap-1 capitalize">
+                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 flex items-center gap-1 capitalize">
                           <span>🎯 {post.tone.toLowerCase()}</span>
                         </span>
                       )}
 
                       {/* AI Generated Badge */}
                       {post.aiGenerated ? (
-                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 flex items-center gap-1">
+                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 flex items-center gap-1">
                           <span>✨ AI Generated</span>
                         </span>
                       ) : (
-                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-lg bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)] flex items-center gap-1">
+                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)] flex items-center gap-1">
                           <span>✍️ Creator Input</span>
                         </span>
                       )}
@@ -337,7 +339,7 @@ export default function PostsPage() {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setEditingPostId(null); }}
-                            className="px-3 py-1 bg-[var(--bg-card)] text-[var(--text-secondary)] rounded-lg text-xs font-semibold"
+                            className="btn btn-secondary px-3.5 py-1.5 text-xs font-semibold"
                           >
                             Cancel
                           </button>
@@ -345,7 +347,7 @@ export default function PostsPage() {
                             type="button"
                             onClick={(e) => handleSavePostEdit(e, post.id)}
                             disabled={savingPostId === post.id}
-                            className="px-3 py-1 bg-[#2563EB] text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                            className="btn btn-primary px-3.5 py-1.5 text-xs font-semibold"
                           >
                             {savingPostId === post.id ? 'Saving...' : 'Save Content'}
                           </button>
@@ -393,8 +395,8 @@ export default function PostsPage() {
 
               {/* Quick action buttons for failed posts */}
               {(post.status === 'FAILED' || post.status === 'PARTIALLY_PUBLISHED') && (
-                <div className="mt-4 pt-3.5 border-t border-slate-800/60 flex items-center justify-between gap-2">
-                  <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between gap-2">
+                  <span className="text-[9px] text-rose-500 font-bold uppercase tracking-wider flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" /> Publishing Failed
                   </span>
                   <div className="flex items-center gap-2">
@@ -402,7 +404,7 @@ export default function PostsPage() {
                       type="button"
                       onClick={(e) => handleCancelSchedule(e, post.id)}
                       disabled={cancellingId === post.id}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-500 rounded-xl text-[10px] font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                       title="Cancel and remove this failed post"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -412,7 +414,7 @@ export default function PostsPage() {
                       type="button"
                       onClick={(e) => handleRetryPost(e, post.id)}
                       disabled={retryingId === post.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl text-[10px] font-extrabold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-[10px] font-extrabold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`h-3 w-3 ${retryingId === post.id ? 'animate-spin' : ''}`} />
                       {retryingId === post.id ? 'Re-queuing...' : 'Retry / Republish'}
@@ -423,12 +425,12 @@ export default function PostsPage() {
 
               {/* Quick action button for scheduled posts */}
               {(post.status === 'SCHEDULED' || post.status === 'DRAFT') && (
-                <div className="mt-4 pt-3.5 border-t border-slate-800/60 flex items-center justify-between">
-                  <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider">Scheduled Post</span>
+                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-[9px] text-[#2563EB] font-bold uppercase tracking-wider">Scheduled Post</span>
                   <button
                     onClick={(e) => handleCancelSchedule(e, post.id)}
                     disabled={cancellingId === post.id}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-950 hover:bg-rose-950/20 border border-slate-800 hover:border-rose-900/30 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] font-bold transition-all duration-300 disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-secondary)] hover:text-rose-500 rounded-lg text-[10px] font-bold transition-all duration-300 disabled:opacity-50 cursor-pointer"
                   >
                     <Trash2 className="h-3 w-3" />
                     {cancellingId === post.id ? 'Cancelling...' : 'Cancel Queue'}
@@ -442,8 +444,14 @@ export default function PostsPage() {
 
       {/* Details drawer/modal side panel */}
       {selectedPost && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-end animate-fadeIn">
-          <div className="bg-[var(--bg-card)] h-full w-full max-w-xl border-l border-[var(--border-color)] p-6 flex flex-col justify-between shadow-2xl overflow-y-auto">
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedPost(null); }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-end animate-fadeIn cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[var(--bg-card)] h-full w-full max-w-xl border-l border-[var(--border-color)] p-6 flex flex-col justify-between shadow-2xl overflow-y-auto cursor-default"
+          >
               <div className="space-y-6">
                 {/* Drawer Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
@@ -463,11 +471,14 @@ export default function PostsPage() {
                     <p className="text-[10px] text-[var(--text-secondary)] font-mono">ID: {selectedPost.id}</p>
                   </div>
 
+                  {/* 🌟 FIX: Updated Clean Close Button based on theme variables */}
                   <button
+                    type="button"
                     onClick={() => setSelectedPost(null)}
-                    className="p-2 hover:bg-[var(--bg-input)] rounded-xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                    className="h-8 w-8 rounded-xl bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-primary)] hover:text-rose-500 transition-all cursor-pointer flex items-center justify-center group shadow-xs"
+                    title="Close details"
                   >
-                    <XCircle className="h-5 w-5" />
+                    <X className="h-4 w-4 transition-transform group-hover:scale-110" />
                   </button>
                 </div>
 
@@ -554,7 +565,7 @@ export default function PostsPage() {
                         <button
                           type="button"
                           onClick={() => setEditingPostId(null)}
-                          className="px-3 py-1.5 bg-[var(--bg-input)] text-[var(--text-secondary)] rounded-xl text-xs font-bold"
+                          className="px-3 py-1.5 bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)] rounded-xl text-xs font-bold cursor-pointer"
                         >
                           Cancel
                         </button>
@@ -562,7 +573,7 @@ export default function PostsPage() {
                           type="button"
                           onClick={(e) => handleSavePostEdit(e, selectedPost.id)}
                           disabled={savingPostId === selectedPost.id}
-                          className="px-4 py-1.5 bg-[#2563EB] text-white rounded-xl text-xs font-bold"
+                          className="px-4 py-1.5 bg-[#2563EB] text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50"
                         >
                           {savingPostId === selectedPost.id ? 'Saving...' : 'Save Edit'}
                         </button>
@@ -719,9 +730,9 @@ export default function PostsPage() {
                   </button>
                 </div>
               </div>
-            </div>
           </div>
-        )}
+        </div>
+  )}
     </div>
   );
 }

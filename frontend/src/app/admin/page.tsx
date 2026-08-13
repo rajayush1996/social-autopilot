@@ -22,6 +22,7 @@ import Link from 'next/link';
 import CONFIG from '@/config';
 import ApiService, { FeatureConfig } from '@/services/apiService';
 import { useToast } from '@/context/ToastContext';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface DispatcherReport {
   scheduleId?: string;
@@ -186,10 +187,10 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-slate-400 text-sm">Querying Super Admin control center...</p>
-      </div>
+      <LoadingScreen 
+        message="Querying Super Admin control center..." 
+        subMessage="Validating administrative permissions and feature flags"
+      />
     );
   }
 
