@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, ChevronRight, Bookmark, Share2 } from 'lucide-react';
+import { Sparkles, Bookmark, Share2 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
 interface CarouselGraphicSlideProps {
@@ -19,7 +19,6 @@ export default function CarouselGraphicSlide({
   title,
   content,
   brandName = 'OmniSync AI',
-  aspectRatio = '4:5',
 }: CarouselGraphicSlideProps) {
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -34,9 +33,7 @@ export default function CarouselGraphicSlide({
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-3xl shadow-sm transition-all duration-300 flex flex-col justify-between p-6 sm:p-8 select-none border border-[var(--border-color)] ${
-        aspectRatio === '4:5' ? 'aspect-[4/5]' : 'aspect-square'
-      }`}
+      className="relative w-full min-h-[360px] sm:min-h-[400px] rounded-2xl shadow-sm transition-all duration-300 flex flex-col justify-between p-5 sm:p-6 select-none border border-[var(--border-color)] overflow-hidden"
       style={{
         background: isLight
           ? isCover
@@ -56,25 +53,25 @@ export default function CarouselGraphicSlide({
       <div className="absolute -bottom-24 -right-24 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-40 bg-purple-500/20" />
 
       {/* TOP HEADER */}
-      <div className="relative z-10 flex items-center justify-between border-b border-[var(--border-color)] pb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#2563EB] p-0.5 shadow-sm">
-            <div className="w-full h-full bg-[var(--bg-card)] rounded-[10px] flex items-center justify-center text-[#2563EB] font-black text-xs">
+      <div className="relative z-10 flex items-center justify-between border-b border-[var(--border-color)]/60 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-[#2563EB] p-0.5 shadow-sm">
+            <div className="w-full h-full bg-[var(--bg-card)] rounded-[6px] flex items-center justify-center text-[#2563EB] font-black text-[10px]">
               OS
             </div>
           </div>
           <div>
-            <p className="text-xs font-black text-[var(--text-primary)] tracking-wide flex items-center gap-1.5">
+            <p className="text-xs font-extrabold text-[var(--text-primary)] tracking-wide flex items-center gap-1.5 leading-tight">
               {brandName}
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </p>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-[#2563EB] font-extrabold">
-              {isCover ? 'Cover Teardown' : isCTA ? 'Action Takeaway' : 'Slide Insight'}
+            <p className="text-[9px] font-mono uppercase tracking-widest text-[#2563EB] font-extrabold">
+              {isCover ? 'Cover Teardown' : isCTA ? 'Action Takeaway' : `Slide ${slideNumber}`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm font-mono text-[11px] font-extrabold">
+        <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm font-mono text-[10px] font-extrabold">
           <span className="text-[#2563EB]">{slideNumber}</span>
           <span className="opacity-40">/</span>
           <span className="opacity-70">{totalSlides}</span>
@@ -82,52 +79,52 @@ export default function CarouselGraphicSlide({
       </div>
 
       {/* CENTER BODY */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center py-6 space-y-4">
+      <div className="relative z-10 flex-1 flex flex-col justify-center py-4 space-y-3">
         {isCover ? (
-          <div className="text-center space-y-4 max-w-md mx-auto">
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 text-[#2563EB] text-[11px] font-extrabold tracking-wider uppercase shadow-sm">
-              <Sparkles className="h-3.5 w-3.5 text-[#2563EB]" />
-              Product Case Study
+          <div className="text-center space-y-3 max-w-sm mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 text-[#2563EB] text-[10px] font-extrabold tracking-wider uppercase shadow-sm">
+              <Sparkles className="h-3 w-3 text-[#2563EB]" />
+              Carousel Slide Deck
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight leading-tight uppercase font-sans">
+            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight leading-snug uppercase font-sans">
               {title}
             </h2>
 
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed font-sans max-w-xs mx-auto font-medium">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-sans max-w-xs mx-auto font-medium">
               {contentLines[0] || 'Swipe left for full step-by-step breakdown 👇'}
             </p>
           </div>
         ) : isCTA ? (
-          <div className="text-center space-y-5 max-w-md mx-auto">
-            <div className="w-12 h-12 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center shadow-sm">
-              <Bookmark className="h-6 w-6 text-emerald-500" />
+          <div className="text-center space-y-3.5 max-w-sm mx-auto">
+            <div className="w-10 h-10 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center shadow-sm">
+              <Bookmark className="h-5 w-5 text-emerald-500" />
             </div>
 
-            <h3 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight leading-snug">
+            <h3 className="text-lg sm:text-xl font-black text-[var(--text-primary)] tracking-tight leading-snug">
               {title || 'Save For Later & Share Your Thoughts!'}
             </h3>
 
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 shadow-sm text-[var(--text-primary)]">
-              <p className="text-xs leading-relaxed font-sans">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-3.5 shadow-sm text-[var(--text-primary)]">
+              <p className="text-xs leading-relaxed font-sans font-medium">
                 {content || 'Drop a comment below with your favorite workflow tool! 💬'}
               </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-4 max-w-md">
-            <h3 className="text-lg sm:text-xl font-black text-[var(--text-primary)] tracking-tight leading-snug flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB] shrink-0" />
+          <div className="space-y-3 max-w-md">
+            <h3 className="text-base sm:text-lg font-black text-[var(--text-primary)] tracking-tight leading-snug flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#2563EB] shrink-0" />
               {title}
             </h3>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {contentLines.map((line, idx) => (
                 <div
                   key={idx}
-                  className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-3.5 transition-all text-xs text-[var(--text-primary)] leading-relaxed font-sans flex items-start gap-2.5 shadow-sm"
+                  className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-3 transition-all text-xs text-[var(--text-primary)] leading-relaxed font-sans flex items-start gap-2 shadow-sm"
                 >
-                  <span className="font-extrabold text-sm text-[#2563EB] shrink-0">
+                  <span className="font-extrabold text-xs text-[#2563EB] shrink-0">
                     •
                   </span>
                   <span className="text-[var(--text-primary)] font-medium">{line}</span>
@@ -139,16 +136,15 @@ export default function CarouselGraphicSlide({
       </div>
 
       {/* FOOTER */}
-      <div className="relative z-10 flex items-center justify-between border-t border-[var(--border-color)] pt-4 text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider">
-        <div className="flex items-center gap-1.5 text-[#2563EB] font-extrabold">
-          <Share2 className="h-3.5 w-3.5" />
+      <div className="relative z-10 flex items-center justify-between border-t border-[var(--border-color)]/60 pt-3 text-[10px] text-[var(--text-secondary)] font-semibold uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[#2563EB] font-extrabold">
+          <Share2 className="h-3 w-3" />
           <span>@{brandName.toLowerCase().replace(/\s+/g, '')}</span>
         </div>
 
         {!isCTA && (
-          <div className="flex items-center gap-1 font-extrabold px-3 py-1 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 text-[#2563EB]">
-            <span>Swipe Left</span>
-            <ChevronRight className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1 font-extrabold px-2.5 py-0.5 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/10 text-[#2563EB] text-[9px]">
+            <span>Swipe Left ➔</span>
           </div>
         )}
       </div>

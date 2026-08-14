@@ -84,33 +84,36 @@ export default function Home() {
 
   useEffect(() => {
     setIsClient(true);
-    const token = localStorage.getItem('auth_token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (token) {
-      setIsLoggedIn(true);
-      fetchDashboardData();
+      // Safely verify token with getMe() without breaking the landing page
+      ApiService.getMe()
+        .then((profile) => {
+          setIsLoggedIn(true);
+          setUser(profile);
+          // Load linked accounts and posts in background
+          Promise.all([
+            ApiService.getConnectedAccounts().catch(() => []),
+            ApiService.getPosts().catch(() => []),
+          ]).then(([linkedAccounts, postsList]) => {
+            setAccounts(linkedAccounts);
+            setPosts(postsList);
+          });
+        })
+        .catch(() => {
+          // Token is dead or expired -> clear stale credentials and treat as guest visitor on Landing Page
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          setIsLoggedIn(false);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     } else {
       setIsLoggedIn(false);
       setLoading(false);
     }
   }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      const [profile, linkedAccounts, postsList] = await Promise.all([
-        ApiService.getMe(),
-        ApiService.getConnectedAccounts(),
-        ApiService.getPosts(),
-      ]);
-
-      setUser(profile);
-      setAccounts(linkedAccounts);
-      setPosts(postsList);
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSyncScheduler = async () => {
     setSyncing(true);

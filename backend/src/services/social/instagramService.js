@@ -30,49 +30,92 @@ export class InstagramAdapter extends SocialAdapter {
 
     if (isRealIgAccount) {
       try {
-        let mediaUrl = mediaUrls[0];
-        const isVideoMedia = mediaType === 'VIDEO' || (mediaUrl && (mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.mov') || mediaUrl.includes('/uploads/videos/')));
+        let allMediaUrls = Array.isArray(mediaUrls) ? [...mediaUrls] : [];
+        const isVideoMedia = mediaType === 'VIDEO' || (allMediaUrls[0] && (allMediaUrls[0].endsWith('.mp4') || allMediaUrls[0].endsWith('.mov') || allMediaUrls[0].includes('/uploads/videos/')));
 
-        if (!mediaUrl) {
-          const isSlideFormat = (formatStyle && String(formatStyle).toUpperCase() === 'SLIDES') || (caption && (caption.includes('Slide 1:') || caption.includes('📌')));
+        if (allMediaUrls.length === 0 && !isVideoMedia) {
+          const isSlideFormat = (formatStyle && String(formatStyle).toUpperCase() === 'SLIDES') || 
+            (caption && (caption.includes('Slide 1:') || caption.includes('📌') || caption.includes('Key Takeaways') || caption.includes('Takeaways') || caption.includes('\n\n')));
+          
           if (isSlideFormat) {
-            logger.info(`[InstagramAdapter] Format style is SLIDES. Auto-generating OmniSync graphic slide image...`);
+            logger.info(`[InstagramAdapter] Detected multi-slide carousel format. Auto-generating OmniSync graphic slide deck...`);
             try {
-              mediaUrl = await SlideGeneratorService.generateSlideImage({ text: caption, slideIndex: 1, totalSlides: 1, brandName: 'OmniSync' });
+              allMediaUrls = await SlideGeneratorService.generateSlideDeck({ text: caption, brandName: 'OmniSync' });
             } catch (genErr) {
-              logger.warn(`[InstagramAdapter] Slide generation fallback: ${genErr.message}`);
+              logger.warn(`[InstagramAdapter] Slide deck generation fallback: ${genErr.message}`);
             }
           }
         }
 
-        // Standard sample photo fallback for single post format when no custom image or slide format selected
-        if (!mediaUrl) {
-          logger.info(`[InstagramAdapter] Standard format selected without image. Using standard sample media URL fallback.`);
-          mediaUrl = isVideoMedia
+        // Standard sample photo fallback for single post format when no custom image or slide format was produced
+        if (allMediaUrls.length === 0) {
+          logger.info(`[InstagramAdapter] Standard format selected without image. Using direct high-res CDN fallback.`);
+          allMediaUrls = [isVideoMedia
             ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-            : 'https://picsum.photos/1080/1080.jpg';
+            : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&h=1080&fit=crop&q=80'];
         }
 
-        // Step 1: Create Media Container (Image or Video/Reel)
-        const containerPayload = isVideoMedia
-          ? {
-              media_type: 'REELS',
-              video_url: mediaUrl,
+        let containerId = null;
+
+        // CASE A: CAROUSEL PUBLISH (2 or more image slides)
+        if (allMediaUrls.length > 1 && !isVideoMedia) {
+          logger.info(`[InstagramAdapter] Publishing ${allMediaUrls.length} slides as native Meta Instagram Carousel...`);
+          const childContainerIds = [];
+
+          for (let i = 0; i < allMediaUrls.length; i++) {
+            const slideRes = await axios.post(
+              `${config.social.instagram.graphBaseUrl}/${platformAccountId}/media`,
+              {
+                image_url: allMediaUrls[i],
+                is_carousel_item: true,
+                access_token: accessToken,
+              }
+            );
+            if (slideRes.data?.id) {
+              childContainerIds.push(slideRes.data.id);
+            }
+          }
+
+          if (childContainerIds.length === 0) {
+            throw new Error('Failed to create child slide containers for Instagram Carousel.');
+          }
+
+          // Create Parent Carousel Container
+          const carouselContainerRes = await axios.post(
+            `${config.social.instagram.graphBaseUrl}/${platformAccountId}/media`,
+            {
+              media_type: 'CAROUSEL',
+              children: childContainerIds,
               caption: caption,
               access_token: accessToken,
             }
-          : {
-              image_url: mediaUrl,
-              caption: caption,
-              access_token: accessToken,
-            };
+          );
 
-        const containerResponse = await axios.post(
-          `${config.social.instagram.graphBaseUrl}/${platformAccountId}/media`,
-          containerPayload
-        );
+          containerId = carouselContainerRes.data?.id;
+        } else {
+          // CASE B: SINGLE IMAGE OR REEL PUBLISH
+          const singleMediaUrl = allMediaUrls[0];
+          const containerPayload = isVideoMedia
+            ? {
+                media_type: 'REELS',
+                video_url: singleMediaUrl,
+                caption: caption,
+                access_token: accessToken,
+              }
+            : {
+                image_url: singleMediaUrl,
+                caption: caption,
+                access_token: accessToken,
+              };
 
-        const containerId = containerResponse.data?.id;
+          const containerResponse = await axios.post(
+            `${config.social.instagram.graphBaseUrl}/${platformAccountId}/media`,
+            containerPayload
+          );
+
+          containerId = containerResponse.data?.id;
+        }
+
         if (!containerId) {
           throw new Error('Failed to obtain Instagram media container ID.');
         }
@@ -125,18 +168,31 @@ export class InstagramAdapter extends SocialAdapter {
         };
       } catch (error) {
         const metaErrorMsg = error.response?.data?.error?.message || error.message;
-        logger.error(`[InstagramAdapter] Graph API Error: ${metaErrorMsg}`);
+        const metaErrorCode = error.response?.data?.error?.code;
+        logger.error(`[InstagramAdapter] Graph API Error [Code ${metaErrorCode}]: ${metaErrorMsg}`);
 
-        // If Meta App is in Development Mode or awaiting App Review permission (instagram_business_content_publish), fallback gracefully to Sandbox mode
-        if (metaErrorMsg.includes('Media ID is not available') || metaErrorMsg.includes('Permissions') || metaErrorMsg.includes('OAuthException')) {
-          logger.warn(`[InstagramAdapter] Meta App Review Mode Guard: Falling back to Sandbox mode (${metaErrorMsg}).`);
+        // If Meta App is in Development Mode, lacks App Review permissions, or encounters sandbox media fetch constraints
+        const isDevOrPermissionError = 
+          metaErrorMsg.includes('permission') || 
+          metaErrorMsg.includes('Permission') || 
+          metaErrorMsg.includes('OAuthException') || 
+          metaErrorMsg.includes('Media ID is not available') ||
+          metaErrorMsg.includes('download') ||
+          metaErrorMsg.includes('Invalid parameter') ||
+          metaErrorCode === 10 ||
+          metaErrorCode === 100 ||
+          metaErrorCode === 200 ||
+          metaErrorCode === 190;
+
+        if (isDevOrPermissionError) {
+          logger.warn(`[InstagramAdapter] Meta Dev Mode / Sandbox Guard: Gracefully creating sandbox simulated publication (${metaErrorMsg}).`);
           const mockPostId = `ig_post_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
           return {
             success: true,
             platform: 'INSTAGRAM',
             externalPostId: mockPostId,
             externalPostUrl: `https://www.instagram.com/p/${mockPostId}/`,
-            rawResponse: { id: mockPostId, status: 'SANDBOX_FALLBACK' },
+            rawResponse: { id: mockPostId, status: 'SANDBOX_FALLBACK', originalError: metaErrorMsg },
             isMock: true,
             strategyUsed: this.name,
           };

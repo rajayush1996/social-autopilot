@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Check, Trash2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface RichPromptEditorProps {
@@ -11,7 +11,7 @@ interface RichPromptEditorProps {
   savedPlaceholders: Array<{ id: string; name: string; value?: string; category?: string }>;
   variableValues: Record<string, string>;
   onUpdateVariableValue: (key: string, val: string) => void;
-  getPlaceholderIcon: (name: string) => React.ReactNode;
+  getPlaceholderIcon?: (name: string) => React.ReactNode;
 }
 
 const CHIP_CLASS = 'inline-chip';
@@ -20,21 +20,23 @@ const CHIP_SELECTOR = `.${CHIP_CLASS}`;
 export function RichPromptEditor({
   value,
   onChange,
-  placeholder = "Type your prompt here... Use the 'Smart Tags' button to insert variables.",
+  placeholder = "Type your prompt here... Use the 'Smart Tags' button to insert variables like {{link}} or {{author}}.",
   savedPlaceholders,
   variableValues,
   onUpdateVariableValue,
-  getPlaceholderIcon,
 }: RichPromptEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPos, setDropdownPos] = useState<{ x: number; y: number } | null>(null);
-  const [dropdownTrigger, setDropdownTrigger] = useState<{ text: string } | null>(null);
+  const [dropdownTrigger, setDropdownTrigger] = useState<{ name: string; currentVal: string } | null>(null);
+  const [tempValue, setTempValue] = useState('');
 
   // Sync tracking
   const isInternalChange = useRef(false);
-  const lastSyncedValue = useRef(value);
+  const lastSyncedValue = useRef<string | null>(null);
+  const lastSyncedVars = useRef<string>('');
 
   // 1. Find Placeholder
   const findPlaceholder = useCallback((name: string) => {
@@ -44,27 +46,25 @@ export function RichPromptEditor({
   // 2. Render HTML Chip
   const renderChip = useCallback((name: string) => {
     const ph = findPlaceholder(name);
-    if (!ph) {
-      return `<span class="${CHIP_CLASS} invalid-chip" data-name="${name}" contenteditable="false">{{${name}}}</span>`;
-    }
-    const cleanLabel = ph.name.replace(/_/g, ' ').toUpperCase();
-    const key = ph.name.toUpperCase();
-    const currentVal = variableValues[key] ?? ph.value ?? '';
-    const isValid = !!currentVal;
+    const cleanLabel = (ph?.name || name).replace(/_/g, ' ').toUpperCase();
+    const key = name.toUpperCase();
+    const currentVal = variableValues[key] ?? ph?.value ?? '';
+    const isValid = Boolean(currentVal && currentVal.trim());
     
-    // We render a simple text icon for the HTML string fallback if complex SVG fails
-    return `<span class="${CHIP_CLASS} ${isValid ? 'valid' : 'empty'}" data-name="${name}" data-id="${ph.id}" contenteditable="false">
-      <span class="chip-label">${cleanLabel}</span>
+    return `<span class="${CHIP_CLASS} ${isValid ? 'valid' : 'empty'}" data-name="${name}" contenteditable="false" title="Click to view & edit {{${cleanLabel}}} value">
+      <span class="chip-dot">${isValid ? '✓' : '✨'}</span>
+      <span class="chip-label">{{${cleanLabel}}}</span>
       ${currentVal ? `<span class="chip-value">(${currentVal})</span>` : ''}
     </span>`;
   }, [findPlaceholder, variableValues]);
 
   // 3. Text to HTML
   const htmlFromText = useCallback((text: string) => {
+    if (!text) return '';
     return text.split(/(\{\{[a-zA-Z0-9_]+\}\})/g).map(part => {
       const match = part.match(/^\{\{([a-zA-Z0-9_]+)\}\}$/);
       if (match) return renderChip(match[1]);
-      return part.replace(/</g, '<').replace(/>/g, '>');
+      return part.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }).join('');
   }, [renderChip]);
 
@@ -203,80 +203,163 @@ export function RichPromptEditor({
     }
   }, [textFromHtml, htmlFromText, onChange, applyHtml]);
 
+  // 7. Click on Chip to open Tooltip Popover
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const chip = target.closest(CHIP_SELECTOR) as HTMLElement;
 
     if (chip) {
       const name = chip.dataset.name;
-      const id = chip.dataset.id;
-      if (name && id) {
+      if (name) {
         e.preventDefault();
         e.stopPropagation();
-        const ph = findPlaceholder(name);
-        if (!ph) return;
         const rect = chip.getBoundingClientRect();
-        setDropdownTrigger({ text: `{{${name}}}` });
+        const key = name.toUpperCase();
+        const val = variableValues[key] ?? findPlaceholder(name)?.value ?? '';
+        setDropdownTrigger({ name, currentVal: val });
+        setTempValue(val);
         setDropdownPos({ x: rect.left + rect.width / 2, y: rect.top });
         setShowDropdown(true);
       }
     }
-  }, [findPlaceholder]);
+  }, [findPlaceholder, variableValues]);
 
-  // Sync from props
+  // Close Popover on Outside Click
   useEffect(() => {
-    if (isInternalChange.current || value === lastSyncedValue.current) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-    const newHtml = htmlFromText(value);
-    if (editor.innerHTML !== newHtml) {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showDropdown]);
+
+  // Sync from props & variable changes
+  useEffect(() => {
+    const varsString = JSON.stringify(variableValues);
+    if (isInternalChange.current) return;
+    
+    if (value !== lastSyncedValue.current || varsString !== lastSyncedVars.current) {
+      const editor = editorRef.current;
+      if (!editor) return;
+      const newHtml = htmlFromText(value || '');
       const caretPos = getCaretPosition(editor);
       applyHtml(editor, newHtml, caretPos);
-      lastSyncedValue.current = value;
+      lastSyncedValue.current = value || '';
+      lastSyncedVars.current = varsString;
     }
-  }, [value, htmlFromText, applyHtml, getCaretPosition]);
+  }, [value, variableValues, htmlFromText, applyHtml, getCaretPosition]);
 
-  // Dropdown render
-  const renderDropdown = useCallback(() => {
+  // Save variable value
+  const handleSaveValue = () => {
+    if (!dropdownTrigger) return;
+    const key = dropdownTrigger.name.toUpperCase();
+    onUpdateVariableValue(key, tempValue);
+    setShowDropdown(false);
+  };
+
+  // Delete variable from prompt
+  const handleDeleteTagFromPrompt = () => {
+    if (!dropdownTrigger) return;
+    const targetTag = `{{${dropdownTrigger.name}}}`;
+    const newText = (value || '').replace(targetTag, '');
+    onChange(newText);
+    setShowDropdown(false);
+  };
+
+  // Tooltip Popover render with Hover Tooltips on Actions
+  const renderDropdown = () => {
     if (!showDropdown || !dropdownPos || !dropdownTrigger) return null;
     return createPortal(
       <div
-        className="fixed z-[9999] w-72 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-3 shadow-2xl animate-fadeIn backdrop-blur-xl"
-        style={{ left: dropdownPos.x, top: dropdownPos.y + 8, transform: 'translateX(-50%)' }}
+        ref={popoverRef}
+        className="fixed z-[9999] w-80 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-3.5 shadow-2xl animate-fadeIn backdrop-blur-xl space-y-3"
+        style={{
+          left: Math.max(16, Math.min(window.innerWidth - 330, dropdownPos.x - 160)),
+          top: Math.max(10, dropdownPos.y - 145),
+        }}
       >
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-extrabold text-[#2563EB] uppercase tracking-wider flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            Set Value
-          </span>
-          <button onClick={() => setShowDropdown(false)} className="text-slate-400 hover:text-slate-200 text-xs font-bold cursor-pointer">✕</button>
+        {/* Header with Tag Name */}
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-[#2563EB]/10 text-[#2563EB] rounded-lg">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className="text-xs font-extrabold text-[var(--text-primary)] block">
+                {`{{${dropdownTrigger.name.toUpperCase()}}}`}
+              </span>
+              <span className="text-[10px] text-[var(--text-secondary)] font-medium">
+                Smart Variable Tooltip
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            title="Close menu"
+            onClick={() => setShowDropdown(false)}
+            className="h-6 w-6 rounded-lg bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-all cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <input
-          type="text"
-          placeholder="Enter value..."
-          className="w-full text-xs bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3 py-2 outline-none focus:border-[#2563EB] font-sans mb-2"
-          onChange={(e) => {
-            onUpdateVariableValue(dropdownTrigger.text.replace(/[{}]/g, '').toUpperCase(), e.target.value);
-            setShowDropdown(false);
-          }}
-          autoFocus
-        />
+
+        {/* Value Input */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">
+            Value to replace on publish:
+          </label>
+          <input
+            type="text"
+            value={tempValue}
+            onChange={(e) => setTempValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveValue();
+              }
+              if (e.key === 'Escape') {
+                setShowDropdown(false);
+              }
+            }}
+            placeholder={`e.g. https://yourbrand.com/launch`}
+            className="w-full text-xs bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3 py-2 outline-none focus:border-[#2563EB] font-sans"
+            autoFocus
+          />
+        </div>
+
+        {/* Action Buttons with Hover Tooltips */}
+        <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border-color)]">
+          <button
+            type="button"
+            onClick={handleDeleteTagFromPrompt}
+            title="Remove this variable tag completely from prompt"
+            className="text-[11px] font-bold text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>Remove Tag</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveValue}
+            title="Save custom value and apply instantly"
+            className="btn btn-primary px-3.5 py-1.5 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer shadow-xs bg-[#2563EB] text-white rounded-lg hover:bg-blue-600"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>Save & Apply</span>
+          </button>
+        </div>
       </div>,
       document.body
     );
-  }, [showDropdown, dropdownPos, dropdownTrigger, onUpdateVariableValue]);
+  };
 
   return (
-    <div className="relative bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-3 flex flex-col transition-all shadow-inner min-h-[200px] focus-within:border-[#2563EB]">
-      
-      {/* SaaS Top Header */}
-      <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[var(--border-color)]/60 shrink-0">
-        <span className="text-xs text-[#2563EB] font-extrabold uppercase tracking-wider flex items-center gap-1.5 px-1">
-          <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
-          Prompt Editor
-        </span>
-      </div>
-
+    <div className="relative bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-3.5 flex flex-col transition-all shadow-inner min-h-[190px] focus-within:border-[#2563EB]">
       {/* Editor Body */}
       <div className="flex-1 relative w-full h-full flex flex-col">
         <div
@@ -299,50 +382,65 @@ export function RichPromptEditor({
           className="w-full flex-1 bg-transparent border-none p-1 text-[var(--text-primary)] text-sm focus:outline-none leading-relaxed font-sans min-h-[140px] empty:before:content-[attr(data-placeholder)] empty:before:text-[var(--text-secondary)] empty:before:italic"
           data-placeholder={placeholder}
           style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
-        >
-          {/* Initial Render handled by useEffect to set cursor right */}
-        </div>
+        />
       </div>
 
-      {/* Internal Styles for Chips */}
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .${CHIP_CLASS} {
           display: inline-flex;
           align-items: center;
-          gap: 4px;
-          padding: 2px 8px;
-          border-radius: 6px;
-          font-size: 11px;
-          font-weight: 700;
+          gap: 5px;
+          padding: 3px 10px;
+          border-radius: 9px;
+          font-size: 12px;
+          font-weight: 800;
           white-space: nowrap;
           cursor: pointer;
           user-select: none;
-          margin: 0 2px;
+          margin: 0 3px;
           vertical-align: middle;
+          transition: all 0.15s ease;
+        }
+        .${CHIP_CLASS}:hover {
+          transform: translateY(-1px);
         }
         .${CHIP_CLASS}.valid {
-          background: rgba(16, 185, 129, 0.1);
-          color: #10b981;
-          border: 1px solid rgba(16, 185, 129, 0.3);
+          background: rgba(16, 185, 129, 0.16);
+          color: #059669;
+          border: 1.5px solid rgba(16, 185, 129, 0.5);
+          box-shadow: 0 1px 3px rgba(16, 185, 129, 0.15);
+        }
+        .${CHIP_CLASS}.valid:hover {
+          background: rgba(16, 185, 129, 0.25);
+          border-color: rgba(16, 185, 129, 0.7);
         }
         .${CHIP_CLASS}.empty {
-          background: rgba(37, 99, 235, 0.15);
-          color: #3b82f6;
-          border: 1px solid rgba(37, 99, 235, 0.4);
+          background: rgba(37, 99, 235, 0.16);
+          color: #2563EB;
+          border: 1.5px solid rgba(37, 99, 235, 0.5);
+          box-shadow: 0 1px 3px rgba(37, 99, 235, 0.15);
         }
-        .${CHIP_CLASS}.invalid-chip {
-          background: rgba(244, 63, 94, 0.1);
-          color: #f43f5e;
-          border: 1px solid rgba(244, 63, 94, 0.3);
+        .${CHIP_CLASS}.empty:hover {
+          background: rgba(37, 99, 235, 0.26);
+          border-color: #2563EB;
+        }
+        .${CHIP_CLASS} .chip-dot {
+          font-size: 11px;
+        }
+        .${CHIP_CLASS} .chip-label {
+          font-weight: 800;
+          font-size: 12px;
         }
         .${CHIP_CLASS} .chip-value {
-          font-size: 9px;
-          opacity: 0.8;
-          max-width: 80px;
+          font-size: 11px;
+          opacity: 0.9;
+          max-width: 120px;
           overflow: hidden;
           text-overflow: ellipsis;
+          font-weight: 700;
         }
-      `}</style>
+      `}} />
 
       {renderDropdown()}
     </div>

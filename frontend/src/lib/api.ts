@@ -46,7 +46,16 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Response interceptor: automatically refresh short-lived 3-min access token on 401 errors
+export const isPublicPath = (pathname?: string | null): boolean => {
+  if (!pathname) return true;
+  const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
+  const publicRoutes = ['/', '/login', '/signup', '/privacy', '/terms'];
+  return publicRoutes.includes(clean);
+};
+
+let isRedirectingToLogin = false;
+
+// Response interceptor: automatically refresh short-lived 5-min access token on 401 errors seamlessly without page reload
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -54,17 +63,20 @@ apiClient.interceptors.response.use(
 
     if (
       error.response?.status === 401 &&
+      originalRequest &&
       !originalRequest._retry &&
       !originalRequest.url?.includes('/api/auth/login') &&
       !originalRequest.url?.includes('/api/auth/refresh')
     ) {
       originalRequest._retry = true;
 
+      // If another request is already refreshing the token, queue this request to wait for the new token
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
+            originalRequest.headers = originalRequest.headers || {};
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return apiClient(originalRequest);
           })
@@ -75,16 +87,25 @@ apiClient.interceptors.response.use(
 
       if (typeof window !== 'undefined') {
         const refreshToken = localStorage.getItem('refresh_token');
+        const isPublic = isPublicPath(window.location.pathname);
 
         if (!refreshToken) {
           isRefreshing = false;
+          processQueue(error, null);
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          delete apiClient.defaults.headers.common['Authorization'];
+
+          if (!isPublic && !isRedirectingToLogin) {
+            isRedirectingToLogin = true;
+            window.location.replace('/login');
+            setTimeout(() => { isRedirectingToLogin = false; }, 3000);
+          }
           return Promise.reject(error);
         }
 
         try {
+          // Perform silent token renewal in background
           const res = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken });
           const { token: newAccessToken, refreshToken: newRefreshToken } = res.data?.data || {};
 
@@ -94,15 +115,25 @@ apiClient.interceptors.response.use(
               localStorage.setItem('refresh_token', newRefreshToken);
             }
             apiClient.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
-            originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+            originalRequest.headers = originalRequest.headers || {};
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             processQueue(null, newAccessToken);
             return apiClient(originalRequest);
+          } else {
+            throw new Error('Refresh endpoint returned empty token');
           }
         } catch (refreshErr) {
+          // ONLY if refresh token ALSO failed / expired: user session is truly dead
           processQueue(refreshErr, null);
           localStorage.removeItem('auth_token');
           localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          delete apiClient.defaults.headers.common['Authorization'];
+
+          if (!isPublic && !isRedirectingToLogin) {
+            isRedirectingToLogin = true;
+            window.location.replace('/login');
+            setTimeout(() => { isRedirectingToLogin = false; }, 3000);
+          }
           return Promise.reject(refreshErr);
         } finally {
           isRefreshing = false;

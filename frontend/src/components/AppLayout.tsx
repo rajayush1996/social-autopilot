@@ -7,7 +7,7 @@ import Header from './Header';
 import { ToastProvider } from '../context/ToastContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import ApiService from '@/services/apiService';
-import { User } from '@/lib/api';
+import { User, isPublicPath } from '@/lib/api';
 import { Sparkles } from 'lucide-react';
 
 function MinimalSaaSPageLoader({ message = 'Loading workspace...' }: { message?: string }) {
@@ -55,21 +55,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setMounted(true);
     
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    setHasToken(!!token);
-    
+    const isPublic = isPublicPath(pathname);
     const isAuthRoute = pathname === '/login' || pathname === '/signup';
-    const isPublicHome = pathname === '/';
 
     if (!token) {
-      if (!isAuthRoute && !isPublicHome) {
-        router.push('/login');
+      setHasToken(false);
+      if (!isPublic) {
+        router.replace('/login');
       }
     } else {
+      setHasToken(true);
       if (isAuthRoute) {
-        router.push('/dashboard');
-      } else {
+        // Verify token validity before redirecting to dashboard
         ApiService.getMe()
-          .then(u => setUser(u))
+          .then((u) => {
+            setUser(u);
+            router.replace('/dashboard');
+          })
+          .catch(() => {
+            // Invalid / expired token: clear it so user can log in without loops
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('refresh_token');
+            setHasToken(false);
+          });
+      } else if (!isPublic) {
+        ApiService.getMe()
+          .then((u) => setUser(u))
           .catch(() => {});
       }
     }
@@ -77,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Automated Jugaad: Silent Background Heartbeat to keep Render awake & auto-sync queue
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !hasToken) return;
 
     // Immediate ping on mount to wake up backend and sweep due posts
     ApiService.triggerSchedulerSync().catch(() => {});
@@ -88,10 +99,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, 4 * 60 * 1000);
 
     return () => clearInterval(heartbeatInterval);
-  }, [mounted]);
+  }, [mounted, hasToken]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
-  const isLandingPage = pathname === '/';
+  const isPublic = isPublicPath(pathname);
 
   if (!mounted) {
     return (
@@ -103,7 +114,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const showSidebar = hasToken && !isAuthPage && !isLandingPage;
+  const showSidebar = hasToken && !isPublic;
 
   if (!showSidebar) {
     return (
@@ -119,8 +130,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             {isAuthPage && (
               <>
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-indigo-500/10 rounded-full blur-3xl -z-10 pointer-events-none animate-pulse" />
-                <div className="absolute bottom-0 left-1/3 w-[300px] h-[300px] bg-purple-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-[#2563EB]/10 rounded-full blur-3xl -z-10 pointer-events-none animate-pulse" />
+                <div className="absolute bottom-0 left-1/3 w-[300px] h-[300px] bg-[#0ea5e9]/5 rounded-full blur-3xl -z-10 pointer-events-none" />
               </>
             )}
             {children}

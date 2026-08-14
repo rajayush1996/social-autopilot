@@ -9,27 +9,81 @@ import { UploadStrategyFactory } from './upload/uploadStrategyFactory.js';
  * Enterprise Slide Image Generator Service.
  * Converts raw text or slide decks into high-res (1080x1080) Instagram-ready graphic slide images.
  */
+/**
+ * Enterprise Slide Image Generator Service.
+ * Converts raw text or slide decks into high-res (1080x1080) Instagram-ready graphic slide images.
+ */
 export class SlideGeneratorService {
+  /**
+   * Normalize Mathematical Unicode Bold / Italic characters into clean ASCII characters for graphic rendering
+   */
+  static normalizeUnicodeForGraphic(text) {
+    if (!text) return '';
+    return text
+      // Math Bold / Sans-serif bold uppercase: 𝗔-𝗭 (0x1D5D4 - 0x1D5ED) -> A-Z
+      .replace(/[\uD835][\uDDD4-\uDDED]/g, (char) => {
+        const code = char.codePointAt(0);
+        return String.fromCharCode(code - 0x1D5D4 + 65);
+      })
+      // Math Bold / Sans-serif bold lowercase: 𝗮-𝘇 (0x1D5EE - 0x1D607) -> a-z
+      .replace(/[\uD835][\uDDEE-\uDE07]/g, (char) => {
+        const code = char.codePointAt(0);
+        return String.fromCharCode(code - 0x1D5EE + 97);
+      })
+      // Math Bold digits: 𝟬-𝟵 (0x1D7CE - 0x1D7D7) -> 0-9
+      .replace(/[\uD835][\uDFCE-\uDFD7]/g, (char) => {
+        const code = char.codePointAt(0);
+        return String.fromCharCode(code - 0x1D7CE + 48);
+      });
+  }
+
   /**
    * Split raw text into individual slide sections
    */
   static parseSlides(text) {
     if (!text || typeof text !== 'string') return ['Social Autopilot'];
-    
-    // Check if text has explicit slide markers
-    const rawBlocks = text.split(/\n(?=(?:Slide \d+:|📌|\d+\.|\w+:))/gi).filter(b => b.trim().length > 0);
-    
-    if (rawBlocks.length > 1) {
-      return rawBlocks.map(b => b.trim()).slice(0, 5); // Max 5 slides
+
+    // Clean JSON wrapper if string starts with JSON
+    let cleanText = text.trim();
+    if (cleanText.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(cleanText);
+        cleanText = parsed.INSTAGRAM || parsed.LINKEDIN || parsed.content || cleanText;
+      } catch (e) {}
     }
 
-    // Split long text into paragraphs
-    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    if (paragraphs.length > 1) {
-      return paragraphs.slice(0, 5);
+    // Strip trailing hashtags for visual slide cards
+    const withoutHashtags = cleanText.replace(/#[a-zA-Z0-9_]+\s*/g, '').trim();
+
+    // Check for explicit slide markers (e.g. Slide 1:, Slide 2:)
+    const explicitSlideBlocks = withoutHashtags.split(/\n(?=(?:SLIDE|Slide|slide)\s*\d+[\s:\-–—|]*)/gi).map(s => s.trim()).filter(Boolean);
+    if (explicitSlideBlocks.length > 1) {
+      return explicitSlideBlocks.slice(0, 7);
     }
 
-    return [text];
+    // Check for structured sections (📌, Key Takeaways, numbered points, paragraphs)
+    const sectionBlocks = withoutHashtags.split(/\n\s*\n/).map(b => b.trim()).filter(b => b.length > 10);
+    if (sectionBlocks.length > 1) {
+      // Group small paragraphs together so we have 2 to 5 rich slides
+      const groupedSlides = [];
+      let currentBuffer = '';
+
+      for (const block of sectionBlocks) {
+        if (!currentBuffer) {
+          currentBuffer = block;
+        } else if ((currentBuffer + '\n\n' + block).length < 240) {
+          currentBuffer += '\n\n' + block;
+        } else {
+          groupedSlides.push(currentBuffer);
+          currentBuffer = block;
+        }
+      }
+      if (currentBuffer) groupedSlides.push(currentBuffer);
+
+      return groupedSlides.slice(0, 6);
+    }
+
+    return [withoutHashtags];
   }
 
   /**
@@ -53,23 +107,35 @@ export class SlideGeneratorService {
   }
 
   /**
-   * Wrap text into multiple SVG lines for 1080x1080 canvas
+   * Wrap text into multiple SVG lines for 1080x1080 canvas (32 chars max per line)
    */
-  static wrapText(text, maxCharsPerLine = 30) {
-    const words = text.split(' ');
+  static wrapText(text, maxCharsPerLine = 32) {
+    const clean = this.normalizeUnicodeForGraphic(text);
+    const paragraphs = clean.split(/\n+/);
     const lines = [];
-    let currentLine = '';
 
-    for (const word of words) {
-      if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
-        currentLine = (currentLine + ' ' + word).trim();
-      } else {
-        if (currentLine) lines.push(currentLine);
-        currentLine = word;
+    for (const para of paragraphs) {
+      const words = para.trim().split(/\s+/);
+      let currentLine = '';
+
+      for (const word of words) {
+        if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
+          currentLine = (currentLine + ' ' + word).trim();
+        } else {
+          if (currentLine) lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+      // Small spacing line between paragraphs if multiple
+      if (paragraphs.length > 1 && lines.length < 10) {
+        lines.push('');
       }
     }
-    if (currentLine) lines.push(currentLine);
-    return lines.slice(0, 12); // Max 12 lines to fit comfortably
+
+    // Filter out trailing blank lines and limit to 10 lines
+    while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+    return lines.slice(0, 10);
   }
 
   /**
@@ -90,19 +156,20 @@ export class SlideGeneratorService {
   static async generateSlideImage({ text, slideIndex = 1, totalSlides = 1, brandName = 'OmniSync' }) {
     const width = 1080;
     const height = 1080;
-    const lines = this.wrapText(text);
+    const rawLines = this.wrapText(text, 34);
 
     // Escape text lines for SVG
-    const escapedLines = lines.map(line => this.escapeXml(line));
+    const escapedLines = rawLines.map(line => this.escapeXml(line));
 
-    // Calculate Y positioning
-    const lineHeight = 56;
+    // Calculate Y positioning to center content vertically
+    const lineHeight = 58;
     const totalTextHeight = escapedLines.length * lineHeight;
-    const startY = Math.max(320, (height - totalTextHeight) / 2);
+    const startY = Math.max(260, Math.round((height - totalTextHeight) / 2));
 
-    const tspanMarkup = escapedLines.map((line, idx) => {
-      return `<tspan x="100" y="${startY + idx * lineHeight}">${line}</tspan>`;
-    }).join('');
+    const textLinesSvg = escapedLines.map((line, idx) => {
+      if (!line) return '';
+      return `<text x="120" y="${startY + idx * lineHeight}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="600" fill="#F8FAFC">${line}</text>`;
+    }).filter(Boolean).join('\n');
 
     const svgString = `
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
@@ -113,7 +180,7 @@ export class SlideGeneratorService {
             <stop offset="100%" stop-color="#0F172A"/>
           </linearGradient>
           <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#6366F1"/>
+            <stop offset="0%" stop-color="#2563EB"/>
             <stop offset="100%" stop-color="#38BDF8"/>
           </linearGradient>
         </defs>
@@ -122,31 +189,29 @@ export class SlideGeneratorService {
         <rect width="100%" height="100%" fill="url(#bg)"/>
         
         <!-- Subtle Glow Orbs -->
-        <circle cx="180" cy="180" r="260" fill="#6366F1" opacity="0.18" />
-        <circle cx="900" cy="900" r="300" fill="#38BDF8" opacity="0.14" />
+        <circle cx="180" cy="180" r="260" fill="#2563EB" opacity="0.22" />
+        <circle cx="900" cy="900" r="300" fill="#38BDF8" opacity="0.16" />
 
         <!-- Header Brand Bar -->
-        <rect x="80" y="80" width="6" height="40" rx="3" fill="url(#accent)" />
-        <text x="104" y="108" fill="#94A3B8" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" letter-spacing="2">
+        <rect x="120" y="90" width="6" height="40" rx="3" fill="url(#accent)" />
+        <text x="144" y="118" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" letter-spacing="2">
           ${this.escapeXml(brandName.toUpperCase())}
         </text>
 
         <!-- Slide Index Pill -->
         ${totalSlides > 1 ? `
-        <rect x="880" y="80" width="120" height="40" rx="20" fill="#1E293B" stroke="#334155" stroke-width="1.5"/>
-        <text x="940" y="106" fill="#E2E8F0" font-family="Arial, sans-serif" font-size="18" font-weight="700" text-anchor="middle">
+        <rect x="840" y="90" width="120" height="40" rx="20" fill="#1E293B" stroke="#334155" stroke-width="1.5"/>
+        <text x="900" y="116" fill="#E2E8F0" font-family="-apple-system, sans-serif" font-size="18" font-weight="700" text-anchor="middle">
           ${slideIndex} / ${totalSlides}
         </text>
         ` : ''}
 
-        <!-- Main Slide Body Text -->
-        <text font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="600" fill="#F8FAFC">
-          ${tspanMarkup}
-        </text>
+        <!-- Main Slide Body Text with 120px Left Padding -->
+        ${textLinesSvg}
 
         <!-- Footer Bottom Bar -->
-        <line x1="100" y1="960" x2="980" y2="960" stroke="#334155" stroke-width="1.5" />
-        <text x="100" y="1005" fill="#64748B" font-family="Arial, sans-serif" font-size="20" font-weight="500">
+        <line x1="120" y1="960" x2="960" y2="960" stroke="#334155" stroke-width="1.5" />
+        <text x="120" y="1005" fill="#64748B" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="500">
           Created with OmniSync ✨
         </text>
       </svg>
@@ -155,7 +220,7 @@ export class SlideGeneratorService {
     const filename = `slide_${Date.now()}_${slideIndex}.jpg`;
 
     const imageBuffer = await sharp(Buffer.from(svgString))
-      .jpeg({ quality: 92 })
+      .jpeg({ quality: 95 })
       .toBuffer();
 
     // Auto-upload generated slide image to Cloudflare R2 / Cloudinary public CDN so Meta API receives a real public HTTPS URL
@@ -185,4 +250,5 @@ export class SlideGeneratorService {
     return publicUrl;
   }
 }
+
 export default SlideGeneratorService;

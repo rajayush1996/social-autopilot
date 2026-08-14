@@ -256,5 +256,27 @@ describe('⚡ Virality Intelligence & Dashboard Unit Tests', () => {
 
       await CacheService.del(testKey);
     });
+
+    test('Should support invalidateMany and wildcard pattern deletion', async () => {
+      const CacheService = (await import('../../src/services/cacheService.js')).default;
+      const key1 = 'app:user:test_user_789:posts:page_1';
+      const key2 = 'app:user:test_user_789:posts:page_2';
+      const key3 = 'app:post:detail_999';
+
+      await CacheService.set(key1, { data: [1, 2] }, 60);
+      await CacheService.set(key2, { data: [3, 4] }, 60);
+      await CacheService.set(key3, { id: '999' }, 60);
+
+      assert.ok(await CacheService.get(key1));
+      assert.ok(await CacheService.get(key2));
+      assert.ok(await CacheService.get(key3));
+
+      // Test invalidateMany with exact key + wildcard pattern
+      await CacheService.invalidateMany([key3, 'app:user:test_user_789:posts:*']);
+
+      assert.strictEqual(await CacheService.get(key1), null);
+      assert.strictEqual(await CacheService.get(key2), null);
+      assert.strictEqual(await CacheService.get(key3), null);
+    });
   });
 });

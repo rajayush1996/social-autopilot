@@ -5,6 +5,8 @@ import {
   createPost,
   listPosts,
   getPostById,
+  updatePost,
+  deletePost,
   cancelScheduledPost,
   triggerScheduledPostsNow,
   retryFailedPost,
@@ -22,7 +24,12 @@ const router = Router();
  */
 router.get('/approve-email', approvePostViaEmail);
 
-// Apply JWT authentication guard globally across remaining post endpoints
+/**
+ * POST /api/posts/trigger-scheduler - Background / Cron Sweeper (Public & Cron Safe)
+ */
+router.post('/trigger-scheduler', triggerScheduledPostsNow);
+
+// Apply JWT authentication guard globally across remaining protected post endpoints
 router.use(authenticateJwt);
 
 /**
@@ -46,11 +53,6 @@ router.post('/', validate(createPostSchema), createPost);
 router.get('/', listPosts);
 
 /**
- * POST /api/posts/trigger-scheduler - On-demand Trigger for Cron Scheduler
- */
-router.post('/trigger-scheduler', triggerScheduledPostsNow);
-
-/**
  * POST /api/posts/:id/retry - Retry or Republish a Failed Post
  */
 router.post('/:id/retry', retryFailedPost);
@@ -60,6 +62,18 @@ router.post('/:id/republish', retryFailedPost);
  * GET /api/posts/:id - Get Post Details by ID
  */
 router.get('/:id', getPostById);
+
+/**
+ * PATCH /api/posts/:id - Update post content, schedule, or media
+ * PUT /api/posts/:id - Full update post
+ */
+router.patch('/:id', updatePost);
+router.put('/:id', updatePost);
+
+/**
+ * DELETE /api/posts/:id - Delete post and cancel queue job
+ */
+router.delete('/:id', deletePost);
 
 /**
  * PATCH /api/posts/:id/cancel - Cancel a Scheduled Post

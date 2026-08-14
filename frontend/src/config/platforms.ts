@@ -75,8 +75,8 @@ export function getPlatformDefinition(platformId: PlatformId): PlatformDefinitio
     label: humanizePlatformId(normalizedId),
     shortLabel: normalizedId.slice(0, 2),
     description: 'A connected publishing channel.',
-    accentClass: 'text-violet-300',
-    badgeClass: 'bg-violet-500/10 text-violet-300 border-violet-500/30',
+    accentClass: 'text-blue-400',
+    badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
   };
 }
 

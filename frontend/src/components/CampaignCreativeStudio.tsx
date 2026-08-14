@@ -54,7 +54,7 @@ export function CampaignCreativeStudio({
     <div className="space-y-3 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-4 shadow-inner">
       <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-[#2563EB] rounded-xl">
+          <div className="p-2 bg-[#2563EB]/10 text-[#2563EB] rounded-xl">
             <Wand2 className="w-4 h-4" />
           </div>
           <div>
@@ -109,7 +109,7 @@ export function CampaignCreativeStudio({
                 type="button"
                 onClick={() => { setSelectedDays(d); if (onDurationChange) onDurationChange(d); }}
                 className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold transition-all border cursor-pointer ${
-                  selectedDays === d ? 'bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] border-blue-300' : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)]'
+                  selectedDays === d ? 'bg-[#2563EB]/15 text-[#2563EB] border-[#2563EB]/40' : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)]'
                 }`}
               >
                 {d}D

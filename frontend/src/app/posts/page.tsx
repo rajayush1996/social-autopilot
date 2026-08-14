@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Calendar, 
   Trash2, 
@@ -12,7 +13,9 @@ import {
   RefreshCw,
   Edit3,
   CheckCircle2,
-  X // Added X import for the new close button
+  X,
+  Hash,
+  Copy
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -70,9 +73,10 @@ function parsePostContent(contentStr: string): { isJson: boolean; map: Record<st
 export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterTab, setFilterTab] = useState<'ALL' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED'>('ALL');
+  const [filterTab, setFilterTab] = useState<'ALL' | 'SCHEDULED' | 'PUBLISHED' | 'DRAFT' | 'FAILED'>('ALL');
   
   // Modal / Drawer state
+  const [portalMounted, setPortalMounted] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -113,6 +117,7 @@ export default function PostsPage() {
   };
 
   useEffect(() => {
+    setPortalMounted(true);
     fetchPosts();
 
     socketClient.connect();
@@ -171,7 +176,8 @@ export default function PostsPage() {
 
   const filteredPosts = posts.filter(post => {
     if (filterTab === 'ALL') return true;
-    if (filterTab === 'SCHEDULED') return post.status === 'SCHEDULED' || post.status === 'DRAFT' || post.status === 'PUBLISHING';
+    if (filterTab === 'SCHEDULED') return post.status === 'SCHEDULED' || post.status === 'PUBLISHING';
+    if (filterTab === 'DRAFT') return post.status === 'DRAFT';
     if (filterTab === 'PUBLISHED') return post.status === 'PUBLISHED' || post.status === 'PARTIALLY_PUBLISHED';
     if (filterTab === 'FAILED') return post.status === 'FAILED' || post.status === 'PARTIALLY_PUBLISHED';
     return post.status === filterTab;
@@ -239,8 +245,8 @@ export default function PostsPage() {
       </div>
 
       {/* Tabs list */}
-      <div className="flex border-b border-[var(--border-color)] gap-6">
-        {(['ALL', 'SCHEDULED', 'PUBLISHED', 'FAILED'] as const).map(tab => (
+      <div className="flex border-b border-[var(--border-color)] gap-6 overflow-x-auto">
+        {(['ALL', 'SCHEDULED', 'PUBLISHED', 'DRAFT', 'FAILED'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setFilterTab(tab)}
@@ -273,24 +279,42 @@ export default function PostsPage() {
             >
               <div>
                 {/* Post Card Header */}
-                <div className="flex items-center justify-between mb-3.5">
-                  {/* Status Badge */}
-                  <span className={`text-xs font-bold px-3 py-1 rounded-md border uppercase tracking-wider ${
-                    post.status === 'PUBLISHED'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      : post.status === 'PUBLISHING'
-                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 animate-pulse font-extrabold'
-                      : post.status === 'FAILED'
-                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      : post.status === 'CANCELLED'
-                      ? 'bg-slate-850 text-slate-400 border-slate-700'
-                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                  }`}>
-                    {post.status}
-                  </span>
+                <div className="flex items-center justify-between mb-3.5 gap-2">
+                  {/* Status & Post ID Badge Row */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md border uppercase tracking-wider ${
+                      post.status === 'PUBLISHED'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : post.status === 'PUBLISHING'
+                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 animate-pulse font-extrabold'
+                        : post.status === 'FAILED'
+                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        : post.status === 'CANCELLED'
+                        ? 'bg-slate-850 text-slate-400 border-slate-700'
+                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    }`}>
+                      {post.status}
+                    </span>
+
+                    {/* Post ID Chip with 1-Click Copy */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(post.id);
+                        toast.success(`Copied Post ID: ${post.id.slice(0, 8)}...`);
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-input)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 text-[11px] font-mono text-[var(--text-secondary)] hover:text-[#2563EB] transition-all cursor-pointer shadow-2xs"
+                      title={`Post ID: ${post.id} (Click to copy)`}
+                    >
+                      <Hash className="w-3 h-3 text-[#2563EB]" />
+                      <span>{post.id.slice(0, 8)}</span>
+                      <Copy className="w-2.5 h-2.5 opacity-60" />
+                    </button>
+                  </div>
 
                   {/* Platforms list */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {post.targetPlatforms.map(plt => (
                       <div key={plt} className="p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg flex items-center justify-center">
                         {getPlatformIcon(plt)}
@@ -309,7 +333,7 @@ export default function PostsPage() {
 
                       {/* Tone Badge */}
                       {post.tone && (
-                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 flex items-center gap-1 capitalize">
+                        <span className="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/25 flex items-center gap-1 capitalize">
                           <span>🎯 {post.tone.toLowerCase()}</span>
                         </span>
                       )}
@@ -393,12 +417,38 @@ export default function PostsPage() {
                 </div>
               </div>
 
+              {/* Quick action buttons for published posts */}
+              {post.status === 'PUBLISHED' && (
+                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPost(post);
+                    }}
+                    className="text-[11px] text-emerald-500 hover:underline font-extrabold flex items-center gap-1 cursor-pointer"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> View Publication Logs ↗
+                  </button>
+                  <span className="text-[10px] text-[var(--text-secondary)] font-semibold">
+                    {post.publishedAt ? formatDateTime(post.publishedAt) : 'Live'}
+                  </span>
+                </div>
+              )}
+
               {/* Quick action buttons for failed posts */}
               {(post.status === 'FAILED' || post.status === 'PARTIALLY_PUBLISHED') && (
-                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between gap-2">
-                  <span className="text-[9px] text-rose-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" /> Publishing Failed
-                  </span>
+                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPost(post);
+                    }}
+                    className="text-[11px] text-rose-500 hover:underline font-extrabold flex items-center gap-1 cursor-pointer"
+                  >
+                    <AlertCircle className="h-3.5 w-3.5" /> Inspect Error Logs ↗
+                  </button>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -423,18 +473,76 @@ export default function PostsPage() {
                 </div>
               )}
 
-              {/* Quick action button for scheduled posts */}
-              {(post.status === 'SCHEDULED' || post.status === 'DRAFT') && (
-                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between">
-                  <span className="text-[9px] text-[#2563EB] font-bold uppercase tracking-wider">Scheduled Post</span>
+              {/* Quick action button for draft posts */}
+              {post.status === 'DRAFT' && (
+                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between gap-2 flex-wrap">
                   <button
-                    onClick={(e) => handleCancelSchedule(e, post.id)}
-                    disabled={cancellingId === post.id}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-secondary)] hover:text-rose-500 rounded-lg text-[10px] font-bold transition-all duration-300 disabled:opacity-50 cursor-pointer"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPost(post);
+                    }}
+                    className="text-[11px] text-amber-500 hover:underline font-extrabold flex items-center gap-1 cursor-pointer"
                   >
-                    <Trash2 className="h-3 w-3" />
-                    {cancellingId === post.id ? 'Cancelling...' : 'Cancel Queue'}
+                    <Edit3 className="h-3.5 w-3.5" /> Draft Details ↗
                   </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleCancelSchedule(e, post.id)}
+                      disabled={cancellingId === post.id}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-500 rounded-xl text-[10px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                      title="Delete this draft"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {cancellingId === post.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleRetryPost(e, post.id)}
+                      disabled={retryingId === post.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-[10px] font-extrabold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${retryingId === post.id ? 'animate-spin' : ''}`} />
+                      {retryingId === post.id ? 'Publishing...' : '🚀 Publish Now'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick action button for scheduled posts */}
+              {post.status === 'SCHEDULED' && (
+                <div className="mt-4 pt-3.5 border-t border-[var(--border-color)] flex items-center justify-between gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPost(post);
+                    }}
+                    className="text-[11px] text-[#2563EB] hover:underline font-extrabold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Info className="h-3.5 w-3.5" /> View Details & Logs ↗
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleCancelSchedule(e, post.id)}
+                      disabled={cancellingId === post.id}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-secondary)] hover:text-rose-500 rounded-lg text-[10px] font-bold transition-all duration-300 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {cancellingId === post.id ? 'Cancelling...' : 'Cancel Queue'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleRetryPost(e, post.id)}
+                      disabled={retryingId === post.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-[10px] font-extrabold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${retryingId === post.id ? 'animate-spin' : ''}`} />
+                      {retryingId === post.id ? 'Publishing...' : '🚀 Publish Now'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -442,20 +550,21 @@ export default function PostsPage() {
         </div>
       )}
 
-      {/* Details drawer/modal side panel */}
-      {selectedPost && (
+      {/* Details drawer/modal side panel rendered via Portal to sit above all Navbars/Headers */}
+      {selectedPost && typeof document !== 'undefined' && createPortal(
         <div 
           onClick={(e) => { if (e.target === e.currentTarget) setSelectedPost(null); }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-end animate-fadeIn cursor-pointer"
+          className="fixed inset-0 w-screen h-screen min-h-screen z-[99999] bg-black/70 backdrop-blur-sm flex items-stretch justify-end animate-fadeIn cursor-pointer"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[var(--bg-card)] h-full w-full max-w-xl border-l border-[var(--border-color)] p-6 flex flex-col justify-between shadow-2xl overflow-y-auto cursor-default"
+            className="bg-[var(--bg-card)] h-full w-full max-w-xl border-l border-[var(--border-color)] p-6 md:p-8 flex flex-col justify-between shadow-2xl overflow-y-auto cursor-default z-[100000] relative"
           >
               <div className="space-y-6">
                 {/* Drawer Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
                       <h3 className="font-extrabold text-base text-[var(--text-primary)]">Post Details & Logs</h3>
                       <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${
@@ -468,7 +577,23 @@ export default function PostsPage() {
                         {selectedPost.status}
                       </span>
                     </div>
-                    <p className="text-[10px] text-[var(--text-secondary)] font-mono">ID: {selectedPost.id}</p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-[var(--text-secondary)] font-mono bg-[var(--bg-input)] px-2.5 py-0.5 rounded-md border border-[var(--border-color)] inline-flex items-center gap-1">
+                        <Hash className="w-3 h-3 text-[#2563EB]" />
+                        <span className="text-[var(--text-primary)] font-bold">{selectedPost.id}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedPost.id);
+                          toast.success('Copied full Post ID to clipboard!');
+                        }}
+                        className="p-1 text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[var(--bg-input)] rounded-md transition-all cursor-pointer border border-transparent hover:border-[var(--border-color)]"
+                        title="Copy full Post ID"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* 🌟 FIX: Updated Clean Close Button based on theme variables */}
@@ -611,7 +736,11 @@ export default function PostsPage() {
                     </div>
                     <input
                       type="datetime-local"
-                      defaultValue={selectedPost.scheduledAt ? new Date(selectedPost.scheduledAt).toISOString().slice(0, 16) : ''}
+                      defaultValue={(() => {
+                        if (!selectedPost.scheduledAt) return '';
+                        const d = new Date(selectedPost.scheduledAt);
+                        return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16);
+                      })()}
                       onChange={async (e) => {
                         const newDateStr = e.target.value;
                         if (!newDateStr) return;
@@ -707,7 +836,7 @@ export default function PostsPage() {
                 </span>
 
                 <div className="flex items-center gap-2">
-                  {(selectedPost.status === 'SCHEDULED' || selectedPost.status === 'FAILED' || selectedPost.status === 'PARTIALLY_PUBLISHED') && (
+                  {(selectedPost.status === 'DRAFT' || selectedPost.status === 'SCHEDULED' || selectedPost.status === 'FAILED' || selectedPost.status === 'PARTIALLY_PUBLISHED') && (
                     <button
                       type="button"
                       onClick={(e) => handleRetryPost(e, selectedPost.id)}
@@ -731,8 +860,9 @@ export default function PostsPage() {
                 </div>
               </div>
           </div>
-        </div>
-  )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

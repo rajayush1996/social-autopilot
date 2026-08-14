@@ -349,7 +349,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                       <h4 className="text-sm font-extrabold text-[var(--text-primary)]">{w.title}</h4>
                       <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{w.desc}</p>
                     </div>
-                    <span className={`h-6 w-11 rounded-full p-1 transition-colors ${isChecked ? 'bg-[#2563EB]' : 'bg-slate-700'}`}>
+                    <span className={`h-6 w-11 rounded-full p-1 transition-colors ${isChecked ? 'bg-[#2563EB]' : 'bg-[var(--border-color)]'}`}>
                       <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${isChecked ? 'translate-x-5' : 'translate-x-0'}`} />
                     </span>
                   </div>
@@ -467,12 +467,12 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider">Connected Accounts</span>
-                <div className="p-2 bg-indigo-500/10 text-indigo-500 rounded-xl">
+                <div className="p-2 bg-[#0ea5e9]/10 text-[#0ea5e9] rounded-xl">
                   <UserCheck className="w-4 h-4" />
                 </div>
               </div>
               <p className="text-3xl font-black text-[var(--text-primary)]">{activeChannels.length} / {accounts.length || 3}</p>
-              <span className="text-[11px] text-indigo-500 font-bold mt-1 block">LinkedIn, Instagram, X</span>
+              <span className="text-[11px] text-[#0ea5e9] font-bold mt-1 block">LinkedIn, Instagram, X</span>
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm">
@@ -596,7 +596,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
         <div className="space-y-8 animate-fadeIn">
           {/* TOP BAR: FOLLOWER PRIME-TIME GOLDEN WINDOW */}
           {peakSlots && (
-            <div className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-violet-600/10 border border-[#2563EB]/30 rounded-3xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-gradient-to-r from-[#2563EB]/15 via-[#0ea5e9]/10 to-[#2563EB]/10 border border-[#2563EB]/30 rounded-3xl p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-[#2563EB] text-white rounded-2xl shadow-md shadow-blue-500/20">
                   <Clock className="w-6 h-6 animate-pulse" />
@@ -736,7 +736,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
               <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
                 <div>
                   <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                    <Hash className="h-5 w-5 text-indigo-500" />
+                    <Hash className="h-5 w-5 text-[#0ea5e9]" />
                     High-Yield Trending Hashtag Radar
                   </h3>
                   <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Top-performing hashtags for your niche</p>

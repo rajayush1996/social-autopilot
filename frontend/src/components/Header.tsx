@@ -16,7 +16,7 @@ export function Header({ userName, userRole }: { userName?: string; userRole?: s
       <div className="flex items-center gap-4">
         {/* Brand Logo & Title */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
             <Sparkles className="h-5 w-5 animate-pulse" />
           </div>
           <div className="hidden sm:block">

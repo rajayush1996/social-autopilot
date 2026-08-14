@@ -14,8 +14,8 @@ export const config = {
   jwt: {
     secret: process.env.JWT_SECRET || 'super_secret_jwt_sign_key_for_social_autopilot',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'super_secret_jwt_refresh_key_for_social_autopilot',
-    accessExpiration: process.env.JWT_ACCESS_EXPIRATION || '3m',
-    refreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '1d',
+    accessExpiration: process.env.JWT_ACCESS_EXPIRATION || '15m',
+    refreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '30d',
   },
 
   db: {

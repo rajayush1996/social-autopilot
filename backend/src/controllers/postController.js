@@ -452,3 +452,55 @@ export const approvePostViaEmail = async (req, res) => {
     `);
   }
 };
+
+/**
+ * Controller: Update an existing post (content, media, status, scheduledAt, platforms).
+ */
+export const updatePost = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const { content, platforms, mediaUrl, mediaType, scheduledAt, status, tone, targetUrl } = req.body;
+
+  const updateData = {};
+  if (content !== undefined) updateData.content = content;
+  if (platforms !== undefined) updateData.platforms = Array.isArray(platforms) ? platforms : [platforms];
+  if (mediaUrl !== undefined) updateData.mediaUrl = mediaUrl;
+  if (mediaType !== undefined) updateData.mediaType = mediaType;
+  if (status !== undefined) updateData.status = status;
+  if (tone !== undefined) updateData.tone = tone;
+  if (targetUrl !== undefined) updateData.targetUrl = targetUrl;
+
+  if (scheduledAt !== undefined) {
+    const scheduledDate = new Date(scheduledAt);
+    if (!isNaN(scheduledDate.getTime())) {
+      updateData.scheduledAt = scheduledDate;
+      // If the post is currently in SCHEDULED status, adjust queue delay safely
+      try {
+        const existingPost = await PostService.findPostById(id, userId);
+        if (existingPost && existingPost.status === POST_STATUS.SCHEDULED) {
+          await removePostJob(id);
+          const delayMs = Math.max(0, scheduledDate.getTime() - Date.now());
+          await enqueuePostJob(id, delayMs);
+        }
+      } catch (queueErr) {
+        logger.warn(`[updatePost] Queue adjustment skipped for post ${id}: ${queueErr.message}`);
+      }
+    }
+  }
+
+  const updatedPost = await PostService.updatePost(id, userId, updateData);
+
+  return successResponse(res, HttpStatus.OK, 'Post updated successfully.', { post: updatedPost });
+});
+
+/**
+ * Controller: Delete a post and remove from queue.
+ */
+export const deletePost = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const deleted = await PostService.deletePost(id, userId);
+
+  return successResponse(res, HttpStatus.OK, 'Post deleted successfully.', { post: deleted });
+});

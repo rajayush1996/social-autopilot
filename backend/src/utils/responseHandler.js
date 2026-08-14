@@ -10,7 +10,7 @@ export function successResponse(res, statusCode = HttpStatus.OK, message = 'Succ
     message,
     ...(data !== null && { data }),
     ...(Object.keys(meta).length > 0 && { meta }),
-    requestId: res.locals.requestId || undefined,
+    requestId: res?.locals?.requestId || undefined,
     timestamp: new Date().toISOString(),
   };
 
@@ -29,7 +29,7 @@ export function errorResponse(res, statusCode = HttpStatus.INTERNAL_SERVER_ERROR
     error: message,
     ...(details && { details }),
     ...(isDev && stack && { stack }),
-    requestId: res.locals.requestId || undefined,
+    requestId: res?.locals?.requestId || undefined,
     timestamp: new Date().toISOString(),
   };
 
@@ -41,5 +41,5 @@ export function errorResponse(res, statusCode = HttpStatus.INTERNAL_SERVER_ERROR
  * Eliminates repetitive try/catch blocks in controllers.
  */
 export const catchAsync = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch((err) => next(err));
+  return Promise.resolve(fn(req, res, next)).catch((err) => next(err));
 };

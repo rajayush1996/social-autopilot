@@ -75,18 +75,61 @@ export class CacheService {
   }
 
   /**
-   * Delete specific key or pattern from cache.
+   * Delete specific key or wildcard pattern from cache (both Redis & In-Memory).
    */
-  static async del(key) {
+  static async del(keyOrPattern) {
+    if (!keyOrPattern) return;
     try {
+      const isPattern = typeof keyOrPattern === 'string' && keyOrPattern.includes('*');
       const redis = getRedisClient();
+
       if (redis) {
-        await redis.del(key);
+        if (isPattern) {
+          const matchingKeys = await redis.keys(keyOrPattern);
+          if (matchingKeys && matchingKeys.length > 0) {
+            await redis.del(...matchingKeys);
+            logger.debug(`[RedisCache] 🗑️ Invalidation pattern matched & deleted ${matchingKeys.length} keys: ${keyOrPattern}`);
+          }
+        } else {
+          await redis.del(keyOrPattern);
+          logger.debug(`[RedisCache] 🗑️ Deleted key: ${keyOrPattern}`);
+        }
       }
-      memoryStore.delete(key);
+
+      // In-Memory store deletion
+      if (isPattern) {
+        const regexStr = '^' + keyOrPattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$';
+        const regex = new RegExp(regexStr);
+        for (const k of memoryStore.keys()) {
+          if (regex.test(k)) {
+            memoryStore.delete(k);
+          }
+        }
+      } else {
+        memoryStore.delete(keyOrPattern);
+      }
     } catch (err) {
-      logger.warn(`[Cache Error] DEL key "${key}": ${err.message}`);
+      logger.warn(`[Cache Error] DEL key/pattern "${keyOrPattern}": ${err.message}`);
     }
+  }
+
+  /**
+   * Invalidate multiple cache keys or patterns concurrently.
+   */
+  static async invalidateMany(keysOrPatterns = []) {
+    if (!Array.isArray(keysOrPatterns) || keysOrPatterns.length === 0) return;
+    try {
+      await Promise.all(keysOrPatterns.map((k) => this.del(k)));
+    } catch (err) {
+      logger.warn(`[Cache Error] InvalidateMany: ${err.message}`);
+    }
+  }
+
+  /**
+   * Invalidate all keys matching a wildcard pattern.
+   */
+  static async invalidatePattern(pattern) {
+    return this.del(pattern);
   }
 
   /**

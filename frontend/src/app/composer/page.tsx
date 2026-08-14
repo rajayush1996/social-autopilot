@@ -34,7 +34,8 @@ import {
   MoreHorizontal,
   Bookmark,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Wand2
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -136,6 +137,9 @@ export default function ComposerPage() {
 
   const [generating, setGenerating] = useState(false);
   const [aiLimitReached, setAiLimitReached] = useState(false);
+
+  // Per-platform toggle between Visual Carousel View and Raw Text Editor
+  const [previewDisplayMode, setPreviewDisplayMode] = useState<Record<string, 'CAROUSEL' | 'TEXT'>>({});
 
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
   const [portalMounted, setPortalMounted] = useState(false);
@@ -279,12 +283,12 @@ export default function ComposerPage() {
 
   const getPlaceholderIcon = (name: string) => {
     const key = name.toLowerCase();
-    if (key.includes('link') || key.includes('url')) return <Link2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />;
+    if (key.includes('link') || key.includes('url')) return <Link2 className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />;
     if (key.includes('web') || key.includes('site') || key.includes('domain')) return <Globe className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
     if (key.includes('code') || key.includes('promo') || key.includes('coupon')) return <Ticket className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
-    if (key.includes('author') || key.includes('user') || key.includes('creator')) return <UserIcon className="w-3.5 h-3.5 text-purple-500 shrink-0" />;
-    if (key.includes('cta')) return <Zap className="w-3.5 h-3.5 text-yellow-500 shrink-0" />;
-    return <TagIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />;
+    if (key.includes('author') || key.includes('user') || key.includes('creator')) return <UserIcon className="w-3.5 h-3.5 text-[#2563EB] shrink-0" />;
+    if (key.includes('cta')) return <Zap className="w-3.5 h-3.5 text-[#0ea5e9] shrink-0" />;
+    return <TagIcon className="w-3.5 h-3.5 text-[#0ea5e9] shrink-0" />;
   };
 
   const toUnicodeBold = (text: string): string => {
@@ -374,33 +378,28 @@ export default function ComposerPage() {
   const isFetchingRef = useRef(false);
 
   const insertPlaceholderAtCursor = (placeholder: string) => {
-    const currentTopic = topic || '';
-    const sel = window.getSelection();
-    let insertPos = currentTopic.length;
-
-    if (sel && sel.rangeCount > 0) {
-      const editor = document.querySelector('[contentEditable][data-placeholder]');
-      if (editor && editor.contains(sel.anchorNode)) {
-        const range = sel.getRangeAt(0);
-        let charIndex = 0;
-        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-        while (walker.nextNode()) {
-          const node = walker.currentNode;
-          if (node === range.startContainer) {
-            insertPos = charIndex + range.startOffset;
-            break;
-          }
-          charIndex += (node.textContent || '').length;
+    const editor = document.querySelector('[contentEditable][data-placeholder]') as HTMLElement;
+    let currentTopic = topic || '';
+    
+    if (editor) {
+      const div = document.createElement('div');
+      div.innerHTML = editor.innerHTML;
+      const liveText = Array.from(div.childNodes).map(node => {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as HTMLElement;
+          if (el.classList.contains('inline-chip')) return `{{${el.dataset.name}}}`;
+          return el.textContent || '';
         }
+        return '';
+      }).join('');
+      if (liveText !== undefined && liveText !== '') {
+        currentTopic = liveText;
       }
     }
 
-    const needsSpaceBefore = insertPos > 0 && currentTopic[insertPos - 1] !== ' ';
-    const needsSpaceAfter = insertPos < currentTopic.length && currentTopic[insertPos] !== ' ';
-    const prefix = needsSpaceBefore ? ' ' : '';
-    const suffix = needsSpaceAfter ? ' ' : '';
-    const inserted = `${prefix}${placeholder}${suffix}`;
-    const newText = currentTopic.substring(0, insertPos) + inserted + currentTopic.substring(insertPos);
+    const trimmed = currentTopic.trim();
+    const newText = trimmed ? `${trimmed} ${placeholder}` : placeholder;
     setTopic(newText);
   };
 
@@ -505,6 +504,29 @@ export default function ComposerPage() {
   };
 
   const [isEnhancing, setIsEnhancing] = useState(false);
+
+  const [diagnosingVirality, setDiagnosingVirality] = useState(false);
+  const [viralityResult, setViralityResult] = useState<any>(null);
+
+  const handleDiagnoseVirality = async (platform: PlatformKey) => {
+    const draft = generatedDrafts[platform] || topic;
+    if (!draft || !draft.trim()) {
+      toast.error('Please generate or write content first to diagnose virality.');
+      return;
+    }
+    setDiagnosingVirality(true);
+    try {
+      const res = await ApiService.diagnosePost({ content: draft, platform });
+      if (res && res.success) {
+        setViralityResult(res);
+        toast.success(`Virality Score: ${res.viralityScore}/100!`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to diagnose virality.');
+    } finally {
+      setDiagnosingVirality(false);
+    }
+  };
 
   const handleEnhancePrompt = async () => {
     if (!topic || !topic.trim()) {
@@ -736,52 +758,134 @@ export default function ComposerPage() {
                   </h2>
                 </div>
 
+                {/* Input Mode Switcher (Custom Prompt vs Summarize Article URL) */}
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--border-color)]/70 flex-wrap gap-2">
+                  <div className="inline-flex p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setInputSource('PROMPT')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                        inputSource === 'PROMPT'
+                          ? 'bg-[#2563EB] text-white shadow-xs'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      ✍️ Custom Prompt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInputSource('URL')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                        inputSource === 'URL'
+                          ? 'bg-[#2563EB] text-white shadow-xs'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      🔗 Summarize Article URL
+                    </button>
+                  </div>
+
+                  {/* Starter Presets */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto">
+                    <span className="text-[11px] font-bold text-[var(--text-secondary)]">Presets:</span>
+                    {[
+                      { label: '🚀 Product Launch', text: 'Excited to announce the launch of our new product feature! Here is why we built it and what it unlocks for users:' },
+                      { label: '💡 Tech Insight', text: '3 critical lessons we learned while scaling our background processing architecture:' },
+                      { label: '📈 Growth Story', text: 'How we increased user engagement by 400% in 30 days without spending a dollar on ads:' },
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setTopic(p.text)}
+                        className="text-[11px] font-bold px-2.5 py-1 bg-[var(--bg-input)] hover:bg-[#2563EB] hover:text-white text-[var(--text-secondary)] border border-[var(--border-color)] rounded-lg transition-all cursor-pointer whitespace-nowrap"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* If URL Mode Active, show Article URL input */}
+                {inputSource === 'URL' && (
+                  <div className="p-3.5 bg-[var(--bg-input)]/70 border border-[#2563EB]/40 rounded-xl space-y-1.5 animate-fadeIn">
+                    <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                      Article / Blog Post URL to Summarize
+                    </label>
+                    <input
+                      type="url"
+                      value={articleUrl}
+                      onChange={(e) => setArticleUrl(e.target.value)}
+                      placeholder="https://techcrunch.com/2026/08/new-ai-architecture-launch..."
+                      className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3.5 py-2.5 outline-none focus:border-[#2563EB] font-medium"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap relative">
-                    <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
-                      <PenTool className="w-3.5 h-3.5 text-[#2563EB]" /> Prompt Text
+                    <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                      <PenTool className="w-3.5 h-3.5 text-[#2563EB]" /> Prompt Text & Directives
                     </label>
 
-                    {/* Beautiful Smart Tags Dropdown */}
-                    <div className="relative">
+                    <div className="flex items-center gap-2.5">
+                      {/* 1. ✨ Enhance Prompt Button with AI */}
                       <button
                         type="button"
-                        onClick={() => setShowDropdownPopover(!showDropdownPopover)}
-                        className="bg-blue-50/50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[11px] font-extrabold rounded-lg px-3 py-1.5 transition-all shadow-sm flex items-center gap-1.5"
+                        onClick={handleEnhancePrompt}
+                        disabled={isEnhancing || !topic || !topic.trim()}
+                        className="bg-[#2563EB] hover:bg-blue-700 text-white border border-[#2563EB] text-xs font-extrabold rounded-xl px-3.5 py-2 transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-40"
+                        title="AI will optimize and format your prompt for viral social performance"
                       >
-                        <Sparkles className="w-3 h-3" />
-                        Smart Tags {savedPlaceholders.length > 0 && <span className="bg-blue-600 text-white text-[9px] px-1.5 rounded-full ml-1">{savedPlaceholders.length}</span>}
+                        <Wand2 className={`w-4 h-4 ${isEnhancing ? 'animate-spin' : ''}`} />
+                        <span>{isEnhancing ? 'Enhancing...' : '✨ Enhance Prompt'}</span>
                       </button>
 
-                      {showDropdownPopover && (
-                        <div className="absolute right-0 top-full mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 p-2 animate-fadeIn overflow-hidden">
-                          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)] mb-2">
-                            <span className="text-xs font-extrabold text-[var(--text-primary)]">Your Variables</span>
-                            <button onClick={() => { setShowDropdownPopover(false); setShowAddModal(true); }} className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold">
-                              + Add New
-                            </button>
-                          </div>
-                          <div className="max-h-60 overflow-y-auto space-y-1 px-1 custom-scrollbar">
-                            {savedPlaceholders.map((item) => (
-                              <div key={item.id} className="flex items-center justify-between p-2 hover:bg-[var(--bg-input)] rounded-xl group transition-all cursor-pointer" onClick={() => { insertPlaceholderAtCursor(`{{${item.name}}}`); setShowDropdownPopover(false); }}>
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                  <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                                    {getPlaceholderIcon(item.name)}
+                      {/* 2. 🏷️ Smart Tags Dropdown */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowDropdownPopover(!showDropdownPopover)}
+                          className="bg-[#2563EB] hover:bg-blue-700 text-white border border-[#2563EB] text-xs font-extrabold rounded-xl px-3.5 py-2 transition-all shadow-xs flex items-center gap-2 cursor-pointer group"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Smart Tags</span>
+                          {savedPlaceholders.length > 0 && (
+                            <span className="bg-white text-[#2563EB] text-[10px] font-extrabold px-2 py-0.5 rounded-full ml-0.5 transition-colors">
+                              {savedPlaceholders.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {showDropdownPopover && (
+                          <div className="absolute right-0 top-full mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-2xl z-50 p-2.5 animate-fadeIn overflow-hidden backdrop-blur-xl">
+                            <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)] mb-2">
+                              <span className="text-xs font-extrabold text-[var(--text-primary)]">Your Smart Variables</span>
+                              <button onClick={() => { setShowDropdownPopover(false); setShowAddModal(true); }} className="text-xs text-[#2563EB] hover:underline font-bold">
+                                + Add New
+                              </button>
+                            </div>
+                            <div className="max-h-60 overflow-y-auto space-y-1 px-1 custom-scrollbar">
+                              {savedPlaceholders.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between p-2 hover:bg-[var(--bg-input)] rounded-xl group transition-all cursor-pointer" onClick={() => { insertPlaceholderAtCursor(`{{${item.name}}}`); setShowDropdownPopover(false); }}>
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-8 h-8 rounded-xl bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+                                      {getPlaceholderIcon(item.name)}
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB] transition-colors">{`{{${item.name.toUpperCase()}}}`}</span>
+                                      <span className="text-[10px] text-[var(--text-secondary)] truncate w-36 font-medium">{item.value || 'Click to insert in prompt...'}</span>
+                                    </div>
                                   </div>
-                                  <div className="flex flex-col">
-                                    <span className="text-[11px] font-extrabold text-[var(--text-primary)] group-hover:text-blue-500 transition-colors">{`{{${item.name}}}`}</span>
-                                    <span className="text-[9px] text-[var(--text-secondary)] truncate w-32 font-medium">{item.value || 'No value set...'}</span>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => { setEditingId(item.id); setTagNameInput(item.name); setTagValueInput(item.value); setShowDropdownPopover(false); setShowAddModal(true); }} className="p-1.5 text-slate-400 hover:text-[#2563EB] hover:bg-[#2563EB]/10 rounded-lg transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => handleDeletePlaceholder(item)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                  <button onClick={() => { setEditingId(item.id); setTagNameInput(item.name); setTagValueInput(item.value); setShowDropdownPopover(false); setShowAddModal(true); }} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-all"><Edit2 className="w-3 h-3" /></button>
-                                  <button onClick={() => handleDeletePlaceholder(item)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-all"><Trash2 className="w-3 h-3" /></button>
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -799,79 +903,269 @@ export default function ComposerPage() {
                     getPlaceholderIcon={getPlaceholderIcon}
                   />
 
-                  {/* 1-Click Trending Hashtags Strip */}
+                  {/* 1-Click Trending Hashtags Strip (Solid Primary Royal Blue Button Color) */}
                   {trendingHashtags.length > 0 && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-1 custom-scrollbar">
-                      <span className="text-[10px] font-extrabold text-[var(--text-secondary)] uppercase shrink-0">🔥 Trending:</span>
-                      {trendingHashtags.map((t, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            const newTopic = topic ? `${topic} ${t.tag}` : t.tag;
-                            setTopic(newTopic);
-                            dispatch(setTopicAction(newTopic));
-                          }}
-                          className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 shrink-0 cursor-pointer transition-all shadow-xs"
-                          title={`Reach multiplier: ${t.reachMultiplier}`}
-                        >
-                          + {t.tag}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1.5 custom-scrollbar">
+                      <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider shrink-0 flex items-center gap-1.5">
+                        <span className="text-amber-500">🔥</span>
+                        <span>Trending:</span>
+                      </span>
+                      {trendingHashtags.map((t, idx) => {
+                        const isAlreadyAdded = topic.includes(t.tag);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              if (isAlreadyAdded) {
+                                toast.info(`${t.tag} is already in your prompt!`);
+                                return;
+                              }
+                              const newTopic = topic ? `${topic} ${t.tag}` : t.tag;
+                              setTopic(newTopic);
+                              dispatch(setTopicAction(newTopic));
+                              toast.success(`Added ${t.tag}`);
+                            }}
+                            className={`text-xs font-bold px-3.5 py-1.5 rounded-xl border shrink-0 cursor-pointer transition-all shadow-xs flex items-center gap-1.5 ${
+                              isAlreadyAdded
+                                ? 'bg-emerald-600 text-white border-emerald-600 font-extrabold shadow-sm'
+                                : 'bg-[#2563EB] text-white hover:bg-blue-700 border-[#2563EB] shadow-xs'
+                            }`}
+                            title={`Reach multiplier: ${t.reachMultiplier}`}
+                          >
+                            <span className="font-extrabold">{isAlreadyAdded ? '✓' : '+'}</span>
+                            <span>{t.tag}</span>
+                            <span className={`text-[11px] font-bold ${isAlreadyAdded ? 'text-white/80' : 'text-blue-100'}`}>({t.reachMultiplier})</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
-                  <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
-                    <div className="space-y-3">
-                      <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">
-                        Target Channels & Status
-                      </label>
-                      <div className="flex flex-wrap gap-2.5">
-                        {selectablePlatforms.map((platform) => {
-                          const isConnected = connectedPlatforms.includes(platform.id);
-                          const active = platforms.includes(platform.id as PlatformKey) && isConnected;
-                          return (
-                            <button
-                              key={platform.id}
-                              onClick={() => togglePlatform(platform.id)}
-                              className={`relative flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${active
-                                  ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md'
-                                  : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-[#2563EB]/50 hover:bg-[var(--bg-card)]'
-                                }`}
-                              title={isConnected ? `${platform.label} is Connected` : `${platform.label} is Offline. Click to connect.`}
-                            >
-                              {/* Glowing Status Dot */}
-                              <span
-                                className={`w-2 h-2 rounded-full shrink-0 ${isConnected
-                                    ? (active ? 'bg-emerald-300 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]')
-                                    : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
-                                  }`}
-                              />
-
-                              {/* Platform Icon & Name */}
-                              <div className="flex items-center gap-1.5 border-r border-current pr-2 pb-0.5 pt-0.5 border-opacity-20">
-                                <PlatformIcon platform={platform.id} className="w-3.5 h-3.5" />
-                                <span>{platform.label}</span>
+                  {/* Active Variable Values Quick-Fill Bar (Only visible when user HAS {{variables}} in prompt) */}
+                  {(() => {
+                    const matchedVars = Array.from(new Set((topic.match(/\{\{([a-zA-Z0-9_]+)\}\}/g) || []).map(m => m.replace(/[{}]/g, '').toUpperCase())));
+                    if (matchedVars.length === 0) return null;
+                    return (
+                      <div className="p-3.5 bg-[var(--bg-input)]/70 border border-[#2563EB]/25 rounded-2xl space-y-2.5 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-extrabold text-[#2563EB] uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+                            Selected Variables in Prompt ({matchedVars.length})
+                          </span>
+                          <span className="text-[10px] text-[var(--text-secondary)] font-medium">Values auto-replace on publish</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {matchedVars.map((vName) => {
+                            const val = variableValues[vName] ?? '';
+                            return (
+                              <div key={vName} className="flex items-center bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3 py-1.5 gap-2 focus-within:border-[#2563EB]">
+                                <span className="text-[11px] font-extrabold text-[#2563EB] shrink-0">{`{{${vName}}}`}:</span>
+                                <input
+                                  type="text"
+                                  value={val}
+                                  onChange={(e) => {
+                                    const nextMap = { ...variableValues, [vName]: e.target.value };
+                                    setVariableValues(nextMap);
+                                  }}
+                                  placeholder={`Enter ${vName.toLowerCase()} value...`}
+                                  className="w-full bg-transparent text-xs text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-secondary)]/50 font-medium"
+                                />
                               </div>
-
-                              {/* Text Status Badge */}
-                              <span className={`text-[9px] px-1 rounded font-extrabold uppercase tracking-widest ${active
-                                  ? 'text-blue-100'
-                                  : isConnected
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : 'text-rose-600 dark:text-rose-400'
-                                }`}>
-                                {isConnected ? 'Active' : 'Offline'}
-                              </span>
-                            </button>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
+                    );
+                  })()}
+
+                  {/* Target Channels & Status (Directly Visible) */}
+                  <div className="pt-4 border-t border-[var(--border-color)] space-y-2.5">
+                    <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                      Target Channels & Status
+                    </label>
+                    <div className="flex flex-wrap gap-2.5">
+                      {selectablePlatforms.map((platform) => {
+                        const isConnected = connectedPlatforms.includes(platform.id);
+                        const active = platforms.includes(platform.id as PlatformKey) && isConnected;
+                        return (
+                          <button
+                            key={platform.id}
+                            onClick={() => togglePlatform(platform.id)}
+                            className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                              active
+                                ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md'
+                                : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-[#2563EB]/50 hover:bg-[var(--bg-card)]'
+                            }`}
+                            title={isConnected ? `${platform.label} is Connected` : `${platform.label} is Offline. Click to connect.`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full shrink-0 ${
+                                isConnected
+                                  ? (active ? 'bg-emerald-300 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]')
+                                  : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                              }`}
+                            />
+                            <div className="flex items-center gap-1.5 border-r border-current pr-2 pb-0.5 pt-0.5 border-opacity-20">
+                              <PlatformIcon platform={platform.id} className="w-4 h-4" />
+                              <span>{platform.label}</span>
+                            </div>
+                            <span className={`text-[10px] px-1 rounded font-extrabold uppercase tracking-widest ${
+                              active
+                                ? 'text-blue-100'
+                                : isConnected
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                            }`}>
+                              {isConnected ? 'Active' : 'Offline'}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
+                  </div>
+
+                  {/* Advanced Directives Accordion (Expand / Shrink Toggle) */}
+                  <div className="pt-2 border-t border-[var(--border-color)]">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="w-full flex items-center justify-between py-2 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] transition-colors cursor-pointer group"
+                    >
+                      <span className="flex items-center gap-2">
+                        <SlidersHorizontal className="w-4 h-4 text-[#2563EB]" />
+                        <span>Advanced Directives (Tone, Length, Format, Emojis, Hashtags)</span>
+                      </span>
+                      <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[#2563EB]">
+                        {showAdvanced ? 'Hide Options' : 'Customize'}
+                        {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </span>
+                    </button>
+
+                    {showAdvanced && (
+                      <div className="mt-3 p-4 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-2xl space-y-4 animate-fadeIn">
+                        {/* 1. Tone of Voice Dropdown */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block flex items-center justify-between">
+                            <span>Tone of Voice</span>
+                            <span className="text-[11px] font-medium text-[#2563EB] lowercase">
+                              {TONE_OPTIONS.find((t) => t.value === tone)?.hint || ''}
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <select
+                              value={tone}
+                              onChange={(e) => setTone(e.target.value)}
+                              className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
+                            >
+                              {TONE_OPTIONS.map((t) => (
+                                <option key={t.value} value={t.value} className="bg-[var(--bg-card)] text-[var(--text-primary)] py-1 font-bold">
+                                  {t.label} — {t.hint}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
+                              <ChevronDown className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Post Length & Format Layout Dropdowns */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border-color)]/60">
+                          {/* Post Length Dropdown */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                              Post Length
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={contentLength}
+                                onChange={(e) => setContentLength(e.target.value)}
+                                className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
+                              >
+                                <option value="CONCISE">⚡ Concise (Short & punchy &lt; 280 chars)</option>
+                                <option value="BALANCED">⚖️ Balanced (Standard 1-2 paragraphs)</option>
+                                <option value="LONG_FORM">📚 Deep Dive (Detailed long-form post)</option>
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
+                                <ChevronDown className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Format Layout Dropdown */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                              Format Layout
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={formatStyle || 'PARAGRAPHS'}
+                                onChange={(e) => setFormatStyle(e.target.value)}
+                                className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
+                              >
+                                <option value="PARAGRAPHS">📄 Standard Paragraphs</option>
+                                <option value="BULLETS">📌 Bullet Points List</option>
+                                <option value="ONE_LINERS">💡 Punchy One-Liners</option>
+                                <option value="CAROUSEL">🎠 Carousel Slide Deck (Slide-by-Slide)</option>
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
+                                <ChevronDown className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. Emoji Density & Hashtag Strategy Dropdowns */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border-color)]/60">
+                          {/* Emoji Density Dropdown */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                              Emoji Density
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={emojiDensity || 'BALANCED'}
+                                onChange={(e) => setEmojiDensity(e.target.value)}
+                                className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
+                              >
+                                <option value="MINIMAL">⚪ Minimal (0-1 subtle emojis)</option>
+                                <option value="BALANCED">✨ Standard (2-4 natural emojis)</option>
+                                <option value="EXPRESSIVE">🔥 Expressive (5+ vibrant emojis)</option>
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
+                                <ChevronDown className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Hashtag Strategy Dropdown */}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                              Hashtag Strategy
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={hashtagCount || 'FOCUSED'}
+                                onChange={(e) => setHashtagCount(e.target.value)}
+                                className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
+                              >
+                                <option value="NONE">🚫 None (0 hashtags - clean text)</option>
+                                <option value="FOCUSED">🎯 Focused (2-3 targeted hashtags)</option>
+                                <option value="MAX_REACH">🚀 Max Reach (5-8 trending hashtags)</option>
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
+                                <ChevronDown className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <button onClick={handleAIGenerate} disabled={generating || !topic || platforms.length === 0} className="w-full flex items-center justify-center gap-2 py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-extrabold text-xs transition-all disabled:opacity-50 shadow-md">
+                <button onClick={handleAIGenerate} disabled={generating || !topic || platforms.length === 0} className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-extrabold text-sm transition-all disabled:opacity-50 shadow-md cursor-pointer mt-2">
                   {generating ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   {generating ? 'Drafting Content...' : 'Generate Preview'}
                 </button>
@@ -949,6 +1243,46 @@ export default function ComposerPage() {
                   <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Social Feed Preview</h2>
                 </div>
 
+                {/* Virality Diagnostics Card (When analyzed) */}
+                {viralityResult && (
+                  <div className="mb-4 p-4 bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-purple-500/10 border border-[#2563EB]/30 rounded-2xl space-y-3 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-[#2563EB] uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[#2563EB]" /> Virality & Hook Diagnostics
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-[#2563EB] text-white">
+                        {viralityResult.viralityScore || viralityResult.score || 85}/100
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="p-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl">
+                        <span className="text-[10px] text-[var(--text-secondary)] font-bold block uppercase">Hook Score</span>
+                        <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
+                          {viralityResult.breakdown?.hookScore || viralityResult.hookScore || 88}%
+                        </span>
+                      </div>
+                      <div className="p-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl">
+                        <span className="text-[10px] text-[var(--text-secondary)] font-bold block uppercase">Readability</span>
+                        <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
+                          {viralityResult.breakdown?.readabilityScore || 92}%
+                        </span>
+                      </div>
+                      <div className="p-2 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl">
+                        <span className="text-[10px] text-[var(--text-secondary)] font-bold block uppercase">CTA Power</span>
+                        <span className="text-xs font-extrabold text-purple-600 dark:text-purple-400">
+                          {viralityResult.breakdown?.ctaScore || 80}%
+                        </span>
+                      </div>
+                    </div>
+                    {viralityResult.improvedHook && (
+                      <div className="p-2.5 bg-[var(--bg-card)] border border-blue-500/20 rounded-xl space-y-1">
+                        <span className="text-[10px] text-[#2563EB] font-extrabold uppercase tracking-wider block">Suggested Viral Hook:</span>
+                        <p className="text-xs font-medium text-[var(--text-primary)] italic">"{viralityResult.improvedHook}"</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {platforms.length === 0 ? (
                   <div className="bg-[var(--bg-card)] border border-[var(--border-color)] border-dashed rounded-3xl p-12 text-center space-y-3">
                     <div className="w-12 h-12 bg-[var(--bg-input)] rounded-full flex items-center justify-center mx-auto mb-2"><Info className="h-5 w-5 text-[var(--text-secondary)]" /></div>
@@ -960,65 +1294,149 @@ export default function ComposerPage() {
                     {platforms.map((platform) => (
                       <div key={platform} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm transition-all hover:shadow-md">
 
-                        {/* Mock Header with Full View Button */}
-                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)]/50">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-[2px]">
-                              <img src="https://ui-avatars.com/api/?name=Brand&background=1e1e1e&color=fff" alt="Avatar" className="w-full h-full rounded-full border-2 border-[var(--bg-card)] object-cover" />
+                        {/* Mock Header with Full View Button & Carousel View Switcher */}
+                        {(() => {
+                          const isCarouselFormat = formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform]));
+                          const currentMode = previewDisplayMode[platform] || (isCarouselFormat ? 'CAROUSEL' : 'TEXT');
+
+                          return (
+                            <>
+                              <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)]/50">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-[2px]">
+                                    <img src="https://ui-avatars.com/api/?name=Brand&background=1e1e1e&color=fff" alt="Avatar" className="w-full h-full rounded-full border-2 border-[var(--bg-card)] object-cover" />
+                                  </div>
+                                  <div className="leading-tight">
+                                    <p className="text-[13px] font-extrabold text-[var(--text-primary)] flex items-center gap-1">Avenar Engineering <CheckCircle2 className="w-3 h-3 text-blue-500" /></p>
+                                    <p className="text-[11px] text-[var(--text-secondary)] font-medium">@avenar_dev • Just now</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {/* Carousel View Mode Toggle */}
+                                  {isCarouselFormat && (
+                                    <div className="flex items-center bg-[var(--bg-input)] p-0.5 rounded-lg border border-[var(--border-color)] text-[10px] font-extrabold mr-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [platform]: 'CAROUSEL' }))}
+                                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                          currentMode === 'CAROUSEL'
+                                            ? 'bg-[#2563EB] text-white shadow-xs'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                      >
+                                        🎠 Slides
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [platform]: 'TEXT' }))}
+                                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                          currentMode === 'TEXT'
+                                            ? 'bg-[#2563EB] text-white shadow-xs'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                        }`}
+                                      >
+                                        📝 Text
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Full View Button */}
+                                  <button
+                                    onClick={() => setIsFullscreenPreview(true)}
+                                    className="p-1.5 bg-[var(--bg-input)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-lg transition-all text-slate-500 hover:text-blue-500 cursor-pointer"
+                                    title="Open Full Screen Editor"
+                                  >
+                                    <Maximize2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <PlatformIcon platform={platform} className={`w-5 h-5 opacity-50 ${getPlatformDefinition(platform).accentClass}`} />
+                                  <MoreHorizontal className="w-4 h-4 text-[var(--text-secondary)] cursor-pointer" />
+                                </div>
+                              </div>
+
+                              {/* Post Body: Platform-tailored layout */}
+                              {currentMode === 'CAROUSEL' ? (
+                                /* Dedicated Carousel Mode (Pure Slide Deck Display) */
+                                <div className="p-3 bg-[var(--bg-card)]">
+                                  <CarouselSlideDeck
+                                    text={generatedDrafts[platform] || ''}
+                                    onTextChange={(newText) => handleTextChange(platform, newText)}
+                                    platformLabel={getPlatformDefinition(platform).label}
+                                  />
+                                </div>
+                              ) : (
+                                /* Standard Raw Text / Caption Mode */
+                                <>
+                                  <div className="px-4 py-3 bg-[var(--bg-card)]">
+                                    <textarea
+                                      value={generatedDrafts[platform] || ''}
+                                      onChange={(e) => handleTextChange(platform, e.target.value)}
+                                      placeholder={`Write your ${getPlatformDefinition(platform).label} post content...`}
+                                      className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-slate-500 border-none outline-none resize-none leading-relaxed min-h-[90px]"
+                                      rows={generatedDrafts[platform] ? Math.min(10, generatedDrafts[platform].split('\n').length + 1) : 4}
+                                    />
+                                  </div>
+
+                                  {mediaFileUrl && (
+                                    <div className="w-full bg-[var(--bg-input)] border-t border-[var(--border-color)]/50 flex items-center justify-center p-2 min-h-[240px] max-h-[420px]">
+                                      {mediaType === 'VIDEO' ? (
+                                        <video src={mediaFileUrl} controls className="w-full max-h-[400px] object-contain rounded-xl" />
+                                      ) : (
+                                        <img src={mediaFileUrl} alt="Attached Media" className="w-full max-h-[400px] object-contain rounded-xl" />
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Social Action Bar */}
+                              <div className="flex items-center justify-between px-5 py-2.5 text-[var(--text-secondary)] border-t border-[var(--border-color)]/30">
+                                <div className="flex items-center gap-6">
+                                  <Heart className="w-[18px] h-[18px] cursor-pointer hover:text-rose-500 transition-colors" />
+                                  <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-blue-500 transition-colors" />
+                                  <Repeat className="w-[18px] h-[18px] cursor-pointer hover:text-green-500 transition-colors" />
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <Bookmark className="w-[18px] h-[18px] cursor-pointer hover:text-amber-500 transition-colors" />
+                                  <Share2 className="w-[18px] h-[18px] cursor-pointer hover:text-indigo-500 transition-colors" />
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+
+                        {/* Character Limit & Virality Diagnostics Action Bar */}
+                        {(() => {
+                          const charLimit = platform === 'TWITTER' ? 280 : platform === 'LINKEDIN' ? 3000 : platform === 'INSTAGRAM' ? 2200 : 5000;
+                          const charCount = (generatedDrafts[platform] || '').length;
+                          const isOverLimit = charCount > charLimit;
+                          return (
+                            <div className="px-4 py-2 bg-[var(--bg-input)]/50 border-t border-[var(--border-color)]/30 flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDiagnoseVirality(platform)}
+                                  disabled={diagnosingVirality}
+                                  className="text-[11px] font-bold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Sparkles className="w-3 h-3 text-[#2563EB]" />
+                                  {diagnosingVirality ? 'Analyzing...' : '⚡ Diagnose Virality'}
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[11px] font-bold ${isOverLimit ? 'text-rose-500' : 'text-[var(--text-secondary)]'}`}>
+                                  {charCount} / {charLimit}
+                                </span>
+                                <div className="w-16 h-1.5 bg-[var(--border-color)] rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all ${isOverLimit ? 'bg-rose-500' : charCount > charLimit * 0.9 ? 'bg-amber-500' : 'bg-[#2563EB]'}`}
+                                    style={{ width: `${Math.min(100, (charCount / charLimit) * 100)}%` }}
+                                  />
+                                </div>
+                              </div>
                             </div>
-                            <div className="leading-tight">
-                              <p className="text-[13px] font-extrabold text-[var(--text-primary)] flex items-center gap-1">Avenar Engineering <CheckCircle2 className="w-3 h-3 text-blue-500" /></p>
-                              <p className="text-[11px] text-[var(--text-secondary)] font-medium">@avenar_dev • Just now</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {/* Full View Button Restored Here */}
-                            <button
-                              onClick={() => setIsFullscreenPreview(true)}
-                              className="p-1.5 bg-[var(--bg-input)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-lg transition-all text-slate-500 hover:text-blue-500 cursor-pointer"
-                              title="Open Full Screen Editor"
-                            >
-                              <Maximize2 className="w-3.5 h-3.5" />
-                            </button>
-                            <PlatformIcon platform={platform} className={`w-5 h-5 opacity-50 ${getPlatformDefinition(platform).accentClass}`} />
-                            <MoreHorizontal className="w-4 h-4 text-[var(--text-secondary)] cursor-pointer" />
-                          </div>
-                        </div>
-
-                        {/* Editable Content Body */}
-                        <div className="px-4 py-3 bg-[var(--bg-card)]">
-                          <textarea
-                            value={generatedDrafts[platform] || ''}
-                            onChange={(e) => handleTextChange(platform, e.target.value)}
-                            placeholder={`Write your ${getPlatformDefinition(platform).label} caption...`}
-                            className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-slate-500 border-none outline-none resize-none leading-relaxed min-h-[80px]"
-                            rows={generatedDrafts[platform] ? Math.min(10, generatedDrafts[platform].split('\n').length + 1) : 3}
-                          />
-                        </div>
-
-                        {/* Attached Media Mockup */}
-                        {mediaFileUrl && (
-                          <div className="w-full bg-slate-100 dark:bg-slate-900 border-y border-[var(--border-color)]/50 flex items-center justify-center max-h-[350px] overflow-hidden">
-                            {mediaType === 'VIDEO' ? (
-                              <video src={mediaFileUrl} controls className="w-full object-contain" />
-                            ) : (
-                              <img src={mediaFileUrl} alt="Preview" className="w-full object-cover" />
-                            )}
-                          </div>
-                        )}
-
-                        {/* Social Action Bar */}
-                        <div className="flex items-center justify-between px-5 py-3 text-[var(--text-secondary)] border-t border-[var(--border-color)]/30">
-                          <div className="flex items-center gap-6">
-                            <Heart className="w-[18px] h-[18px] cursor-pointer hover:text-rose-500 transition-colors" />
-                            <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-blue-500 transition-colors" />
-                            <Repeat className="w-[18px] h-[18px] cursor-pointer hover:text-green-500 transition-colors" />
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <Bookmark className="w-[18px] h-[18px] cursor-pointer hover:text-amber-500 transition-colors" />
-                            <Share2 className="w-[18px] h-[18px] cursor-pointer hover:text-indigo-500 transition-colors" />
-                          </div>
-                        </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -1088,18 +1506,27 @@ export default function ComposerPage() {
                           )}
                         </div>
 
-                        {/* Editor Body */}
+                        {/* Editor Body or Carousel Slide Deck */}
                         <div className="space-y-6 flex-1 flex flex-col w-full">
                           <div className="space-y-2.5 flex-1 flex flex-col">
-                            <label className="text-xs text-[#2563EB] font-extrabold uppercase tracking-wider block shrink-0">Caption Editor</label>
+                            <label className="text-xs text-[#2563EB] font-extrabold uppercase tracking-wider block shrink-0">Caption & Slide Editor</label>
 
-                            {/* FIX 2: Added 'flex-1 h-full', changed resize-y to resize-none, removed max-h limit */}
-                            <textarea
-                              value={generatedDrafts[platform] || ''}
-                              onChange={(e) => handleTextChange(platform, e.target.value)}
-                              placeholder={`Type or edit complete content for ${platform} here...`}
-                              className="w-full flex-1 h-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-6 text-base md:text-lg text-[var(--text-primary)] focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans min-h-[300px] overflow-y-auto resize-none shadow-inner placeholder:opacity-50 transition-all font-normal custom-scrollbar"
-                            />
+                            {formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform])) ? (
+                              <div className="flex-1">
+                                <CarouselSlideDeck
+                                  text={generatedDrafts[platform] || ''}
+                                  onTextChange={(newText) => handleTextChange(platform, newText)}
+                                  platformLabel={platformDefinition.label}
+                                />
+                              </div>
+                            ) : (
+                              <textarea
+                                value={generatedDrafts[platform] || ''}
+                                onChange={(e) => handleTextChange(platform, e.target.value)}
+                                placeholder={`Type or edit complete content for ${platform} here...`}
+                                className="w-full flex-1 h-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-6 text-base md:text-lg text-[var(--text-primary)] focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans min-h-[300px] overflow-y-auto resize-none shadow-inner placeholder:opacity-50 transition-all font-normal custom-scrollbar"
+                              />
+                            )}
                           </div>
 
                           {/* Attached Media */}
