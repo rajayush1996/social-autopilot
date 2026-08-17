@@ -24,12 +24,15 @@ import {
   RefreshCw,
   ChevronRight,
   ChevronLeft,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Moon,
+  Sun
 } from 'lucide-react';
 import ApiService, { AutomationSchedule } from '@/services/apiService';
 import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import PlatformIcon from '@/components/PlatformIcon';
+import { getReviewPipelineNarrative, formatTimeDisplay } from '@/utils/date';
 
 export interface MediaAssetItem {
   id: string;
@@ -276,6 +279,7 @@ export function SchedulingDispatcher() {
   useEffect(() => { setPortalMounted(true); }, []);
 
   const [formName, setFormName] = useState<string>('Daily Growth Engine');
+  const [formDraftTime, setFormDraftTime] = useState<string>('09:00');
   const [formTime, setFormTime] = useState<string>('20:00');
   const [formTimezone, setFormTimezone] = useState<string>('Asia/Kolkata');
   const [formDays, setFormDays] = useState<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
@@ -377,7 +381,9 @@ export function SchedulingDispatcher() {
   const handleOpenAddModal = () => {
     setEditingSchedule(null);
     setFormName('Daily Growth Engine');
+    setFormDraftTime('09:00');
     setFormTime('20:00');
+    setFormTimezone('Asia/Kolkata');
     setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat('WEEKLY');
     setFormPlatforms(['LINKEDIN']);
@@ -395,7 +401,9 @@ export function SchedulingDispatcher() {
   const handleOpenEditModal = (sched: AutomationSchedule) => {
     setEditingSchedule(sched);
     setFormName(sched.name);
+    setFormDraftTime(sched.draftTimeOfDay || '09:00');
     setFormTime(sched.timeOfDay || '20:00');
+    setFormTimezone(sched.timezone || 'Asia/Kolkata');
     setFormDays(sched.daysOfWeek || ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat(sched.repeatType || 'WEEKLY');
     setFormPlatforms((sched.targetPlatforms as any) || ['LINKEDIN']);
@@ -415,6 +423,7 @@ export function SchedulingDispatcher() {
     try {
       const payload = {
         name: formName.trim() || 'Daily Auto-Post',
+        draftTimeOfDay: formDraftTime,
         timeOfDay: formTime,
         timezone: formTimezone,
         daysOfWeek: formDays,
@@ -567,10 +576,15 @@ export function SchedulingDispatcher() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-[var(--bg-input)] border border-[var(--border-color)] px-3.5 py-2 rounded-xl shrink-0">
-                  <div className="flex items-center gap-1.5 border-r border-[var(--border-color)] pr-3">
-                    <Clock className="h-3.5 w-3.5 text-[#2563EB]" />
-                    <span className="font-mono text-xs font-black text-[var(--text-primary)]">{formatTimeDisplay(sched.timeOfDay)}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-[var(--bg-input)] border border-[var(--border-color)] px-3.5 py-2 rounded-xl shrink-0">
+                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+                    <span>🌅 Draft:</span>
+                    <span className="font-mono text-xs font-bold text-[var(--text-primary)]">{formatTimeDisplay(sched.draftTimeOfDay || '09:00')}</span>
+                  </div>
+                  <span className="hidden sm:inline text-slate-400">➔</span>
+                  <div className="flex items-center gap-1.5 sm:border-r border-[var(--border-color)] sm:pr-3">
+                    <span className="text-[11px] text-[#2563EB] font-bold">🚀 Live:</span>
+                    <span className="font-mono text-xs font-black text-[var(--text-primary)]">{formatTimeDisplay(sched.timeOfDay || '20:00')}</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-[var(--text-secondary)]">{formatDaysSummary(sched.daysOfWeek)}</span>
                 </div>
@@ -692,41 +706,112 @@ export function SchedulingDispatcher() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Release Time</label>
-                    <input
-                      type="time"
-                      required
-                      value={formTime}
-                      onChange={(e) => setFormTime(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] font-mono font-bold"
-                    />
+                <div className="bg-[var(--bg-input)]/50 border border-[var(--border-color)] p-4 rounded-2xl space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold text-[#2563EB] uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" /> 2-Stage Review & Publishing Pipeline
+                    </span>
+                    <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] font-bold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                      Approval Safe
+                    </span>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Timezone</label>
-                    <select
-                      value={formTimezone}
-                      onChange={(e) => setFormTimezone(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] font-mono"
-                    >
-                      <option value="Asia/Kolkata">IST (UTC+5:30)</option>
-                      <option value="UTC">UTC</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Stage 1: AI Draft & Review Email Time */}
+                    <div className="space-y-1 bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl">
+                      <label className="text-[11px] font-bold text-[var(--text-primary)] block">
+                        🌅 1. AI Draft & Review Email
+                      </label>
+                      <p className="text-[10px] text-[var(--text-secondary)]">Time when AI generates content & sends approval link</p>
+                      <input
+                        type="time"
+                        required
+                        value={formDraftTime}
+                        onChange={(e) => setFormDraftTime(e.target.value)}
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] font-mono font-bold mt-1"
+                      />
+                    </div>
+
+                    {/* Stage 2: Live Publishing Dispatch Time */}
+                    <div className="space-y-1 bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl">
+                      <label className="text-[11px] font-bold text-[var(--text-primary)] block">
+                        🚀 2. Live Social Dispatch
+                      </label>
+                      <p className="text-[10px] text-[var(--text-secondary)]">Time when approved post goes live to channels</p>
+                      <input
+                        type="time"
+                        required
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] font-mono font-bold mt-1"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Frequency</label>
-                    <select
-                      value={formRepeat}
-                      onChange={(e) => setFormRepeat(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] font-bold"
-                    >
-                      <option value="DAILY">Daily</option>
-                      <option value="WEEKLY">Weekly</option>
-                    </select>
+                  {/* Timezone & Frequency Bar */}
+                  <div className="grid grid-cols-2 gap-3 pt-1 border-t border-[var(--border-color)]/60">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Timezone</label>
+                      <select
+                        value={formTimezone}
+                        onChange={(e) => setFormTimezone(e.target.value)}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] font-mono"
+                      >
+                        <option value="Asia/Kolkata">IST (UTC+5:30) - India</option>
+                        <option value="UTC">UTC (Universal)</option>
+                        <option value="America/New_York">EST (UTC-5:00) - New York</option>
+                        <option value="America/Los_Angeles">PST (UTC-8:00) - Los Angeles</option>
+                        <option value="Europe/London">GMT (UTC+0:00) - London</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Frequency</label>
+                      <select
+                        value={formRepeat}
+                        onChange={(e) => setFormRepeat(e.target.value)}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] font-bold"
+                      >
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY">Weekly</option>
+                      </select>
+                    </div>
                   </div>
+
+                  {/* Dynamic Review Window Banner */}
+                  {(() => {
+                    const pipeline = getReviewPipelineNarrative(formDraftTime, formTime);
+                    return (
+                      <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+                        pipeline.isOvernight 
+                          ? 'bg-indigo-50/90 dark:bg-indigo-950/70 border-indigo-200 dark:border-indigo-700/60 text-indigo-950 dark:text-indigo-100'
+                          : 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-200 dark:border-blue-700/60 text-blue-950 dark:text-blue-100'
+                      }`}>
+                        <div className="flex items-start gap-2.5">
+                          {pipeline.isOvernight ? (
+                            <Moon className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <Sun className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="space-y-0.5">
+                            <span className="text-xs leading-relaxed font-medium block">
+                              {pipeline.isOvernight ? (
+                                <>
+                                  Draft created the evening before at <strong className="text-indigo-900 dark:text-white font-extrabold">{pipeline.draftTimeDisplay}</strong> ➔ Review & approve via email or web before auto-dispatch next morning at <strong className="text-indigo-900 dark:text-white font-extrabold">{pipeline.publishTimeDisplay} (Next Day)</strong>.
+                                </>
+                              ) : (
+                                <>
+                                  Draft created daily at <strong className="text-blue-900 dark:text-white font-extrabold">{pipeline.draftTimeDisplay}</strong> ➔ Review & approve via email or web before auto-dispatch at <strong className="text-blue-900 dark:text-white font-extrabold">{pipeline.publishTimeDisplay}</strong>.
+                                </>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border shrink-0 ${pipeline.badgeColorClass}`}>
+                          {pipeline.reviewWindowText} Window
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="space-y-2">

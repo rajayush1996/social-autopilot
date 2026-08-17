@@ -73,8 +73,26 @@ export class LinkedinAdapter extends SocialAdapter {
           strategyUsed: this.name,
         };
       } catch (error) {
-        logger.error(`[LinkedinAdapter] API Error: ${error.response?.data?.message || error.message}`);
-        throw new Error(`LinkedIn Publish Failed: ${error.response?.data?.message || error.message}`);
+        const errorMsg = error.response?.data?.message || error.message || '';
+        logger.error(`[LinkedinAdapter] API Error: ${errorMsg}`);
+
+        // Gracefully resolve LinkedIn Duplicate Post: If content was already published, link to the existing live post
+        const duplicateMatch = errorMsg.match(/urn:li:(?:share|ugcPost):\d+/i);
+        if (duplicateMatch) {
+          const existingUrn = duplicateMatch[0];
+          logger.info(`[LinkedinAdapter] Post is already live on LinkedIn as duplicate URN: ${existingUrn}`);
+          return {
+            success: true,
+            platform: 'LINKEDIN',
+            externalPostId: existingUrn,
+            externalPostUrl: `https://www.linkedin.com/feed/update/${existingUrn}/`,
+            rawResponse: { message: errorMsg, isDuplicateOfExisting: true, existingUrn },
+            isMock: false,
+            strategyUsed: this.name,
+          };
+        }
+
+        throw new Error(`LinkedIn Publish Failed: ${errorMsg}`);
       }
     }
 

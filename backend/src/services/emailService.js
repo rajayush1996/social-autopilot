@@ -27,10 +27,41 @@ class EmailService {
           user: smtpUser,
           pass: smtpPass,
         },
+        tls: {
+          rejectUnauthorized: false,
+        },
       });
       logger.info(`[EmailService] 📧 SMTP Transporter initialized (${smtpHost}:${smtpPort})`);
     } else {
       logger.warn('[EmailService] ⚠️ SMTP credentials missing. Email service running in Console Log fallback mode.');
+    }
+  }
+
+  /**
+   * Send Generic Transactional Email
+   */
+  async sendEmail({ to, subject, html, text, from }) {
+    const fromAddress = from || process.env.SMTP_FROM || process.env.FROM_EMAIL || 'info@omnisyncapp.com';
+    const mailOptions = {
+      from: `"OmniSync" <${fromAddress}>`,
+      to,
+      subject,
+      html,
+      text,
+    };
+
+    if (this.transporter) {
+      try {
+        const info = await this.transporter.sendMail(mailOptions);
+        logger.info(`[EmailService] ✉️ Email delivered to ${to} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId };
+      } catch (err) {
+        logger.error(`[EmailService] ❌ Failed to deliver email to ${to}: ${err.message}`);
+        return { success: false, error: err.message };
+      }
+    } else {
+      logger.info(`[EmailService Console Fallback] ✉️ To: ${to} | Subject: ${subject}\n${text || html}`);
+      return { success: true, isConsoleFallback: true };
     }
   }
 
@@ -106,8 +137,10 @@ class EmailService {
     </html>
     `;
 
+    const fromAddress = process.env.SMTP_FROM || process.env.FROM_EMAIL || 'info@omnisyncapp.com';
+
     const mailOptions = {
-      from: `"OmniSync Autopilot" <${process.env.FROM_EMAIL || 'notifications@omnisync.io'}>`,
+      from: `"OmniSync Autopilot" <${fromAddress}>`,
       to: userEmail,
       subject: `[Action Required] Approve your new post for ${targetPlatforms.join(', ') || 'Social Media'}`,
       html: htmlContent,

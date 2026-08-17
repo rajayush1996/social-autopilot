@@ -107,7 +107,7 @@ function getTimeAndDayInTimezone(date, timezone = 'UTC') {
 }
 
 /**
- * Checks active Auto-Pilot Schedules and triggers dispatches if timeOfDay & day matches.
+ * Checks active Auto-Pilot Schedules and triggers AI Draft Generation & Approval Dispatch at draftTimeOfDay.
  */
 export async function checkAndTriggerAutoPilotSchedules() {
   const now = new Date();
@@ -125,7 +125,7 @@ export async function checkAndTriggerAutoPilotSchedules() {
     for (const sched of activeSchedules) {
       if (!sched.user || sched.user.autopilotEnabled === false) continue;
 
-      const schedTz = sched.timezone || 'UTC';
+      const schedTz = sched.timezone || 'Asia/Kolkata';
       const timeInfo = getTimeAndDayInTimezone(now, schedTz);
 
       // Check if current day in target timezone matches schedule's active days
@@ -133,30 +133,30 @@ export async function checkAndTriggerAutoPilotSchedules() {
         continue;
       }
 
-      // Parse schedule target time (e.g. "20:00" -> 20 * 60 = 1200 total minutes)
-      const [hStr, mStr] = (sched.timeOfDay || '09:00').split(':');
-      const targetTotalMinutes = (parseInt(hStr, 10) || 9) * 60 + (parseInt(mStr, 10) || 0);
+      // Parse schedule draft time (e.g. "09:00" -> 9 * 60 = 540 total minutes)
+      const [dhStr, dmStr] = (sched.draftTimeOfDay || '09:00').split(':');
+      const draftTotalMinutes = (parseInt(dhStr, 10) || 9) * 60 + (parseInt(dmStr, 10) || 0);
 
-      // Check if current time in target timezone is at or past the scheduled timeOfDay
-      if (timeInfo.totalMinutes >= targetTotalMinutes) {
-        // Check if already executed for today's date in target timezone
-        const lastRunDateStr = sched.lastRunAt ? getTimeAndDayInTimezone(new Date(sched.lastRunAt), schedTz).dateStr : null;
-        if (lastRunDateStr === timeInfo.dateStr) {
+      // Check if current time in target timezone is at or past the scheduled draftTimeOfDay
+      if (timeInfo.totalMinutes >= draftTotalMinutes) {
+        // Check if draft already generated for today's date in target timezone
+        const lastDraftDateStr = sched.lastDraftAt ? getTimeAndDayInTimezone(new Date(sched.lastDraftAt), schedTz).dateStr : null;
+        if (lastDraftDateStr === timeInfo.dateStr) {
           continue;
         }
 
-        logger.info(`[PostScheduler] Triggering AutoPilot schedule "${sched.name}" (${sched.id}) for user ${sched.userId} at ${sched.timeOfDay} ${schedTz}`);
+        logger.info(`[PostScheduler] 🧠 Generating AutoPilot AI draft for "${sched.name}" (${sched.id}) for user ${sched.userId} (Review window opened at ${sched.draftTimeOfDay || '09:00'} ${schedTz})`);
 
         try {
           await ScheduleService.runScheduleNow(sched.id, sched.userId);
           
-          // Record successful execution timestamp
+          // Record successful draft generation timestamp
           await prisma.automationSchedule.update({
             where: { id: sched.id },
-            data: { lastRunAt: now },
+            data: { lastDraftAt: now },
           });
         } catch (err) {
-          logger.error(`[PostScheduler] Error running schedule ${sched.id}: ${err.message}`);
+          logger.error(`[PostScheduler] Error generating draft for schedule ${sched.id}: ${err.message}`);
         }
       }
     }

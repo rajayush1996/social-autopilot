@@ -10,9 +10,9 @@ import { enqueuePostJob } from '../queues/postQueue.js';
 import { POST_STATUS } from '../config/constants.js';
 import logger from '../utils/logger.js';
 import emailService from './emailService.js';
-
 import CacheService from './cacheService.js';
 import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
+import { extractBrandFromContent, collectCoveredBrandsFromPosts } from '../utils/brandExtractor.js';
 
 export const SCHEDULER_FEATURE_KEY = 'scheduling-dispatcher';
 
@@ -70,6 +70,7 @@ export class ScheduleService {
     const {
       name,
       daysOfWeek,
+      draftTimeOfDay,
       timeOfDay,
       timezone,
       repeatType,
@@ -85,14 +86,15 @@ export class ScheduleService {
         name: name || 'Automated Daily Pulse',
         daysOfWeek: Array.isArray(daysOfWeek) && daysOfWeek.length > 0 
           ? daysOfWeek 
-          : ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-        timeOfDay: timeOfDay || '09:00',
-        timezone: timezone || 'UTC',
+          : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+        draftTimeOfDay: draftTimeOfDay || '09:00',
+        timeOfDay: timeOfDay || '20:00',
+        timezone: timezone || 'Asia/Kolkata',
         repeatType: repeatType || 'WEEKLY',
         isActive: isActive !== undefined ? !!isActive : true,
         targetPlatforms: Array.isArray(targetPlatforms) && targetPlatforms.length > 0 
           ? targetPlatforms 
-          : ['LINKEDIN', 'X'],
+          : ['LINKEDIN'],
         tone: tone || 'ENGAGING',
         topicPrompt: topicPrompt || '',
         campaignMemory: CampaignMemoryService.getDefaultMemory(null, name || 'Automated Daily Pulse'),
@@ -116,6 +118,7 @@ export class ScheduleService {
       data: {
         ...(data.name && { name: data.name }),
         ...(data.daysOfWeek && { daysOfWeek: data.daysOfWeek }),
+        ...(data.draftTimeOfDay && { draftTimeOfDay: data.draftTimeOfDay }),
         ...(data.timeOfDay && { timeOfDay: data.timeOfDay }),
         ...(data.timezone && { timezone: data.timezone }),
         ...(data.repeatType && { repeatType: data.repeatType }),
@@ -189,16 +192,31 @@ export class ScheduleService {
     
     logger.info(`[ScheduleService] 🚀 Running schedule "${schedule.name}" (${schedule.id}) for user ${userId}...`);
 
-    // Fetch Structured Campaign Memory from Redis Cache (O(1) ~1ms)
+    // 1. Fetch user's recent posts from DB to build complete historical exclusion memory
+    const recentPosts = await prisma.post.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 25,
+      select: { content: true, aiPrompt: true },
+    });
+
+    const dbExcludedBrands = collectCoveredBrandsFromPosts(recentPosts);
+
+    // 2. Fetch Structured Campaign Memory from Redis Cache / DB
     const memoryContract = await CampaignMemoryService.getCampaignMemory(schedule.id, schedule.name);
+    const memoryExcludedBrands = memoryContract?.aiExclusionRules?.doNotRepeatBrands || [];
 
-    // Format memory JSON into clean AI exclusion directives
-    const excludedBrands = memoryContract?.aiExclusionRules?.doNotRepeatBrands || [];
-    const memorySummaryStr = excludedBrands.length
-      ? `EXCLUDED BRANDS (STRICTLY DO NOT REPEAT): ${excludedBrands.join(', ')}`
-      : undefined;
+    // Merge unique excluded brands
+    const allExcludedBrands = Array.from(new Set([...dbExcludedBrands, ...memoryExcludedBrands]));
 
-    // Generate AI content with Structured Memory Contract
+    const memorySummaryStr = allExcludedBrands.length
+      ? `STRICT ANTI-REPETITION MANDATE:
+1. ALREADY COVERED COMPANIES/PRODUCTS (STRICTLY DO NOT WRITE ABOUT OR MENTION ANY OF THESE): ${allExcludedBrands.join(', ')}
+2. You MUST pick a completely DIFFERENT, NEW, innovative real-world company or product (e.g. Canva, Figma, Stripe, Supabase, Linear, Retool, Midjourney, Duolingo, Airtable, Webflow, Vercel, Shopify, Calendly, Grammarly, GitHub, Miro, Postman, Brex, Ramp, ElevenLabs, Runway, Perplexity, ClickUp, Discord, Airbnb, Spotify, etc.).
+3. Vary the opening hook and industry category (e.g. FinTech, DevTools, Design, AI, E-Commerce, EdTech).`
+      : `DIVERSITY MANDATE: Pick a fresh, innovative real-world product or company from diverse categories (e.g. DevTools, FinTech, Design, AI, SaaS).`;
+
+    // 3. Generate AI content with anti-repetition memory contract
     const aiResult = await generatePostContent({
       prompt: `Schedule: "${schedule.name}". Context: "${context}". Write a compelling, unique social media post.`,
       platform: schedule.targetPlatforms[0] || 'GENERAL',
@@ -211,8 +229,10 @@ export class ScheduleService {
       throw new Error('Failed to generate AI post content.');
     }
 
-    // Dual-sync update to Campaign Memory (PostgreSQL DB + Redis Cache)
+    // 4. Auto-detect generated brand name and dual-sync update to Campaign Memory
+    const detectedBrand = extractBrandFromContent(aiResult.content);
     await CampaignMemoryService.updateCampaignMemory(schedule.id, {
+      brandName: detectedBrand,
       hookText: aiResult.content.split('\n')[0] || '',
     });
 

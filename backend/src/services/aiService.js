@@ -52,22 +52,19 @@ const getOpenAIClient = () => {
  * - Key Entities (Brands, Companies, Metrics)
  * - Optimal Post Format & Viral Hook Angle
  */
-export async function analyzePromptIntent({ prompt, platform = 'LINKEDIN', tone = 'ENGAGING' }) {
+export async function analyzePromptIntent({ prompt, platform = 'LINKEDIN', tone = 'ENGAGING', contentSummary = '' }) {
   const clean = extractCoreThought(prompt);
   const openai = getOpenAIClient();
 
-  // Local Deterministic Syntactic AST Check (0 Tokens, ~1ms)
-  const isChoicePattern = /(?:for example|such as|like|e\.g\.|or)\s+/i.test(clean);
-
   if (!openai) {
-    const isCaseStudy = /product|startup|loom|skyscanner|acquisition|acquire|business|case study|problem|train/i.test(clean);
+    const isCaseStudy = /product|startup|growth|acquisition|acquire|business|case study|problem/i.test(clean);
     return {
       primaryIntent: isCaseStudy ? 'PRODUCT_CASE_STUDY' : 'BUSINESS_INSIGHT',
       targetAudience: isCaseStudy ? 'Founders, Product Managers & Tech Innovators' : 'Professionals & Creators',
       emotionalTone: tone.toLowerCase(),
       coreProblem: isCaseStudy ? 'Eliminating real-world customer friction' : 'Optimizing growth & productivity',
-      entities: isCaseStudy ? ['Loom', 'Skyscanner', 'Where is my Train'] : [],
-      primarySubject: isCaseStudy ? 'Loom' : 'Productivity',
+      entities: [],
+      primarySubject: isCaseStudy ? 'Innovative Tech Product' : 'Productivity',
       executionStrategy: 'SINGLE_SUBJECT_FOCUS',
       postType: isCaseStudy ? 'STORY_CASE_STUDY' : 'STRATEGIC_TAKEAWAY',
       viralHookAngle: isCaseStudy ? 'Bold claim about landmark product solving hidden friction' : 'High-impact industry perspective',
@@ -94,14 +91,18 @@ Output ONLY raw JSON with these exact keys:
   "postType": "STORY_CASE_STUDY" | "ACTIONABLE_LIST" | "POETIC_REFLECTIVE" | "PROBLEM_SOLUTION",
   "viralHookAngle": "compelling 1-line hook angle for ${platform}",
   "cleanPrompt": "cleaned topic string"
-}`,
+}
+
+CRITICAL DIVERSITY MANDATE:
+1. If the prompt mentions example names (e.g., 'like Loom, Skyscanner, etc.'), these are ONLY illustrative examples. Do NOT always pick the same example.
+2. If exclusions are provided (${contentSummary ? `"${contentSummary}"` : 'None'}), STRICTLY DO NOT pick any excluded company/subject. Pick a completely fresh, exciting real-world company or product (e.g. Canva, Figma, Stripe, Supabase, Linear, Retool, Midjourney, Duolingo, Airtable, Webflow, Vercel, Shopify, Calendly, Grammarly, GitHub, Miro, Postman, Brex, Ramp, ElevenLabs, Runway, Perplexity, ClickUp, Discord, Airbnb, Spotify, etc.).`,
         },
         {
           role: 'user',
-          content: `Raw Prompt: "${clean}"`,
+          content: `Raw Prompt: "${clean}"\nConstraints & Exclusions: ${contentSummary || 'None'}`,
         },
       ],
-      temperature: 0.2,
+      temperature: 0.7,
       max_tokens: 300,
     });
 
@@ -115,7 +116,7 @@ Output ONLY raw JSON with these exact keys:
     };
   } catch (err) {
     logger.warn(`[AIService] Intent analysis fallback: ${err.message}`);
-    const isCaseStudy = /product|startup|loom|skyscanner|acquisition|acquire|business|case study|problem/i.test(clean);
+    const isCaseStudy = /product|startup|growth|acquisition|acquire|business|case study|problem/i.test(clean);
     return {
       primaryIntent: isCaseStudy ? 'PRODUCT_CASE_STUDY' : 'BUSINESS_INSIGHT',
       targetAudience: 'Founders & Product Creators',
@@ -207,8 +208,8 @@ export async function generatePostContent({
 
     systemPrompt += buildFormattingInstructions({ emojiDensity, hashtagCount, formatStyle, contentLength, tone });
 
-    // STAGE 1: Execute Chain-of-Thought Intent Analysis
-    const intentMeta = await analyzePromptIntent({ prompt: cleanTopic, platform, tone });
+    // STAGE 1: Execute Chain-of-Thought Intent Analysis with memory exclusions
+    const intentMeta = await analyzePromptIntent({ prompt: cleanTopic, platform, tone, contentSummary });
 
     const userPrompt = articleUrl
       ? buildArticleUserPrompt({ articleUrl, article: resolvedArticle, inputTopic: cleanTopic, tone, platform })
@@ -223,6 +224,7 @@ export async function generatePostContent({
 
 [USER CORE INSTRUCTION & TOPIC]
 "${intentMeta.cleanPrompt}"
+${contentSummary ? `\n[MANDATORY EXCLUSIONS & DIVERSITY INSTRUCTION]\n${contentSummary}\nDo NOT repeat or write about any of the excluded companies or products above.` : ''}
 
 CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
 1. Write an authentic, compelling ${platform} post that directly addresses the Target Audience in a ${tone} tone.
@@ -255,7 +257,7 @@ CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.7,
+      temperature: 0.85,
       max_tokens: 1200,
     });
 

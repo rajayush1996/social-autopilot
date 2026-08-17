@@ -165,14 +165,16 @@ model AutomationSchedule {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   name            String           @default("Daily Auto-Post")
   daysOfWeek      String[]         @default(["MON", "TUE", "WED", "THU", "FRI"])
-  timeOfDay       String           @default("09:00")
-  timezone        String           @default("UTC")
+  draftTimeOfDay  String?          @default("09:00")
+  timeOfDay       String           @default("20:00")
+  timezone        String           @default("Asia/Kolkata")
   repeatType      String           @default("WEEKLY")
   isActive        Boolean          @default(true)
   targetPlatforms SocialPlatform[] @default([LINKEDIN, X])
   tone            AITone?          @default(ENGAGING)
   topicPrompt     String?
   campaignMemory  Json?
+  lastDraftAt     DateTime?
   lastRunAt       DateTime?
   nextRunAt       DateTime?
   createdAt       DateTime         @default(now())

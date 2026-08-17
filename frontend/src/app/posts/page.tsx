@@ -70,6 +70,19 @@ function parsePostContent(contentStr: string): { isJson: boolean; map: Record<st
   return { isJson: false, map: {}, text: contentStr };
 }
 
+function toLocalDatetimeInputString(dateInput: string | Date | undefined | null): string {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,10 +95,15 @@ export default function PostsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const toast = useToast();
 
-  // Inline Post Editor state
+  // Inline Post Content Editor state
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string>('');
   const [savingPostId, setSavingPostId] = useState<string | null>(null);
+
+  // Inline Schedule Time Editor state
+  const [isEditingScheduledTime, setIsEditingScheduledTime] = useState(false);
+  const [newScheduledTime, setNewScheduledTime] = useState('');
+  const [savingTime, setSavingTime] = useState(false);
 
   const handleSavePostEdit = async (e: React.MouseEvent, postId: string) => {
     e.stopPropagation();
@@ -102,6 +120,25 @@ export default function PostsPage() {
       toast.error('Failed to save post edit.');
     } finally {
       setSavingPostId(null);
+    }
+  };
+
+  const handleSaveScheduledTime = async (postId: string) => {
+    if (!newScheduledTime) return;
+    setSavingTime(true);
+    try {
+      const isoDate = new Date(newScheduledTime).toISOString();
+      await ApiService.updatePost(postId, { scheduledAt: isoDate });
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost({ ...selectedPost, scheduledAt: isoDate });
+      }
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, scheduledAt: isoDate } : p)));
+      toast.success('Scheduled release time updated successfully!');
+      setIsEditingScheduledTime(false);
+    } catch (err) {
+      toast.error('Failed to update scheduled time.');
+    } finally {
+      setSavingTime(false);
     }
   };
 
@@ -640,12 +677,55 @@ export default function PostsPage() {
 
                   {/* Scheduled Release Time */}
                   {selectedPost.scheduledAt && (
-                    <div className="bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-3 space-y-1">
-                      <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Scheduled Release</span>
-                      <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
-                        {formatDateTime(selectedPost.scheduledAt)}
-                      </span>
+                    <div className={`bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-3 space-y-2 ${isEditingScheduledTime ? 'col-span-2' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Scheduled Release Time</span>
+                        {selectedPost.status === 'SCHEDULED' && !isEditingScheduledTime && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingScheduledTime(true);
+                              setNewScheduledTime(toLocalDatetimeInputString(selectedPost.scheduledAt));
+                            }}
+                            className="text-[11px] text-[#2563EB] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 className="h-3 w-3" /> Edit Time
+                          </button>
+                        )}
+                      </div>
+
+                      {isEditingScheduledTime ? (
+                        <div className="space-y-2 pt-1">
+                          <input
+                            type="datetime-local"
+                            value={newScheduledTime}
+                            onChange={(e) => setNewScheduledTime(e.target.value)}
+                            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3 py-1.5 text-xs font-mono font-bold focus:outline-none focus:border-[#2563EB]"
+                          />
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingScheduledTime(false)}
+                              className="px-2.5 py-1 bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)] rounded-lg text-xs font-semibold cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveScheduledTime(selectedPost.id)}
+                              disabled={savingTime}
+                              className="px-3.5 py-1 bg-[#2563EB] text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {savingTime ? 'Saving...' : 'Save Time'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
+                          {formatDateTime(selectedPost.scheduledAt)}
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -725,39 +805,6 @@ export default function PostsPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Reschedule Release Slot for Scheduled Posts */}
-                {selectedPost.status === 'SCHEDULED' && (
-                  <div className="bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-[#2563EB] font-bold uppercase tracking-wider block flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5" /> Reschedule Target Time
-                      </span>
-                    </div>
-                    <input
-                      type="datetime-local"
-                      defaultValue={(() => {
-                        if (!selectedPost.scheduledAt) return '';
-                        const d = new Date(selectedPost.scheduledAt);
-                        return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16);
-                      })()}
-                      onChange={async (e) => {
-                        const newDateStr = e.target.value;
-                        if (!newDateStr) return;
-                        try {
-                          const isoDate = new Date(newDateStr).toISOString();
-                          await ApiService.updatePost(selectedPost.id, { scheduledAt: isoDate });
-                          setSelectedPost({ ...selectedPost, scheduledAt: isoDate });
-                          setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, scheduledAt: isoDate } : p));
-                          toast.success('Post rescheduled successfully!');
-                        } catch (err) {
-                          toast.error('Failed to reschedule post.');
-                        }
-                      }}
-                      className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-[#2563EB]"
-                    />
-                  </div>
-                )}
 
                 {/* Media Asset Preview */}
                 {selectedPost.mediaUrls && selectedPost.mediaUrls.length > 0 && (

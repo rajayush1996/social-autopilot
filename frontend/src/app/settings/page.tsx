@@ -7,15 +7,18 @@ import {
   ToggleLeft, 
   ToggleRight, 
   Building2, 
-  ShieldAlert,
-  Zap,
-  AlarmClock
+  ShieldAlert, 
+  Zap, 
+  AlarmClock,
+  Moon,
+  Sun
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import { User } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import LoadingScreen from '@/components/LoadingScreen';
+import { getReviewPipelineNarrative } from '@/utils/date';
 
 export default function AutopilotSettingsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,6 +27,9 @@ export default function AutopilotSettingsPage() {
   // Autopilot Engine Form States
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
   const [brandContext, setBrandContext] = useState('');
+  const [globalDraftTime, setGlobalDraftTime] = useState('09:00');
+  const [globalPublishTime, setGlobalPublishTime] = useState('20:00');
+  const [globalTimezone, setGlobalTimezone] = useState('Asia/Kolkata');
   
   // UX Feedback States
   const [updatingSettings, setUpdatingSettings] = useState(false);
@@ -31,11 +37,20 @@ export default function AutopilotSettingsPage() {
 
   const fetchAutopilotProfile = async () => {
     try {
-      const u = await ApiService.getMe();
+      const [u, schedRes] = await Promise.all([
+        ApiService.getMe(),
+        ApiService.getUserSchedules().catch(() => null),
+      ]);
       if (u) {
         setUser(u);
         setAutopilotEnabled(u.autopilotEnabled);
         setBrandContext(u.brandContext || '');
+      }
+      if (schedRes && schedRes.schedules && schedRes.schedules.length > 0) {
+        const firstSched = schedRes.schedules[0];
+        if (firstSched.draftTimeOfDay) setGlobalDraftTime(firstSched.draftTimeOfDay);
+        if (firstSched.timeOfDay) setGlobalPublishTime(firstSched.timeOfDay);
+        if (firstSched.timezone) setGlobalTimezone(firstSched.timezone);
       }
     } catch (err) {
       console.error('Failed to load autopilot settings profile:', err);
@@ -57,7 +72,20 @@ export default function AutopilotSettingsPage() {
         autopilotEnabled,
         brandContext,
       });
-      toast.success('Autopilot engine configurations saved successfully!');
+
+      // Also ensure default schedule timings match
+      const schedRes = await ApiService.getUserSchedules().catch(() => null);
+      if (schedRes && schedRes.schedules && schedRes.schedules.length > 0) {
+        for (const s of schedRes.schedules) {
+          await ApiService.updateSchedule(s.id, {
+            draftTimeOfDay: globalDraftTime,
+            timeOfDay: globalPublishTime,
+            timezone: globalTimezone,
+          }).catch(() => {});
+        }
+      }
+
+      toast.success('Autopilot engine and workflow timings saved successfully!');
       fetchAutopilotProfile();
     } catch (err: any) {
       console.error('Failed to save settings:', err);
@@ -153,29 +181,104 @@ export default function AutopilotSettingsPage() {
                 </span>
               </div>
 
-              {/* System Audit & Production Logging Mode Control */}
-              <div className="bg-slate-955 border border-slate-850 rounded-2xl p-4 space-y-3">
+              {/* 2-Stage Review & Publishing Pipeline Controls */}
+              <div className="bg-[var(--bg-input)]/60 border border-[var(--border-color)] p-4 rounded-2xl space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                      <Settings className="h-3.5 w-3.5 text-indigo-400" />
-                      Production Logging & Audit Trail Mode
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      Filters debug clutter in production while keeping critical error logs active
-                    </p>
-                  </div>
-
-                  <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                    Filtered Production Mode (Quiet)
+                  <span className="text-xs font-bold text-[#2563EB] uppercase tracking-wider flex items-center gap-1.5">
+                    <AlarmClock className="w-4 h-4" /> Global AutoPilot Schedule Timings
+                  </span>
+                  <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] font-bold px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                    Approval Review Safe
                   </span>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Stage 1: AI Draft & Review Email Time */}
+                  <div className="space-y-1 bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-xl">
+                    <label className="text-xs font-bold text-[var(--text-primary)] block">
+                      🌅 1. AI Draft & Review Email Time
+                    </label>
+                    <p className="text-[10px] text-[var(--text-secondary)]">Time when AI generates content and sends approval email</p>
+                    <input
+                      type="time"
+                      value={globalDraftTime}
+                      onChange={(e) => setGlobalDraftTime(e.target.value)}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] font-mono font-bold mt-1"
+                    />
+                  </div>
+
+                  {/* Stage 2: Live Publishing Dispatch Time */}
+                  <div className="space-y-1 bg-[var(--bg-card)] border border-[var(--border-color)] p-3.5 rounded-xl">
+                    <label className="text-xs font-bold text-[var(--text-primary)] block">
+                      🚀 2. Live Social Dispatch Time
+                    </label>
+                    <p className="text-[10px] text-[var(--text-secondary)]">Time when approved post goes live to social channels</p>
+                    <input
+                      type="time"
+                      value={globalPublishTime}
+                      onChange={(e) => setGlobalPublishTime(e.target.value)}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] font-mono font-bold mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Timezone */}
+                <div className="pt-1">
+                  <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase block mb-1">Timezone</label>
+                  <select
+                    value={globalTimezone}
+                    onChange={(e) => setGlobalTimezone(e.target.value)}
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs text-[var(--text-primary)] font-mono"
+                  >
+                    <option value="Asia/Kolkata">IST (UTC+5:30) - India</option>
+                    <option value="UTC">UTC (Universal Coordinated Time)</option>
+                    <option value="America/New_York">EST (UTC-5:00) - New York</option>
+                    <option value="America/Los_Angeles">PST (UTC-8:00) - Los Angeles</option>
+                    <option value="Europe/London">GMT (UTC+0:00) - London</option>
+                  </select>
+                </div>
+
+                {/* Dynamic Review Window Banner */}
+                {(() => {
+                  const pipeline = getReviewPipelineNarrative(globalDraftTime, globalPublishTime);
+                  return (
+                    <div className={`p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+                      pipeline.isOvernight 
+                        ? 'bg-indigo-50/90 dark:bg-indigo-950/70 border-indigo-200 dark:border-indigo-700/60 text-indigo-950 dark:text-indigo-100'
+                        : 'bg-blue-50/90 dark:bg-blue-950/70 border-blue-200 dark:border-blue-700/60 text-blue-950 dark:text-blue-100'
+                    }`}>
+                      <div className="flex items-start gap-2.5">
+                        {pipeline.isOvernight ? (
+                          <Moon className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                        ) : (
+                          <Sun className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5">
+                          <span className="text-xs leading-relaxed font-medium block">
+                            {pipeline.isOvernight ? (
+                              <>
+                                Draft created the evening before at <strong className="text-indigo-900 dark:text-white font-extrabold">{pipeline.draftTimeDisplay}</strong> ➔ Review & approve via email before live auto-dispatch next morning at <strong className="text-indigo-900 dark:text-white font-extrabold">{pipeline.publishTimeDisplay} (Next Day)</strong>.
+                              </>
+                            ) : (
+                              <>
+                                Draft created daily at <strong className="text-blue-900 dark:text-white font-extrabold">{pipeline.draftTimeDisplay}</strong> ➔ Review & approve via email before live auto-dispatch at <strong className="text-blue-900 dark:text-white font-extrabold">{pipeline.publishTimeDisplay}</strong>.
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border shrink-0 ${pipeline.badgeColorClass}`}>
+                        {pipeline.reviewWindowText} Window
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <button
                 type="submit"
                 disabled={updatingSettings}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
               >
                 {updatingSettings ? (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

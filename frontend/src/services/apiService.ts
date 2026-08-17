@@ -16,6 +16,7 @@ export interface AutomationSchedule {
   userId: string;
   name: string;
   daysOfWeek: string[];
+  draftTimeOfDay?: string;
   timeOfDay: string;
   timezone: string;
   repeatType: string;
@@ -23,6 +24,7 @@ export interface AutomationSchedule {
   targetPlatforms: PlatformId[];
   tone: string;
   topicPrompt?: string;
+  lastDraftAt?: string;
   lastRunAt?: string;
   nextRunAt?: string;
   createdAt: string;
