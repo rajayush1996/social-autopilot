@@ -13,6 +13,7 @@ import emailService from './emailService.js';
 import CacheService from './cacheService.js';
 import { CACHE_KEYS, TTL } from '../config/cacheKeys.js';
 import { extractBrandFromContent, collectCoveredBrandsFromPosts } from '../utils/brandExtractor.js';
+import ImageService from './ai/imageService.js';
 
 export const SCHEDULER_FEATURE_KEY = 'scheduling-dispatcher';
 
@@ -78,6 +79,9 @@ export class ScheduleService {
       targetPlatforms,
       tone,
       topicPrompt,
+      includeImage,
+      imageMode,
+      customImageUrl,
     } = data;
 
     const result = await prisma.automationSchedule.create({
@@ -97,6 +101,9 @@ export class ScheduleService {
           : ['LINKEDIN'],
         tone: tone || 'ENGAGING',
         topicPrompt: topicPrompt || '',
+        includeImage: !!includeImage || imageMode === 'AI_FLUX',
+        imageMode: imageMode || (includeImage ? 'AI_FLUX' : 'NONE'),
+        customImageUrl: customImageUrl || null,
         campaignMemory: CampaignMemoryService.getDefaultMemory(null, name || 'Automated Daily Pulse'),
       },
     });
@@ -126,6 +133,9 @@ export class ScheduleService {
         ...(data.targetPlatforms && { targetPlatforms: data.targetPlatforms }),
         ...(data.tone && { tone: data.tone }),
         ...(data.topicPrompt !== undefined && { topicPrompt: data.topicPrompt }),
+        ...(data.includeImage !== undefined && { includeImage: !!data.includeImage }),
+        ...(data.imageMode !== undefined && { imageMode: data.imageMode }),
+        ...(data.customImageUrl !== undefined && { customImageUrl: data.customImageUrl }),
       },
     });
     await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
@@ -299,24 +309,66 @@ export class ScheduleService {
       }
     })();
 
+    // Check for existing pending post for this exact target release time to avoid stacking duplicates
+    let postToUpdateId = updateExistingPostId;
+    if (!postToUpdateId) {
+      const existingPending = await prisma.post.findFirst({
+        where: {
+          userId: user.id,
+          status: { in: [POST_STATUS.SCHEDULED, POST_STATUS.DRAFT] },
+          scheduledAt: targetScheduledAt,
+        },
+        select: { id: true },
+      });
+      if (existingPending) {
+        postToUpdateId = existingPending.id;
+      }
+    }
+
+    // Handle visual media generation (AI Flux/Branded Card or Custom Brand Image)
+    let postMediaUrls = [];
+    let postMediaType = null;
+
+    if (schedule.includeImage || schedule.imageMode === 'AI_FLUX') {
+      try {
+        const visualRes = await ImageService.generatePostVisual({
+          topic: schedule.name,
+          brandName: detectedBrand,
+          content: aiResult.content,
+          tone: schedule.tone,
+        });
+        if (visualRes && visualRes.imageUrl) {
+          postMediaUrls = [visualRes.imageUrl];
+          postMediaType = 'IMAGE';
+        }
+      } catch (imgErr) {
+        logger.warn(`[ScheduleService] Image generation warning: ${imgErr.message}`);
+      }
+    } else if (schedule.imageMode === 'CUSTOM_UPLOAD' && schedule.customImageUrl) {
+      postMediaUrls = [schedule.customImageUrl];
+      postMediaType = 'IMAGE';
+    }
+
     let post;
-    if (updateExistingPostId) {
-      // Update existing pending queued post with new AI content instead of creating a duplicate
-      post = await PostService.updatePost(updateExistingPostId, userId, {
+    if (postToUpdateId) {
+      // Update existing pending queued post with new AI content & visual instead of creating a duplicate
+      post = await PostService.updatePost(postToUpdateId, userId, {
         content: aiResult.content,
+        mediaUrls: postMediaUrls,
+        mediaType: postMediaType,
         targetPlatforms: schedule.targetPlatforms,
         status: POST_STATUS.SCHEDULED,
         scheduledAt: targetScheduledAt,
         aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
       });
-      logger.info(`[ScheduleService] Updated existing pending queued post (${post.id}) with new AI draft!`);
+      logger.info(`[ScheduleService] Cleanly updated existing pending queued post (${post.id}) with new AI draft & media!`);
     } else {
-      // Create post record scheduled for target time
+      // Create post record scheduled for target time with media
       post = await PostService.createPost({
         userId: user.id,
         content: aiResult.content,
-        mediaUrls: [],
-        mediaType: null,
+        mediaUrls: postMediaUrls,
+        mediaType: postMediaType,
         targetPlatforms: schedule.targetPlatforms,
         status: POST_STATUS.SCHEDULED,
         scheduledAt: targetScheduledAt,

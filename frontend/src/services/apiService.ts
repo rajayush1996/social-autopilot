@@ -610,6 +610,42 @@ export class ApiService {
       content: r?.adaptedPosts?.[payload.platform || 'LINKEDIN'] || r?.content || '',
     };
   }
+
+  /**
+   * 🔄 Live Sync Post Engagement Metrics (Likes, Comments, Shares, Reach) from platform API
+   */
+  static async syncPostMetrics(postId: string): Promise<{
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    engagementRate: string;
+    isLiveSynced: boolean;
+  }> {
+    const response = await apiClient.post(`/api/posts/${postId}/sync-metrics`);
+    return response.data?.data?.metrics;
+  }
+
+  /**
+   * 🎨 1-Click Generate or Regenerate AI Visual Graphic for a post
+   */
+  static async generatePostImage(postId: string): Promise<{ post: Post; imageUrl: string }> {
+    const response = await apiClient.post(`/api/posts/${postId}/generate-image`);
+    return response.data?.data;
+  }
+
+  /**
+   * 🖼️ Update post media attachments directly
+   */
+  static async updatePostMedia(postId: string, mediaUrls: string[], mediaType: string = 'IMAGE'): Promise<Post> {
+    const response = await apiClient.patch(`/api/posts/${postId}`, {
+      mediaUrls,
+      mediaType,
+    });
+    return response.data?.data;
+  }
 }
 
 export default ApiService;
+
+

@@ -11,6 +11,8 @@ import {
   triggerScheduledPostsNow,
   retryFailedPost,
   approvePostViaEmail,
+  syncPostMetrics,
+  regeneratePostImage,
 } from '../controllers/postController.js';
 import { validate } from '../middlewares/validate.js';
 import { generateAiSchema, createPostSchema } from '../validations/postValidation.js';
@@ -31,6 +33,16 @@ router.post('/trigger-scheduler', triggerScheduledPostsNow);
 
 // Apply JWT authentication guard globally across remaining protected post endpoints
 router.use(authenticateJwt);
+
+/**
+ * POST /api/posts/:id/sync-metrics - Sync live post engagement (Likes, Comments, Shares)
+ */
+router.post('/:id/sync-metrics', syncPostMetrics);
+
+/**
+ * POST /api/posts/:id/generate-image - 1-Click Generate or Regenerate AI Visual Graphic
+ */
+router.post('/:id/generate-image', aiLimiter, regeneratePostImage);
 
 /**
  * POST /api/posts/enhance-prompt - Magic AI Prompt Enhancer

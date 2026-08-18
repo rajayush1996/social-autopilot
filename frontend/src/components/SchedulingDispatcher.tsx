@@ -26,7 +26,8 @@ import {
   ChevronLeft,
   Image as ImageIcon,
   Moon,
-  Sun
+  Sun,
+  Upload,
 } from 'lucide-react';
 import ApiService, { AutomationSchedule } from '@/services/apiService';
 import { Post } from '@/lib/api';
@@ -296,6 +297,11 @@ export function SchedulingDispatcher() {
   const [isTopicExpanded, setIsTopicExpanded] = useState<boolean>(false);
   const [sampleDrafts, setSampleDrafts] = useState<Record<string, string> | null>(null);
   const [generatingSample, setGeneratingSample] = useState<boolean>(false);
+
+  // 🖼️ Visual Media Engine State (AI Flux vs Custom Brand Upload vs None)
+  const [formImageMode, setFormImageMode] = useState<'AI_FLUX' | 'CUSTOM_UPLOAD' | 'NONE'>('AI_FLUX');
+  const [formCustomImageUrl, setFormCustomImageUrl] = useState<string>('');
+  const [uploadingScheduleMedia, setUploadingScheduleMedia] = useState<boolean>(false);
   
   // 🌟 Generated Images State lifted up for Live Previews
   const [generatedAssets, setGeneratedAssets] = useState<Array<{ day: number; url: string; prompt: string }>>([]);
@@ -378,6 +384,23 @@ export function SchedulingDispatcher() {
     fetchPostsData();
   }, []);
 
+  const handleUploadScheduleCustomMedia = async (file: File) => {
+    setUploadingScheduleMedia(true);
+    try {
+      const uploadRes = await ApiService.uploadMedia(file);
+      const url = (uploadRes as any)?.fileUrl || (uploadRes as any)?.url;
+      if (url) {
+        setFormCustomImageUrl(url);
+        setFormImageMode('CUSTOM_UPLOAD');
+        toast.success('📁 Custom brand image uploaded!');
+      }
+    } catch (err) {
+      toast.error('Failed to upload custom image.');
+    } finally {
+      setUploadingScheduleMedia(false);
+    }
+  };
+
   const handleOpenAddModal = () => {
     setEditingSchedule(null);
     setFormName('Daily Growth Engine');
@@ -393,6 +416,8 @@ export function SchedulingDispatcher() {
     setFormHashtagCount('MODERATE');
     setFormContentLength('BALANCED');
     setFormTopic('');
+    setFormImageMode('AI_FLUX');
+    setFormCustomImageUrl('');
     setSampleDrafts(null);
     setGeneratedAssets([]); // 🌟 Reset images on open
     setIsModalOpen(true);
@@ -413,6 +438,8 @@ export function SchedulingDispatcher() {
     setFormHashtagCount('MODERATE');
     setFormContentLength('BALANCED');
     setFormTopic(sched.topicPrompt || '');
+    setFormImageMode((sched as any).imageMode || ((sched as any).includeImage ? 'AI_FLUX' : 'NONE'));
+    setFormCustomImageUrl((sched as any).customImageUrl || '');
     setSampleDrafts(null);
     setGeneratedAssets([]); // 🌟 Reset images on open
     setIsModalOpen(true);
@@ -431,6 +458,9 @@ export function SchedulingDispatcher() {
         targetPlatforms: formPlatforms,
         tone: formTone,
         topicPrompt: formTopic.trim(),
+        includeImage: formImageMode === 'AI_FLUX',
+        imageMode: formImageMode,
+        customImageUrl: formImageMode === 'CUSTOM_UPLOAD' ? formCustomImageUrl : null,
         isActive: true,
       };
 
@@ -589,12 +619,27 @@ export function SchedulingDispatcher() {
                   <span className="text-[11px] font-extrabold text-[var(--text-secondary)]">{formatDaysSummary(sched.daysOfWeek)}</span>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                   {sched.targetPlatforms?.map((p) => (
                     <span key={p} className="text-[9px] font-extrabold uppercase px-2 py-1 rounded-md bg-[var(--bg-input)] text-[var(--text-primary)] border border-[var(--border-color)]">
                       {p}
                     </span>
                   ))}
+
+                  {/* Media Mode Badge */}
+                  {(sched as any).imageMode === 'AI_FLUX' || (sched as any).includeImage ? (
+                    <span className="text-[9px] font-extrabold px-2 py-1 rounded-md bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/25 flex items-center gap-1">
+                      <span>✨ AI Visual</span>
+                    </span>
+                  ) : (sched as any).imageMode === 'CUSTOM_UPLOAD' ? (
+                    <span className="text-[9px] font-extrabold px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/25 flex items-center gap-1">
+                      <span>📁 Brand Media</span>
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-medium px-2 py-1 rounded-md bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)]">
+                      Text Only
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 border-t lg:border-t-0 border-[var(--border-color)] pt-3 lg:pt-0">
@@ -947,6 +992,150 @@ export function SchedulingDispatcher() {
                       <option value="LONG">Long-form Deep Dive</option>
                     </select>
                   </div>
+                </div>
+
+                {/* 🖼️ VISUAL MEDIA ENGINE SELECTOR (Flux AI vs Custom Upload vs Text Only) */}
+                <div className="bg-[var(--bg-input)]/60 border border-[var(--border-color)] p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-[#2563EB]" />
+                      <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
+                        Visual Media Engine
+                      </span>
+                    </div>
+                    <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] font-bold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                      +2x Reach
+                    </span>
+                  </div>
+
+                  {/* 3 Selectable Modern Radio Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {/* Mode 1: AI Visual Flux */}
+                    <button
+                      type="button"
+                      onClick={() => setFormImageMode('AI_FLUX')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                        formImageMode === 'AI_FLUX'
+                          ? 'bg-[#2563EB]/10 border-[#2563EB] shadow-xs'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-[#2563EB]/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> AI Visual
+                        </span>
+                        {formImageMode === 'AI_FLUX' && (
+                          <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[var(--text-secondary)] leading-tight">
+                        Auto-generates matching 1080x1080 graphic for each topic.
+                      </p>
+                    </button>
+
+                    {/* Mode 2: Custom Brand Upload */}
+                    <button
+                      type="button"
+                      onClick={() => setFormImageMode('CUSTOM_UPLOAD')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                        formImageMode === 'CUSTOM_UPLOAD'
+                          ? 'bg-emerald-500/10 border-emerald-500 shadow-xs'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-emerald-500/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
+                          <Upload className="w-3.5 h-3.5 text-emerald-500" /> Custom Brand
+                        </span>
+                        {formImageMode === 'CUSTOM_UPLOAD' && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[var(--text-secondary)] leading-tight">
+                        Tag fixed company graphic or logo.
+                      </p>
+                    </button>
+
+                    {/* Mode 3: Text Only */}
+                    <button
+                      type="button"
+                      onClick={() => setFormImageMode('NONE')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                        formImageMode === 'NONE'
+                          ? 'bg-[var(--bg-card)] border-[#2563EB] shadow-xs'
+                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-[var(--text-secondary)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-[var(--text-primary)]">
+                          📝 Text Only
+                        </span>
+                        {formImageMode === 'NONE' && (
+                          <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-[var(--text-secondary)] leading-tight">
+                        Standard pure text posts without media attachments.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Custom Upload Dropzone / Preview when Mode 2 is selected */}
+                  {formImageMode === 'CUSTOM_UPLOAD' && (
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl space-y-2.5 pt-2">
+                      {formCustomImageUrl ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <img src={formCustomImageUrl} alt="Custom Preview" className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-[var(--text-primary)] block truncate">Custom Graphic Attached</span>
+                              <span className="text-[10px] text-emerald-500 font-medium">Ready to tag in all scheduled posts</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-primary)] border border-[var(--border-color)] cursor-pointer">
+                              Replace
+                              <input
+                                type="file"
+                                accept="image/*,video/*"
+                                className="hidden"
+                                disabled={uploadingScheduleMedia}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleUploadScheduleCustomMedia(f);
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setFormCustomImageUrl('')}
+                              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="border border-dashed border-[var(--border-color)] rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-emerald-500 transition-all bg-[var(--bg-input)]">
+                          <Upload className="w-5 h-5 text-emerald-500" />
+                          <span className="text-xs font-bold text-[var(--text-primary)]">
+                            {uploadingScheduleMedia ? 'Uploading Brand Image...' : 'Click to Upload Custom Brand Graphic'}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-secondary)]">PNG, JPG, WebP up to 10MB</span>
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            className="hidden"
+                            disabled={uploadingScheduleMedia}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadScheduleCustomMedia(f);
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

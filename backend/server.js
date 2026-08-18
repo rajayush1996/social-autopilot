@@ -54,6 +54,9 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Serve Public Uploads Statically
+app.use('/uploads', express.static('public/uploads'));
+
 // Request Tracing & Logging Middleware
 app.use(requestLogger);
 

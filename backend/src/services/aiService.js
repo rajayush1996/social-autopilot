@@ -229,10 +229,16 @@ ${contentSummary ? `\n[MANDATORY EXCLUSIONS & DIVERSITY INSTRUCTION]\n${contentS
 CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
 1. Write an authentic, compelling ${platform} post that directly addresses the Target Audience in a ${tone} tone.
 2. Focus 100% of the narrative, hook, body, takeaways, and moral on EXACTLY ONE primary subject (${intentMeta.primarySubject}). Do NOT list or combine multiple products or topics in the opening line or body copy.
-3. HOOK MANDATE: NEVER start with "Discover how...", "In today's fast-paced world...", or generic corporate fluff. Line 1 MUST be a dramatic, scroll-stopping metric or acquisition event (e.g. "When Atlassian acquired a simple 2-minute video tool for $975 Million, the tech world paid attention...").
-4. REAL-WORLD DEAL FACTS: Include the specific acquisition or valuation details (such as acquisition by Atlassian, Google, etc.) whenever mentioned in the prompt context to make the teardown authentic and fascinating.
-5. If primaryIntent is PRODUCT_CASE_STUDY or STORY_CASE_STUDY: tell an authentic story about ${intentMeta.primarySubject}, explain the customer friction solved, explain why it succeeded, list 3 actionable takeaways with Unicode Bold headers, and end with the moral of the story.
-6. EMOJI DENSITY MANDATE: Strictly follow user choice (${emojiDensity}): ${
+3. VIRAL HOOK MANDATE (NO REPETITIVE PATTERNS): Never start with "Discover how...", "In today's fast-paced world...", or repetitive "When [Brand] was valued at...". Pick one of 5 distinct viral hooks:
+   - Contrarian Insight ("Most founders believe X. The reality is the exact opposite...")
+   - Forensic Teardown ("How [Brand] scaled to 1M users with $0 marketing spend...")
+   - Before/After Friction ("In 2020, solving [X] took 4 hours. Then [Brand] deleted the entire bottleneck...")
+   - Paradigm Shift ("Unpopular opinion: The best products don't add features—they remove friction...")
+   - High-Stakes Story ("When a 3-person team tackled [Friction], they ended up redefining an entire industry...")
+4. CLEAN FORMATTING & MOBILE DWELL TIME: Keep paragraphs strictly to 1-2 punchy sentences.
+5. If primaryIntent is PRODUCT_CASE_STUDY or STORY_CASE_STUDY: tell an authentic story about ${intentMeta.primarySubject}, explain the customer friction solved, explain why it succeeded, list 3 actionable takeaways with clean UPPERCASE headers and emojis (e.g. 📌 1. SOLVE THE INVISIBLE FRICTION: explanation), and end with the moral of the story. Do NOT use fake Unicode math glyphs.
+6. ALGORITHM-BOOSTING POLARIZING CTA: End with a sharp, 3-second choice, debate, or specific question (e.g., "[Option A] or [Option B]?", "Agree or disagree?", "What is the single biggest bottleneck in your stack?") that forces readers to comment immediately.
+7. EMOJI DENSITY MANDATE: Strictly follow user choice (${emojiDensity}): ${
   emojiDensity === 'NONE'
     ? 'Do NOT include any emojis anywhere in the text (0 emojis).'
     : emojiDensity === 'LOW'
@@ -241,15 +247,15 @@ CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
     ? 'Include vibrant emojis next to every section, takeaway, and bullet point.'
     : 'Include 3 to 5 relevant emojis next to key takeaways, moral of the story, and CTA question (e.g. 📌 3 Takeaways, 🎯 Moral, 💡 CTA).'
 } Do NOT return 0 emojis when ${emojiDensity} is selected.
-7. HASHTAG MANDATE: Follow user choice (${hashtagCount}): ${
+8. HASHTAG MANDATE: Follow user choice (${hashtagCount}): ${
   hashtagCount === 'NONE'
     ? 'Do NOT include any hashtags.'
     : hashtagCount === 'HEAVY'
     ? 'Include 8 to 12 niche industry hashtags at the end.'
     : 'Include 3 to 5 targeted hashtags at the end.'
 }
-8. LINK & TAG MANDATE: If the user prompt mentions a website URL, link, or custom tag value (such as www.google.com or {{link}}), you MUST include that exact URL link or tag in the final post content (preferably near the CTA at the end).
-9. Output ONLY the ready-to-publish post content without meta-commentary, quotation marks, or prompt headers.`;
+9. LINK & TAG MANDATE: If the user prompt mentions a website URL, link, or custom tag value (such as www.google.com or {{link}}), you MUST include that exact URL link or tag in the final post content (preferably near the CTA at the end).
+10. Output ONLY the ready-to-publish post content without meta-commentary, quotation marks, or prompt headers.`;
 
     const completion = await openai.chat.completions.create({
       model: model,

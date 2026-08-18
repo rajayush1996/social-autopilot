@@ -173,6 +173,9 @@ model AutomationSchedule {
   targetPlatforms SocialPlatform[] @default([LINKEDIN, X])
   tone            AITone?          @default(ENGAGING)
   topicPrompt     String?
+  includeImage    Boolean          @default(false)
+  imageMode       String?          @default("NONE") // NONE, AI_FLUX, CUSTOM_UPLOAD
+  customImageUrl  String?
   campaignMemory  Json?
   lastDraftAt     DateTime?
   lastRunAt       DateTime?

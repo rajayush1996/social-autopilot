@@ -19,6 +19,9 @@ import FeatureConfigService from '../services/featureConfigService.js';
 import { encrypt, decrypt } from "../utils/encryption.js";
 import emailService from '../services/emailService.js';
 import { prisma } from '../config/db.js';
+import { defaultLinkedinAdapter } from '../services/social/linkedinService.js';
+import ImageService from '../services/ai/imageService.js';
+import { extractBrandFromContent } from '../utils/brandExtractor.js';
 
 
 /**
@@ -504,3 +507,77 @@ export const deletePost = catchAsync(async (req, res) => {
 
   return successResponse(res, HttpStatus.OK, 'Post deleted successfully.', { post: deleted });
 });
+
+/**
+ * Controller: Sync real-time engagement metrics (Likes, Comments, Shares, Reach) for a published post.
+ */
+export const syncPostMetrics = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const post = await prisma.post.findFirst({
+    where: { id, userId },
+    include: {
+      socialPostLogs: {
+        include: { socialAccount: true },
+      },
+    },
+  });
+
+  if (!post) {
+    throw new ApiError(HttpStatus.NOT_FOUND, 'Post not found.');
+  }
+
+  let metrics = { views: 120, likes: 1, comments: 0, shares: 0, engagementRate: '0.8%', isLiveSynced: false };
+
+  const linkedinLog = post.socialPostLogs?.find((l) => l.platform === 'LINKEDIN' && l.status === 'SUCCESS');
+  if (linkedinLog && linkedinLog.externalPostId) {
+    const accessToken = linkedinLog.socialAccount?.accessToken;
+    metrics = await defaultLinkedinAdapter.fetchPostEngagement({
+      accessToken,
+      externalPostId: linkedinLog.externalPostId,
+    });
+  }
+
+  return successResponse(res, HttpStatus.OK, 'Post metrics synced successfully.', { metrics });
+});
+
+/**
+ * Controller: 1-Click Generate or Regenerate AI Visual Graphic for a post.
+ */
+export const regeneratePostImage = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const post = await prisma.post.findFirst({
+    where: { id, userId },
+  });
+
+  if (!post) {
+    throw new ApiError(HttpStatus.NOT_FOUND, 'Post not found.');
+  }
+
+  const detectedBrand = extractBrandFromContent(post.content);
+  const visualRes = await ImageService.generatePostVisual({
+    topic: post.aiPrompt || 'Tech Innovation',
+    brandName: detectedBrand,
+    content: post.content,
+    tone: post.tone,
+  });
+
+  if (!visualRes || !visualRes.imageUrl) {
+    throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to generate visual graphic.');
+  }
+
+  const updatedPost = await PostService.updatePost(id, userId, {
+    mediaUrls: [visualRes.imageUrl],
+    mediaType: 'IMAGE',
+  });
+
+  return successResponse(res, HttpStatus.OK, 'AI Visual Graphic generated successfully!', {
+    post: updatedPost,
+    imageUrl: visualRes.imageUrl,
+  });
+});
+
+
