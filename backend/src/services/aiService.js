@@ -44,92 +44,25 @@ const getOpenAIClient = () => {
 };
 
 /**
- * STAGE 1: Deep Intent, Sentiment & Metadata Analyzer.
- * Deconstructs raw user prompts into rich structured intent JSON:
- * - Intent & Content Category
- * - Target Audience & Resonant Emotion
- * - Core Customer Friction & Problem
- * - Key Entities (Brands, Companies, Metrics)
- * - Optimal Post Format & Viral Hook Angle
+ * Fast Rule-Based Intent, Sentiment & Format Heuristic (0ms Latency).
+ * Deconstructs raw user prompts into rich structured intent metadata.
  */
-export async function analyzePromptIntent({ prompt, platform = 'LINKEDIN', tone = 'ENGAGING', contentSummary = '' }) {
+export function analyzePromptIntent({ prompt, platform = 'LINKEDIN', tone = 'ENGAGING', contentSummary = '' }) {
   const clean = extractCoreThought(prompt);
-  const openai = getOpenAIClient();
+  const isCaseStudy = /product|startup|growth|acquisition|acquire|business|case study|problem|innovat/i.test(clean);
 
-  if (!openai) {
-    const isCaseStudy = /product|startup|growth|acquisition|acquire|business|case study|problem/i.test(clean);
-    return {
-      primaryIntent: isCaseStudy ? 'PRODUCT_CASE_STUDY' : 'BUSINESS_INSIGHT',
-      targetAudience: isCaseStudy ? 'Founders, Product Managers & Tech Innovators' : 'Professionals & Creators',
-      emotionalTone: tone.toLowerCase(),
-      coreProblem: isCaseStudy ? 'Eliminating real-world customer friction' : 'Optimizing growth & productivity',
-      entities: [],
-      primarySubject: isCaseStudy ? 'Innovative Tech Product' : 'Productivity',
-      executionStrategy: 'SINGLE_SUBJECT_FOCUS',
-      postType: isCaseStudy ? 'STORY_CASE_STUDY' : 'STRATEGIC_TAKEAWAY',
-      viralHookAngle: isCaseStudy ? 'Bold claim about landmark product solving hidden friction' : 'High-impact industry perspective',
-      cleanPrompt: clean,
-    };
-  }
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: config.openai.model,
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert Social Media AI Intent & Sentiment Analyst. Analyze the raw prompt and extract structured JSON metadata.
-Output ONLY raw JSON with these exact keys:
-{
-  "primaryIntent": "PRODUCT_CASE_STUDY" | "FOUNDER_STORY" | "POETRY_SHAYARI" | "SPORTS_ANALYSIS" | "FITNESS_HEALTH" | "HOW_TO_GUIDE" | "BUSINESS_INSIGHT",
-  "targetAudience": "string describing target audience",
-  "emotionalTone": "string describing emotional tone",
-  "coreProblem": "string summarizing core friction/topic",
-  "entities": ["array of company/product/concept names"],
-  "primarySubject": "the single hero entity or subject to focus on",
-  "executionStrategy": "SINGLE_SUBJECT_FOCUS",
-  "postType": "STORY_CASE_STUDY" | "ACTIONABLE_LIST" | "POETIC_REFLECTIVE" | "PROBLEM_SOLUTION",
-  "viralHookAngle": "compelling 1-line hook angle for ${platform}",
-  "cleanPrompt": "cleaned topic string"
-}
-
-CRITICAL DIVERSITY MANDATE:
-1. If the prompt mentions example names (e.g., 'like Loom, Skyscanner, etc.'), these are ONLY illustrative examples. Do NOT always pick the same example.
-2. If exclusions are provided (${contentSummary ? `"${contentSummary}"` : 'None'}), STRICTLY DO NOT pick any excluded company/subject. Pick a completely fresh, exciting real-world company or product (e.g. Canva, Figma, Stripe, Supabase, Linear, Retool, Midjourney, Duolingo, Airtable, Webflow, Vercel, Shopify, Calendly, Grammarly, GitHub, Miro, Postman, Brex, Ramp, ElevenLabs, Runway, Perplexity, ClickUp, Discord, Airbnb, Spotify, etc.).`,
-        },
-        {
-          role: 'user',
-          content: `Raw Prompt: "${clean}"\nConstraints & Exclusions: ${contentSummary || 'None'}`,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 300,
-    });
-
-    const rawJson = response.choices[0]?.message?.content?.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(rawJson);
-    return {
-      ...parsed,
-      executionStrategy: 'SINGLE_SUBJECT_FOCUS',
-      primarySubject: parsed.primarySubject || parsed.entities?.[0] || 'the main topic',
-      cleanPrompt: clean,
-    };
-  } catch (err) {
-    logger.warn(`[AIService] Intent analysis fallback: ${err.message}`);
-    const isCaseStudy = /product|startup|growth|acquisition|acquire|business|case study|problem/i.test(clean);
-    return {
-      primaryIntent: isCaseStudy ? 'PRODUCT_CASE_STUDY' : 'BUSINESS_INSIGHT',
-      targetAudience: 'Founders & Product Creators',
-      emotionalTone: tone.toLowerCase(),
-      coreProblem: 'Solving real customer friction',
-      entities: [],
-      primarySubject: 'the main topic',
-      executionStrategy: 'SINGLE_SUBJECT_FOCUS',
-      postType: isCaseStudy ? 'STORY_CASE_STUDY' : 'ACTIONABLE_LIST',
-      viralHookAngle: 'High impact problem-solution hook',
-      cleanPrompt: clean,
-    };
-  }
+  return {
+    primaryIntent: isCaseStudy ? 'PRODUCT_CASE_STUDY' : 'BUSINESS_INSIGHT',
+    targetAudience: isCaseStudy ? 'Founders, Product Leaders & Tech Innovators' : 'Industry Professionals & Creators',
+    emotionalTone: tone.toLowerCase(),
+    coreProblem: isCaseStudy ? 'Solving real-world customer friction' : 'Optimizing growth & productivity',
+    entities: [],
+    primarySubject: '1 unique innovative product or topic',
+    executionStrategy: 'SINGLE_SUBJECT_FOCUS',
+    postType: isCaseStudy ? 'STORY_CASE_STUDY' : 'ACTIONABLE_LIST',
+    viralHookAngle: 'Bold claim or contrarian insight solving hidden friction',
+    cleanPrompt: clean,
+  };
 }
 
 /**

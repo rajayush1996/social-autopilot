@@ -377,10 +377,12 @@ export class ScheduleService {
       });
     }
 
-    // Queue in BullMQ until exact target scheduledAt time
-    await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });
+    // Queue in BullMQ until exact target scheduledAt time (non-blocking)
+    enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt }).catch(err => {
+      logger.warn(`[ScheduleService] BullMQ enqueue warning: ${err.message}`);
+    });
 
-    // Send Email Approval Notification to User
+    // Send Email Approval Notification to User in background (non-blocking)
     if (user.email) {
       try {
         const approvalToken = jwt.sign(
@@ -388,7 +390,7 @@ export class ScheduleService {
           config.jwt.secret,
           { expiresIn: '7d' }
         );
-        await emailService.sendPostApprovalEmail({
+        emailService.sendPostApprovalEmail({
           userEmail: user.email,
           userName: user.name,
           postId: post.id,
@@ -397,9 +399,11 @@ export class ScheduleService {
           targetPlatforms: post.targetPlatforms,
           scheduledAt: post.scheduledAt,
           approvalToken,
+        }).catch(emailErr => {
+          logger.warn(`[ScheduleService] Email notification background warning: ${emailErr.message}`);
         });
       } catch (emailErr) {
-        logger.warn(`[ScheduleService] Email notification warning: ${emailErr.message}`);
+        logger.warn(`[ScheduleService] Email notification token warning: ${emailErr.message}`);
       }
     }
 

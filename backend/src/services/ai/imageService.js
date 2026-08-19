@@ -165,7 +165,7 @@ export class ImageService {
             'Authorization': `Key ${falKey}`,
             'Content-Type': 'application/json',
           },
-          timeout: 25000,
+          timeout: 10000, // 10s strict timeout
         }
       );
 
@@ -215,12 +215,13 @@ export class ImageService {
       return fluxResult;
     }
 
-    // 2. Second Priority: DALL-E 3 if configured
+    // 2. Second Priority: DALL-E 3 with 12s timeout race
     const openai = getOpenAIClient();
     if (openai) {
       try {
         const prompt = `A sleek, minimalist modern 3D tech graphic illustration representing "${visualSubject}". Clean lighting, isometric dark mode aesthetic, vibrant blue and cyan glowing accents, ultra-high resolution, premium aesthetic for LinkedIn social post banner. No distorted text.`;
-        const res = await openai.images.generate({
+        
+        const dallePromise = openai.images.generate({
           model: 'dall-e-3',
           prompt,
           n: 1,
@@ -228,6 +229,11 @@ export class ImageService {
           quality: 'standard',
         });
 
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('DALL-E 3 timeout after 12s')), 12000)
+        );
+
+        const res = await Promise.race([dallePromise, timeoutPromise]);
         const remoteUrl = res.data[0]?.url;
         if (remoteUrl) {
           logger.info(`[ImageService] DALL-E 3 Visual generated successfully!`);
