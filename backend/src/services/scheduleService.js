@@ -393,6 +393,7 @@ export class ScheduleService {
           userName: user.name,
           postId: post.id,
           postContent: post.content,
+          mediaUrls: post.mediaUrls || [],
           targetPlatforms: post.targetPlatforms,
           scheduledAt: post.scheduledAt,
           approvalToken,

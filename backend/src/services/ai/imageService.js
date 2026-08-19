@@ -135,21 +135,91 @@ export class ImageService {
   }
 
   /**
-   * Main High-Level AI Visual Generator with Multi-Tier Strategy (Flux / DALL-E / Branded Card)
+   * Generates ultra-fast, photorealistic 3D visuals using Fal.ai Flux.1 Schnell ($0.003/image cost-optimized)
+   */
+  static async generateFluxVisual({ topic, brandName, visualSubject, tone = 'ENGAGING' }) {
+    const falKey = process.env.FLUX_API_KEY || process.env.FAL_KEY;
+    if (!falKey || falKey === 'your_flux_api_key_here' || falKey.includes('placeholder')) {
+      return null;
+    }
+
+    try {
+      const apiUrl = process.env.FLUX_API_URL?.replace('queue.fal.run', 'fal.run') || 'https://fal.run/fal-ai/flux/schnell';
+      const subjectToRender = visualSubject || brandName || topic || 'Modern AI Technology';
+      const prompt = `Minimalist 3D isometric tech banner illustration representing ${subjectToRender}. Deep indigo and electric cyan glowing accents, dark mode aesthetic, soft studio lighting, clean geometry, ultra-sharp 8k digital art, premium LinkedIn post banner visual. Zero distorted text.`;
+
+      logger.info(`[ImageService] 🚀 Generating visual with Flux.1 Schnell via Fal.ai for subject: "${subjectToRender}"`);
+      const startTime = Date.now();
+
+      const response = await axios.post(
+        apiUrl,
+        {
+          prompt,
+          image_size: 'square_hd',
+          num_inference_steps: 4, // Cost-minimizing 4 steps
+          num_images: 1,
+          enable_safety_checker: true,
+        },
+        {
+          headers: {
+            'Authorization': `Key ${falKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 25000,
+        }
+      );
+
+      const imageUrl = response.data?.images?.[0]?.url;
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+      if (imageUrl) {
+        logger.info(`[ImageService] ✅ Flux Visual generated in ${duration}s! URL: ${imageUrl}`);
+        return {
+          success: true,
+          imageUrl,
+          provider: 'FLUX_1_SCHNELL',
+          width: 1024,
+          height: 1024,
+        };
+      }
+    } catch (err) {
+      logger.warn(`[ImageService] Flux generation warning: ${err.response?.data?.detail || err.message}. Falling back to Branded Infographic Card.`);
+    }
+
+    return null;
+  }
+
+  /**
+   * Main High-Level AI Visual Generator with Multi-Tier Strategy (Flux -> DALL-E -> Branded Card)
    */
   static async generatePostVisual({ topic, brandName, content = '', tone = 'ENGAGING' }) {
-    logger.info(`[ImageService] 🪄 Requesting AI Visual Generation for: "${brandName || topic}"`);
-
-    // Parse takeaways & hook from content for the visual
+    // 1. Extract specific post title/subject from content if available!
     const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-    const hookText = lines[0] || `The blueprint behind ${brandName || topic}'s growth.`;
+    const hookText = lines[0] || '';
+    
+    // Clean emojis, leading symbols & markdown formatting (e.g. "🚀 Replit Agent" -> "Replit Agent")
+    const cleanSubject = hookText
+      .replace(/^[^\p{L}\p{N}]+/gu, '')
+      .replace(/[*_#`]/g, '')
+      .split('\n')[0]
+      .trim();
+
+    const visualSubject = cleanSubject || brandName || topic || 'Modern Tech Innovation';
+    logger.info(`[ImageService] 🪄 Requesting AI Visual Generation for: "${visualSubject}" (Source topic: "${topic}")`);
+
     const takeaways = lines.filter(l => /(?:📌|🎯|💡|\b\d+\.\s+)/.test(l));
 
-    // 1. Try DALL-E 3 / Flux if external API key is provided
+    // 1. First Priority: Fal.ai Flux.1 Schnell (Fastest 0.15s, Ultra-HD, lowest cost: $0.0035)
+    const fluxResult = await this.generateFluxVisual({ topic, brandName, visualSubject, tone });
+    if (fluxResult && fluxResult.imageUrl) {
+      return fluxResult;
+    }
+
+    // 2. Second Priority: DALL-E 3 if configured
     const openai = getOpenAIClient();
     if (openai) {
       try {
-        const prompt = `A sleek, minimalist modern 3D tech graphic illustration representing "${brandName || topic}". Clean lighting, isometric dark mode aesthetic, vibrant blue and cyan glowing accents, ultra-high resolution, premium aesthetic for LinkedIn social post banner. No distorted text.`;
+        const prompt = `A sleek, minimalist modern 3D tech graphic illustration representing "${visualSubject}". Clean lighting, isometric dark mode aesthetic, vibrant blue and cyan glowing accents, ultra-high resolution, premium aesthetic for LinkedIn social post banner. No distorted text.`;
         const res = await openai.images.generate({
           model: 'dall-e-3',
           prompt,
@@ -172,7 +242,7 @@ export class ImageService {
       }
     }
 
-    // 2. High-Performance Deterministic Branded Graphic Card
+    // 3. High-Performance Zero-Cost Branded Graphic Card
     const cardResult = await this.generateBrandedGraphicCard({
       topic,
       brandName,
@@ -182,7 +252,7 @@ export class ImageService {
 
     if (cardResult) return cardResult;
 
-    // Fallback placeholder
+    // 4. Fallback placeholder
     return {
       success: true,
       imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&auto=format&fit=crop',
@@ -192,3 +262,4 @@ export class ImageService {
 }
 
 export default ImageService;
+

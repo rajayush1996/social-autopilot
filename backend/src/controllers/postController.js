@@ -580,4 +580,23 @@ export const regeneratePostImage = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * Controller: Generate a live sample Flux visual graphic from a prompt
+ */
+export const generateSampleVisual = catchAsync(async (req, res) => {
+  const { topic, brandName, tone = 'ENGAGING' } = req.body;
+  const visualRes = await ImageService.generatePostVisual({
+    topic: topic || 'Tech Innovation & AI Productivity Workflows',
+    brandName,
+    tone,
+  });
+
+  if (!visualRes || !visualRes.imageUrl) {
+    throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to generate visual graphic.');
+  }
+
+  return successResponse(res, HttpStatus.OK, 'Sample visual generated successfully', visualRes);
+});
+
+
 

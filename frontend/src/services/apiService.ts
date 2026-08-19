@@ -644,6 +644,17 @@ export class ApiService {
     });
     return response.data?.data;
   }
+
+  /**
+   * ⚡ Generate a live sample Flux visual graphic from a prompt
+   */
+  static async generateSampleVisual(topic: string, brandName?: string): Promise<{ imageUrl: string; provider: string }> {
+    const response = await apiClient.post('/api/posts/sample-visual', {
+      topic,
+      brandName,
+    });
+    return response.data?.data;
+  }
 }
 
 export default ApiService;

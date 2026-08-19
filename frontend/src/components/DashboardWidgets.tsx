@@ -274,7 +274,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
             }`}
           >
             <Sparkles className="h-4 w-4 text-amber-400" />
-            <span>AI Virality & Audience Lab</span>
+            <span>Post Quality & Tips</span>
           </button>
 
           <button
@@ -379,7 +379,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
          ========================================================================== */}
       {activeTab === 'CORE' && (
         <div className="space-y-8 animate-fadeIn">
-          {/* OMNI-PROMPT COMMAND BAR */}
+          {/* QUICK POST CREATOR COMMAND BAR */}
           <div className="bg-[var(--bg-card)] border-2 border-[#2563EB]/30 rounded-3xl p-6 md:p-8 shadow-lg relative overflow-hidden backdrop-blur-xl">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -387,8 +387,8 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                   <Sparkles className="h-5 w-5 animate-pulse" />
                 </span>
                 <div>
-                  <h2 className="text-lg font-extrabold text-[var(--text-primary)]">Omni-Prompt AI Command Bar</h2>
-                  <p className="text-xs text-[var(--text-secondary)] font-medium">Type any content command or campaign instruction for instant multi-channel generation</p>
+                  <h2 className="text-lg font-extrabold text-[var(--text-primary)]">Quick Post Creator</h2>
+                  <p className="text-xs text-[var(--text-secondary)] font-medium">Write what you want to post, and AI will generate and format it for all your channels</p>
                 </div>
               </div>
             </div>
@@ -400,7 +400,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 value={omniPrompt}
                 onChange={(e) => setOmniPrompt(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRunOmniPrompt()}
-                placeholder="e.g. Make 3 tweets about a new AI startup launch and schedule for tomorrow..."
+                placeholder="e.g. Announce our new product update and schedule it for tomorrow morning..."
                 disabled={isGenerating}
                 className="w-full h-14 pl-5 pr-44 bg-[var(--bg-card)] border-2 border-[#2563EB]/40 focus:border-[#2563EB] rounded-2xl text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none shadow-md transition-colors"
               />
@@ -625,9 +625,9 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 <div>
                   <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
                     <Wand2 className="h-5 w-5 text-[#2563EB]" />
-                    Post Virality Diagnostic & Hook Inspector
+                    Post Quality & Engagement Checker
                   </h3>
-                  <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Diagnose why a post performed or flopped and get high-converting hook rewrites</p>
+                  <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Check why a post performed well or needs improvement, and get opening line suggestions</p>
                 </div>
               </div>
 
@@ -638,7 +638,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                   rows={3}
                   value={selectedPostToDiagnose}
                   onChange={(e) => setSelectedPostToDiagnose(e.target.value)}
-                  placeholder="Paste your post text here to run AI virality diagnostics..."
+                  placeholder="Paste your post text here to check its engagement score..."
                   className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-4 text-xs md:text-sm text-[var(--text-primary)] focus:outline-none focus:border-[#2563EB]"
                 />
                 <div className="flex items-center justify-between gap-3">
@@ -662,7 +662,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                     className="btn btn-primary px-5 py-2 text-xs font-extrabold flex items-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {isDiagnosing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    <span>{isDiagnosing ? 'Analyzing...' : 'Run Virality X-Ray'}</span>
+                    <span>{isDiagnosing ? 'Analyzing...' : 'Check Post Score'}</span>
                   </button>
                 </div>
               </div>
@@ -672,13 +672,13 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 <div className="p-5 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-2xl space-y-4 animate-fadeIn">
                   <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
                     <div>
-                      <span className="text-xs font-extrabold text-[var(--text-secondary)] uppercase">Overall Virality Index</span>
+                      <span className="text-xs font-extrabold text-[var(--text-secondary)] uppercase">Overall Quality Score</span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-black text-[var(--text-primary)]">{viralityDiagnosis.viralityScore}/100</span>
                         <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${
                           viralityDiagnosis.viralityScore > 75 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
                         }`}>
-                          {viralityDiagnosis.viralityScore > 75 ? '🔥 High Viral Potential' : '⚠️ Optimization Needed'}
+                          {viralityDiagnosis.viralityScore > 75 ? '🔥 High Engagement Potential' : '⚠️ Improvements Suggested'}
                         </span>
                       </div>
                     </div>
@@ -687,7 +687,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                   {/* 3 Metric Scores */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
-                      <span className="text-[10px] font-extrabold text-[var(--text-secondary)] uppercase block">Hook Strength</span>
+                      <span className="text-[10px] font-extrabold text-[var(--text-secondary)] uppercase block">Opening Hook</span>
                       <p className="text-lg font-black text-[var(--text-primary)] mt-0.5">{viralityDiagnosis.breakdown?.hookScore}/100</p>
                     </div>
                     <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
@@ -695,14 +695,14 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                       <p className="text-lg font-black text-[var(--text-primary)] mt-0.5">{viralityDiagnosis.breakdown?.readabilityScore}/100</p>
                     </div>
                     <div className="p-3 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
-                      <span className="text-[10px] font-extrabold text-[var(--text-secondary)] uppercase block">CTA Power</span>
+                      <span className="text-[10px] font-extrabold text-[var(--text-secondary)] uppercase block">Call to Action</span>
                       <p className="text-lg font-black text-[var(--text-primary)] mt-0.5">{viralityDiagnosis.breakdown?.ctaScore}/100</p>
                     </div>
                   </div>
 
-                  {/* Viral Fixes */}
+                  {/* Suggested Fixes */}
                   <div className="space-y-1.5">
-                    <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase">Actionable Fixes:</span>
+                    <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase">Suggested Improvements:</span>
                     <ul className="text-xs text-[var(--text-secondary)] space-y-1 list-disc pl-4">
                       {viralityDiagnosis.viralFixes?.map((fix: string, i: number) => (
                         <li key={i}>{fix}</li>
@@ -710,10 +710,10 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                     </ul>
                   </div>
 
-                  {/* 1-Click Viral Hook Apply */}
+                  {/* 1-Click Opening Line Apply */}
                   {viralityDiagnosis.improvedViralHook && (
                     <div className="p-4 bg-[#2563EB]/10 border border-[#2563EB]/30 rounded-xl space-y-2">
-                      <span className="text-xs font-extrabold text-[#2563EB] uppercase block">🪄 AI Improved Viral Hook:</span>
+                      <span className="text-xs font-extrabold text-[#2563EB] uppercase block">Suggested Opening Line:</span>
                       <p className="text-xs md:text-sm font-semibold text-[var(--text-primary)] italic">
                         &quot;{viralityDiagnosis.improvedViralHook}&quot;
                       </p>
@@ -723,7 +723,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                         className="btn btn-primary px-4 py-2 text-xs font-extrabold flex items-center gap-1.5 mt-2 cursor-pointer"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>Use this Hook in New Post</span>
+                        <span>Use This Opening Line</span>
                       </button>
                     </div>
                   )}

@@ -41,6 +41,7 @@ class EmailService {
    * Send Generic Transactional Email
    */
   async sendEmail({ to, subject, html, text, from }) {
+    if (!this.transporter) this.initTransporter();
     const fromAddress = from || process.env.SMTP_FROM || process.env.FROM_EMAIL || 'info@omnisyncapp.com';
     const mailOptions = {
       from: `"OmniSync" <${fromAddress}>`,
@@ -66,9 +67,9 @@ class EmailService {
   }
 
   /**
-   * Send Email Approval Request for Generated Post Content
+   * Send Email Approval Request for Generated Post Content (Ultra-Clean Light Theme)
    */
-  async sendPostApprovalEmail({ userEmail, userName, postId, postContent, targetPlatforms = [], scheduledAt, approvalToken, apiBaseUrl, frontendUrl }) {
+  async sendPostApprovalEmail({ userEmail, userName, postId, postContent, mediaUrls = [], targetPlatforms = [], scheduledAt, approvalToken, apiBaseUrl, frontendUrl }) {
     const baseUrl = apiBaseUrl || process.env.API_BASE_URL || 'http://localhost:5000';
     const appUrl = frontendUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -76,63 +77,147 @@ class EmailService {
     const editLink = `${appUrl}/composer?postId=${postId}`;
 
     const formattedDate = scheduledAt ? new Date(scheduledAt).toLocaleString('en-US', {
-      dateStyle: 'full',
-      timeStyle: 'short',
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
     }) : 'Immediate / Next Slot';
 
-    const platformsHtml = (targetPlatforms || ['LINKEDIN', 'X'])
-      .map((p) => `<span style="background:#312e81; color:#c7d2fe; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:bold; margin-right:6px;">${p}</span>`)
+    // Modern Platform Badges
+    const platformColors = {
+      LINKEDIN: { bg: '#0077b5', text: '#ffffff', label: 'LinkedIn' },
+      X: { bg: '#0f1419', text: '#ffffff', label: 'X (Twitter)' },
+      FACEBOOK: { bg: '#1877f2', text: '#ffffff', label: 'Facebook' },
+      INSTAGRAM: { bg: '#e1306c', text: '#ffffff', label: 'Instagram' },
+    };
+
+    const platformsHtml = (targetPlatforms && targetPlatforms.length > 0 ? targetPlatforms : ['LINKEDIN'])
+      .map((p) => {
+        const plat = platformColors[p] || { bg: '#2563eb', text: '#ffffff', label: p };
+        return `<span style="display:inline-block; background-color:${plat.bg}; color:${plat.text}; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; margin-bottom:6px;">${plat.label}</span>`;
+      })
       .join('');
+
+    // Optional Attached Media Preview
+    const mediaHtml = (mediaUrls && mediaUrls.length > 0 && mediaUrls[0]) ? `
+      <div style="margin-top:16px; margin-bottom:16px; text-align:center;">
+        <img src="${mediaUrls[0]}" alt="Attached Post Visual" style="max-width:100%; max-height:360px; border-radius:10px; border:1px solid #e2e8f0; object-fit:cover; display:block; margin:0 auto;" />
+      </div>
+    ` : '';
 
     const htmlContent = `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Post Approval Required - OmniSync</title>
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0f19; color: #f3f4f6; margin: 0; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; }
-        .header { background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 24px; text-align: center; }
-        .header h1 { margin: 0; color: #ffffff; font-size: 20px; letter-spacing: 0.5px; }
-        .content { padding: 28px; }
-        .badge-bar { margin-bottom: 16px; }
-        .post-card { background: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 20px; margin: 16px 0; font-size: 14px; line-height: 1.6; color: #e5e7eb; white-space: pre-wrap; }
-        .meta-info { font-size: 12px; color: #9ca3af; margin-bottom: 24px; }
-        .btn-container { text-align: center; margin-top: 28px; }
-        .btn-approve { display: inline-block; background: #10b981; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; padding: 14px 28px; border-radius: 10px; margin-right: 12px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
-        .btn-edit { display: inline-block; background: #374151; color: #d1d5db; text-decoration: none; font-weight: bold; font-size: 14px; padding: 14px 24px; border-radius: 10px; border: 1px solid #4b5563; }
-        .footer { background: #0f172a; padding: 16px; text-align: center; font-size: 11px; color: #6b7280; border-top: 1px solid #1e293b; }
-      </style>
     </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>⚡ OmniSync Autopilot Approval</h1>
-        </div>
-        <div class="content">
-          <p>Hi ${userName || 'Creator'},</p>
-          <p>Your new AI-generated social media post is ready for review. Please review the content below and approve it for automated scheduling:</p>
-          
-          <div class="badge-bar">
-            ${platformsHtml}
-          </div>
+    <body style="margin:0; padding:30px 15px; background-color:#f8fafc; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased; color:#0f172a;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed;">
+        <tr>
+          <td align="center">
+            <!-- Email Container Card (Light Minimalist Theme) -->
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; background-color:#ffffff; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 4px 20px -2px rgba(15, 23, 42, 0.06); overflow:hidden;">
+              
+              <!-- Header Bar -->
+              <tr>
+                <td style="padding:28px 36px 20px 36px; border-bottom:1px solid #f1f5f9; background-color:#ffffff;">
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                      <td align="left">
+                        <div style="display:inline-block; vertical-align:middle; background-color:#2563eb; color:#ffffff; font-weight:800; font-size:13px; padding:6px 10px; border-radius:8px; letter-spacing:0.5px;">
+                          ⚡ OMNISYNC
+                        </div>
+                      </td>
+                      <td align="right">
+                        <span style="font-size:12px; font-weight:700; color:#2563eb; background-color:#eff6ff; border:1px solid #bfdbfe; padding:4px 10px; border-radius:20px;">
+                          Draft Review Ready
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
 
-          <div class="post-card">${postContent}</div>
+              <!-- Main Body Content -->
+              <tr>
+                <td style="padding:32px 36px;">
+                  <h2 style="margin:0 0 8px 0; font-size:20px; font-weight:800; color:#0f172a; letter-spacing:-0.3px;">
+                    Review today's scheduled post
+                  </h2>
+                  <p style="margin:0 0 24px 0; font-size:14px; line-height:1.6; color:#475569;">
+                    Hi <strong>${userName || 'Creator'}</strong>, your AutoPilot engine has generated a new draft. Review the content and attached visual below to approve it for automated dispatch.
+                  </p>
 
-          <div class="meta-info">
-            📅 <strong>Target Scheduled Time:</strong> ${formattedDate}
-          </div>
+                  <!-- Target Platform Badges -->
+                  <div style="margin-bottom:12px;">
+                    ${platformsHtml}
+                  </div>
 
-          <div class="btn-container">
-            <a href="${approveLink}" class="btn-approve">✅ Approve & Schedule Post</a>
-            <a href="${editLink}" class="btn-edit">✏️ Edit in Composer</a>
-          </div>
-        </div>
-        <div class="footer">
-          Sent by OmniSync Social Autopilot Engine • Safe 1-Click Approval
-        </div>
-      </div>
+                  <!-- Post Preview Card (Clean Light High-Contrast) -->
+                  <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:22px; margin-bottom:20px;">
+                    <div style="font-size:14px; line-height:1.65; color:#1e293b; white-space:pre-wrap; word-break:break-word; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${postContent}</div>
+                    ${mediaHtml}
+                  </div>
+
+                  <!-- Scheduled Time Info Banner -->
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; margin-bottom:28px;">
+                    <tr>
+                      <td style="padding:12px 16px; font-size:13px; color:#1e40af;">
+                        📅 <strong>Target Publishing Time:</strong> ${formattedDate}
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Action Buttons CTA (Prominent Light Theme) -->
+                  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top:10px; margin-bottom:16px;">
+                    <tr>
+                      <td align="center">
+                        <table border="0" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                          <tr>
+                            <td align="center" style="border-radius:10px; background-color:#2563eb; box-shadow:0 4px 12px rgba(37, 99, 235, 0.25);">
+                              <a href="${approveLink}" target="_blank" style="display:inline-block; padding:14px 28px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:14px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px;">
+                                ✅ Approve & Schedule Post
+                              </a>
+                            </td>
+                            <td style="width:12px;"></td>
+                            <td align="center" style="border-radius:10px; background-color:#ffffff; border:1px solid #cbd5e1;">
+                              <a href="${editLink}" target="_blank" style="display:inline-block; padding:13px 22px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:14px; font-weight:700; color:#475569; text-decoration:none; border-radius:10px;">
+                                ✏️ Edit in Composer
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin:20px 0 0 0; text-align:center; font-size:12px; color:#64748b;">
+                    🔒 <em>Safe 1-Click Approval — No password or login required.</em>
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="padding:20px 36px; background-color:#f8fafc; border-top:1px solid #e2e8f0; text-align:center;">
+                  <p style="margin:0 0 4px 0; font-size:12px; font-weight:600; color:#64748b;">
+                    OmniSync Social AutoPilot • Intelligent Growth Platform
+                  </p>
+                  <p style="margin:0; font-size:11px; color:#94a3b8;">
+                    You received this transactional review email because automated draft approval is active on your account.
+                  </p>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
     `;
@@ -142,10 +227,12 @@ class EmailService {
     const mailOptions = {
       from: `"OmniSync Autopilot" <${fromAddress}>`,
       to: userEmail,
-      subject: `[Action Required] Approve your new post for ${targetPlatforms.join(', ') || 'Social Media'}`,
+      subject: `[Action Required] Review & Approve: Post for ${targetPlatforms.join(', ') || 'Social Media'}`,
       html: htmlContent,
-      text: `Hi ${userName || 'Creator'},\n\nYour post is ready:\n\n"${postContent}"\n\nApprove & Schedule: ${approveLink}\nEdit: ${editLink}`,
+      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${postContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
     };
+
+    if (!this.transporter) this.initTransporter();
 
     if (this.transporter) {
       try {

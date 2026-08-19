@@ -471,7 +471,8 @@ function unmaskPlaceholders(text, placeholders) {
 }
 
 /**
- * Magic Prompt Enhancer: Expands a user's rough thought into an optimized, high-converting social media prompt.
+ * Magic Prompt Enhancer & Angles Generator:
+ * Expands rough topic into high-converting prompt and provides 3 tailored actionable angles.
  */
 export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = 'ENGAGING' }) {
   if (!rawThought || !rawThought.trim()) {
@@ -482,28 +483,34 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
   const { maskedText, placeholders } = maskPlaceholders(cleanThought);
   const openai = getOpenAIClient();
 
-  // Helper to format mock response cleanly without raw bracket tags or recursive nesting
-  const formatMockPrompt = (thought) => {
-    let clean = (thought || '').replace(/\n*\[PROMPT DIRECTIVE\]:[\s\S]*/gi, '').trim();
-    const containsExamples = /(?:for example|such as|like|e\.g\.|or)\s+/i.test(clean);
-    
-    if (containsExamples) {
-      return `${clean}\n\nNote: For each generated post, focus deeply on exactly ONE primary subject from your examples to deliver an authentic, high-impact narrative.`;
-    }
-    
-    if (clean.split(/\s+/).length > 10) {
-      return clean;
-    }
-    
-    return `Write an engaging ${platform} post about "${clean}". Use a ${tone.toLowerCase()} tone. Start with a compelling scroll-stopping hook, detail key insights with clean line breaks, and end with an engaging audience question.`;
-  };
+  const generateFallbackAngles = (topic) => [
+    {
+      id: 'founder_story',
+      badge: '👨‍💻 Founder & Tech Story',
+      title: 'Personal Lesson & Experience',
+      prompt: `Share a real engineering/product challenge we experienced regarding "${topic}", the mistake we made initially, and the exact lesson we learned in first-person voice ('I / We') with clean line breaks and key numbers.`,
+    },
+    {
+      id: 'contrarian',
+      badge: '🔥 Contrarian Opinion',
+      title: 'Debunking Outdated Advice',
+      prompt: `Unpopular opinion on "${topic}": Explain why conventional approaches are failing in 2026 and detail the 3-step modern framework that actually works.`,
+    },
+    {
+      id: 'step_by_step',
+      badge: '📊 Practical Step-by-Step Guide',
+      title: 'Actionable Framework',
+      prompt: `A high-impact 3-step breakdown of how to solve key challenges in "${topic}". Detail the friction, practical implementation steps, and the key moral/takeaway.`,
+    },
+  ];
 
   if (!openai) {
-    const mockOutput = formatMockPrompt(maskedText);
+    const mockOutput = `Create engaging, high-impact ${platform} posts about "${cleanThought}". Use a ${tone.toLowerCase()} tone in first-person voice. Start with a compelling scroll-stopping hook, detail actionable insights with clean spacing, and end with an engaging discussion prompt.`;
     return {
       success: true,
       originalThought: cleanThought,
       enhancedPrompt: unmaskPlaceholders(mockOutput, placeholders),
+      angles: generateFallbackAngles(cleanThought),
       isMock: true,
       mockReason: 'OpenAI API key missing or invalid format',
     };
@@ -515,39 +522,58 @@ export async function enhancePrompt({ rawThought, platform = 'GENERAL', tone = '
       messages: [
         {
           role: 'system',
-          content: `You are an expert AI Prompt Optimizer. Your job is to refine a user's prompt for ${platform} in a ${tone} tone.
-RULES:
-1. Preserve 100% of the user's domain, theme, and intent.
-2. If the user provided multiple examples, add an explicit instruction to focus on EXACTLY ONE primary subject per post.
-3. If the user's prompt is already detailed and rich, keep it mostly intact, only sharpening the clarity.
-4. CRITICAL: Preserve all __PLACEHOLDER_X__ tokens EXACTLY as they are without deleting, renaming, or modifying them.
-5. Output ONLY the optimized prompt string without meta-commentary, headers like "Create a post focusing on:", or quotation marks.`,
+          content: `You are an expert Social Media Copywriting & Viral Growth Strategist.
+Your task is to take a user's rough topic for ${platform} (${tone} tone) and return a JSON object with:
+1. "enhancedPrompt": A polished, high-converting social media prompt instructing the AI to write in authentic first-person voice ("I / We") with a scroll-stopping hook, clean line breaks, and an engaging closing discussion question.
+2. "angles": Exactly 3 tailored, actionable prompt angle variations specifically for this topic:
+   - Angle 1: Badge "👨‍💻 Founder Story" (Personal lesson/breakdown in first-person voice)
+   - Angle 2: Badge "🔥 Contrarian Take" (Debunking common myths or mistakes about this topic)
+   - Angle 3: Badge "📊 Actionable Framework" (Step-by-step practical guide with real numbers/takeaways)
+
+CRITICAL: Preserve all __PLACEHOLDER_X__ tokens EXACTLY as they are.
+
+Return ONLY valid JSON matching this schema:
+{
+  "enhancedPrompt": "...",
+  "angles": [
+    { "id": "founder_story", "badge": "👨‍💻 Founder Story", "title": "...", "prompt": "..." },
+    { "id": "contrarian", "badge": "🔥 Contrarian Take", "title": "...", "prompt": "..." },
+    { "id": "step_by_step", "badge": "📊 Actionable Framework", "title": "...", "prompt": "..." }
+  ]
+}`,
         },
         {
           role: 'user',
-          content: `Raw Prompt: "${maskedText}"`,
+          content: `Topic: "${maskedText}"`,
         },
       ],
-      temperature: 0.5,
-      max_tokens: 250,
+      response_format: { type: 'json_object' },
+      temperature: 0.6,
+      max_tokens: 650,
     });
 
-    const rawEnhancedText = extractCoreThought(response.choices[0]?.message?.content?.trim() || maskedText);
-    const finalEnhanced = unmaskPlaceholders(rawEnhancedText || formatMockPrompt(maskedText), placeholders);
+    const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+    const enhanced = unmaskPlaceholders(parsed.enhancedPrompt || maskedText, placeholders);
+    const angles = (parsed.angles && parsed.angles.length > 0 ? parsed.angles : generateFallbackAngles(cleanThought)).map((a) => ({
+      ...a,
+      prompt: unmaskPlaceholders(a.prompt, placeholders),
+    }));
 
     return {
       success: true,
       originalThought: cleanThought,
-      enhancedPrompt: finalEnhanced,
+      enhancedPrompt: enhanced,
+      angles,
       isMock: false,
     };
   } catch (err) {
     logger.warn(`[AIService] Enhance prompt OpenAI fallback: ${err.message}`);
-    const fallbackOutput = formatMockPrompt(maskedText);
+    const fallbackOutput = `Create engaging, high-impact ${platform} posts about "${cleanThought}". Start with a scroll-stopping hook and provide actionable takeaways with clean line breaks.`;
     return {
       success: true,
       originalThought: cleanThought,
       enhancedPrompt: unmaskPlaceholders(fallbackOutput, placeholders),
+      angles: generateFallbackAngles(cleanThought),
       isMock: true,
       mockReason: err.message,
     };

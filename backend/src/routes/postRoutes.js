@@ -13,6 +13,7 @@ import {
   approvePostViaEmail,
   syncPostMetrics,
   regeneratePostImage,
+  generateSampleVisual,
 } from '../controllers/postController.js';
 import { validate } from '../middlewares/validate.js';
 import { generateAiSchema, createPostSchema } from '../validations/postValidation.js';
@@ -33,6 +34,11 @@ router.post('/trigger-scheduler', triggerScheduledPostsNow);
 
 // Apply JWT authentication guard globally across remaining protected post endpoints
 router.use(authenticateJwt);
+
+/**
+ * POST /api/posts/sample-visual - Generate live sample Flux visual
+ */
+router.post('/sample-visual', aiLimiter, generateSampleVisual);
 
 /**
  * POST /api/posts/:id/sync-metrics - Sync live post engagement (Likes, Comments, Shares)

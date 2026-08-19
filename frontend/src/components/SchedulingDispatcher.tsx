@@ -52,47 +52,73 @@ const TONES = [
   { id: 'HUMOROUS', label: 'Humorous & Fun' },
 ];
 
-// 🌟 AI CREATIVE STUDIO (With Empty State Logic)
+// 🌟 UNIFIED VISUAL MEDIA STUDIO & BATCH BUNDLE ENGINE
 export function CampaignCreativeStudio({ 
   onImageClick,
   onDurationChange,
   campaignTopic = '',
+  imageMode = 'AI_FLUX',
+  onImageModeChange,
+  customImageUrl = '',
+  onCustomImageUrlChange,
+  uploadingMedia = false,
+  onUploadCustomMedia,
   assets,
   onAssetsUpdate
 }: { 
   onImageClick: (url: string, title: string) => void; 
   onDurationChange?: (days: number) => void;
   campaignTopic?: string;
+  imageMode: 'AI_FLUX' | 'CUSTOM_UPLOAD' | 'NONE';
+  onImageModeChange: (mode: 'AI_FLUX' | 'CUSTOM_UPLOAD' | 'NONE') => void;
+  customImageUrl?: string;
+  onCustomImageUrlChange: (url: string) => void;
+  uploadingMedia?: boolean;
+  onUploadCustomMedia: (file: File) => void;
   assets: Array<{ day: number; url: string; prompt: string }>;
   onAssetsUpdate: (assets: Array<{ day: number; url: string; prompt: string }>) => void;
 }) {
-  const [generationType, setGenerationType] = useState<'SINGLE' | 'BATCH'>('BATCH');
-  const [generatingBatch, setGeneratingBatch] = useState(false);
-  const [visualStyle, setVisualStyle] = useState('3D_SAAS');
+  const [aiVisualSubMode, setAiVisualSubMode] = useState<'DYNAMIC' | 'BATCH'>('DYNAMIC');
+  const [generatingVisual, setGeneratingVisual] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number>(15);
-  const [customVisualPrompt, setCustomVisualPrompt] = useState<string>('');
 
-  const handleGenerate = () => {
-    setGeneratingBatch(true);
-    
-    // Simulating API Call for Image Generation
-    setTimeout(() => {
-      if (generationType === 'BATCH') {
-        const newAssets = Array.from({ length: selectedDays }).map((_, i) => ({
-          day: i + 1,
-          url: `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=60&sig=${Math.random()}`,
-          prompt: campaignTopic || `Day ${i + 1} creative`
-        }));
-        onAssetsUpdate(newAssets);
+  const toast = useToast();
+
+  const handleGenerateFluxAssets = async () => {
+    setGeneratingVisual(true);
+    try {
+      const baseTopic = campaignTopic.trim() || 'Modern High-Scale SaaS Architecture & AI Automation';
+      
+      if (aiVisualSubMode === 'DYNAMIC') {
+        const res = await ApiService.generateSampleVisual(baseTopic);
+        if (res && res.imageUrl) {
+          onAssetsUpdate([{
+            day: 1,
+            url: res.imageUrl,
+            prompt: baseTopic,
+          }]);
+          toast.success('🎨 Sample Flux.1 visual generated!');
+        }
       } else {
-        onAssetsUpdate([{
-          day: 1,
-          url: `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=60&sig=${Math.random()}`,
-          prompt: campaignTopic || 'Single creative'
-        }]);
+        // Generate primary Flux visual
+        const primaryRes = await ApiService.generateSampleVisual(baseTopic);
+        const primaryUrl = primaryRes?.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=60';
+        
+        // Build the 7, 15, or 30-Day Batch Bundle
+        const batchList = Array.from({ length: selectedDays }).map((_, i) => ({
+          day: i + 1,
+          url: i === 0 ? primaryUrl : `${primaryUrl}&variation=${i + 1}`,
+          prompt: `${baseTopic} - Day ${i + 1} Visual Theme`,
+        }));
+        
+        onAssetsUpdate(batchList);
+        toast.success(`⚡ Generated ${selectedDays}-Day Campaign Visual Bundle!`);
       }
-      setGeneratingBatch(false);
-    }, generationType === 'BATCH' ? 3000 : 1500);
+    } catch (err: any) {
+      toast.error('Failed to generate Flux visuals.');
+    } finally {
+      setGeneratingVisual(false);
+    }
   };
 
   const scrollSlider = (direction: 'left' | 'right') => {
@@ -104,150 +130,268 @@ export function CampaignCreativeStudio({
   };
 
   return (
-    <div className="space-y-3 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl p-4 shadow-inner">
+    <div className="space-y-3.5 bg-[var(--bg-input)]/70 border border-[var(--border-color)] rounded-3xl p-5 shadow-sm">
+      {/* Media Header Row */}
       <div className="flex items-center justify-between pb-2 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-blue-50 dark:bg-blue-900/20 text-[#2563EB] rounded-xl">
-            <Wand2 className="w-4 h-4" />
+          <div className="p-1.5 bg-[#2563EB]/10 text-[#2563EB] rounded-xl border border-[#2563EB]/20">
+            <ImageIcon className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">AI Visual Generator Engine</h4>
-            <p className="text-[11px] text-[var(--text-secondary)]">Batch visuals synchronized with your topic</p>
+            <h4 className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">Post Images</h4>
+            <p className="text-[11px] text-[var(--text-secondary)]">Choose how images are added to your posts</p>
           </div>
         </div>
         
+        <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] font-extrabold px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+          More Reach
+        </span>
+      </div>
+
+      {/* Top 3-Way Mode Toggle Selector */}
+      <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={handleGenerate}
-          disabled={generatingBatch}
-          className="px-3.5 py-2 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          onClick={() => onImageModeChange('AI_FLUX')}
+          className={`py-2.5 px-3 rounded-xl border text-center font-extrabold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            imageMode === 'AI_FLUX'
+              ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+              : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
+          }`}
         >
-          {generatingBatch ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          {generatingBatch ? 'Processing...' : (generationType === 'BATCH' ? `Generate ${selectedDays}-Day Batch` : 'Generate Single')}
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI Images</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onImageModeChange('CUSTOM_UPLOAD')}
+          className={`py-2.5 px-3 rounded-xl border text-center font-extrabold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            imageMode === 'CUSTOM_UPLOAD'
+              ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+              : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>Upload Image</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onImageModeChange('NONE')}
+          className={`py-2.5 px-3 rounded-xl border text-center font-extrabold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            imageMode === 'NONE'
+              ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+              : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
+          }`}
+        >
+          <span>📝 No Image</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Visual Context Prompt</label>
-          <input
-            type="text"
-            value={customVisualPrompt}
-            onChange={(e) => setCustomVisualPrompt(e.target.value)}
-            placeholder="e.g. Minimalist tech mockup..."
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[#2563EB]"
-          />
+      {/* Dynamic Content Area based on Selected Mode */}
+      {imageMode === 'NONE' && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center space-y-1.5 shadow-xs">
+          <p className="text-xs font-bold text-[var(--text-primary)]">📝 Text Only Posts</p>
+          <p className="text-[11px] text-[var(--text-secondary)]">
+            Posts will be formatted and published as clean text without any images attached.
+          </p>
         </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Art Style</label>
-          <select value={visualStyle} onChange={(e) => setVisualStyle(e.target.value)} className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] font-medium">
-            <option value="3D_SAAS">3D SaaS Render</option>
-            <option value="CORPORATE">Clean Corporate</option>
-            <option value="VECTOR">Minimalist Vector</option>
-            <option value="CYBERPUNK">Cyberpunk Tech</option>
-          </select>
-        </div>
-      </div>
+      )}
 
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <div className="flex items-center bg-[var(--bg-card)] p-1 rounded-xl border border-[var(--border-color)]">
-          <button
-            type="button"
-            onClick={() => setGenerationType('SINGLE')}
-            className={`px-3 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
-              generationType === 'SINGLE' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-secondary)]'
-            }`}
-          >
-            🖼️ Single Image
-          </button>
-          <button
-            type="button"
-            onClick={() => setGenerationType('BATCH')}
-            className={`px-3 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
-              generationType === 'BATCH' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-secondary)]'
-            }`}
-          >
-            ⚡ Campaign Batch
-          </button>
-        </div>
-
-        {generationType === 'BATCH' && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase">Days:</span>
-            {[7, 15, 30].map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => { setSelectedDays(d); if (onDurationChange) onDurationChange(d); }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-extrabold transition-all border cursor-pointer ${
-                  selectedDays === d ? 'bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] border-blue-300' : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)]'
-                }`}
-              >
-                {d}D
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 🌟 EMPTY STATE LOGIC (Pehle koi image nahi dikhegi) */}
-      {assets.length === 0 ? (
-        <div className="h-28 w-full bg-[var(--bg-card)] border border-dashed border-[var(--border-color)] rounded-xl flex flex-col items-center justify-center space-y-1.5 mt-2">
-          <div className="p-2 bg-[var(--bg-input)] rounded-full border border-[var(--border-color)]">
-            <ImageIcon className="w-5 h-5 text-[var(--text-secondary)] opacity-70" />
-          </div>
-          <p className="text-[11px] font-extrabold text-[var(--text-primary)]">No Visuals Generated Yet</p>
-          <p className="text-[9px] text-[var(--text-secondary)]">Click the Generate button above to create AI images</p>
-        </div>
-      ) : generationType === 'BATCH' ? (
-        <div className="relative group/slider pt-1">
-          <button 
-            type="button"
-            onClick={() => scrollSlider('left')}
-            className="absolute -left-3 top-[50%] -translate-y-[50%] z-10 p-2 bg-[var(--bg-card)] hover:bg-[#2563EB] hover:text-white border border-[var(--border-color)] rounded-full text-[var(--text-primary)] shadow-md transition-all cursor-pointer"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button 
-            type="button"
-            onClick={() => scrollSlider('right')}
-            className="absolute -right-3 top-[50%] -translate-y-[50%] z-10 p-2 bg-[var(--bg-card)] hover:bg-[#2563EB] hover:text-white border border-[var(--border-color)] rounded-full text-[var(--text-primary)] shadow-md transition-all cursor-pointer"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          <div 
-            id="creative-slider-container"
-            className="grid grid-flow-col auto-cols-[calc(33.333%-8px)] gap-3 overflow-x-hidden pb-1 px-1 scroll-smooth"
-          >
-            {assets.map((asset) => (
+      {imageMode === 'CUSTOM_UPLOAD' && (
+        <div className="bg-[var(--bg-card)] border border-emerald-500/30 rounded-2xl p-4 space-y-3 shadow-xs">
+          {customImageUrl ? (
+            <div className="space-y-2.5">
               <div 
-                key={asset.day} 
-                onClick={() => onImageClick(asset.url, `Day ${asset.day} Creative`)}
-                className="group relative bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xs cursor-pointer hover:border-[#2563EB] transition-all shrink-0 snap-start"
+                onClick={() => onImageClick(customImageUrl, 'Image Preview')}
+                className="h-44 w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl overflow-hidden cursor-pointer group flex items-center justify-center relative p-2"
               >
-                <div className="h-28 w-full bg-slate-900 overflow-hidden relative">
-                  <img src={asset.url} alt={`Day ${asset.day}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  <span className="absolute top-1.5 left-1.5 bg-black/75 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-md">
-                    Day {asset.day}
-                  </span>
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
-                    🔍 View
-                  </div>
+                <img src={customImageUrl} alt="Custom Upload" className="max-h-40 w-full object-contain rounded-lg group-hover:scale-105 transition-transform" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 rounded-xl">
+                  🔍 Click to preview full screen
                 </div>
               </div>
-            ))}
-          </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] font-bold text-emerald-500 flex items-center gap-1">
+                  ✓ Image will be attached to your scheduled posts
+                </span>
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-primary)] border border-[var(--border-color)] cursor-pointer">
+                    Replace
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      className="hidden"
+                      disabled={uploadingMedia}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) onUploadCustomMedia(f);
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => onCustomImageUrlChange('')}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <label className="border border-dashed border-[var(--border-color)] rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-emerald-500 transition-all bg-[var(--bg-input)]">
+              <Upload className="w-6 h-6 text-emerald-500" />
+              <span className="text-xs font-extrabold text-[var(--text-primary)]">
+                {uploadingMedia ? 'Uploading Image...' : 'Click to Upload Image'}
+              </span>
+              <span className="text-[10px] text-[var(--text-secondary)]">PNG, JPG, WebP up to 10MB</span>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                disabled={uploadingMedia}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onUploadCustomMedia(f);
+                }}
+              />
+            </label>
+          )}
         </div>
-      ) : (
-        <div 
-          onClick={() => onImageClick(assets[0].url, 'Single Generated Creative')}
-          className="h-32 w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden relative cursor-pointer group flex items-center justify-center"
-        >
-          <img src={assets[0].url} alt="Single preview" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-            🔍 Click to preview full screen
+      )}
+
+      {imageMode === 'AI_FLUX' && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 space-y-3 shadow-xs">
+          {/* Sub-Toggle Switch: Dynamic per post vs Batch Bundle */}
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border-color)]">
+            <div className="flex items-center bg-[var(--bg-input)] p-1 rounded-xl border border-[var(--border-color)]">
+              <button
+                type="button"
+                onClick={() => setAiVisualSubMode('DYNAMIC')}
+                className={`px-3 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  aiVisualSubMode === 'DYNAMIC' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                ⚡ Generate per post
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiVisualSubMode('BATCH')}
+                className={`px-3 py-1 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                  aiVisualSubMode === 'BATCH' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                📦 Image Pack
+              </button>
+            </div>
+
+            {aiVisualSubMode === 'BATCH' ? (
+              <div className="flex items-center gap-1">
+                {[7, 15, 30].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => { setSelectedDays(d); if (onDurationChange) onDurationChange(d); }}
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all border cursor-pointer ${
+                      selectedDays === d ? 'bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] border-blue-300' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
+                    }`}
+                  >
+                    {d} Days
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[10px] text-[var(--text-secondary)] font-medium">
+                Auto-matches daily post topic
+              </span>
+            )}
           </div>
+
+          {/* Sub-mode action row */}
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              {aiVisualSubMode === 'DYNAMIC' 
+                ? 'Creates an AI image matching your post topic.' 
+                : `Pre-render ${selectedDays} daily images based on your topic.`}
+            </p>
+            <button
+              type="button"
+              onClick={handleGenerateFluxAssets}
+              disabled={generatingVisual}
+              className="px-3.5 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold transition-all shadow-sm flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+            >
+              {generatingVisual ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              <span>{generatingVisual ? 'Generating...' : (aiVisualSubMode === 'BATCH' ? `Generate ${selectedDays}-Day Pack` : 'Preview Sample Image')}</span>
+            </button>
+          </div>
+
+          {/* Asset Preview Deck */}
+          {assets.length === 0 ? (
+            <div className="h-28 w-full bg-[var(--bg-input)] border border-dashed border-[var(--border-color)] rounded-xl flex flex-col items-center justify-center space-y-1 mt-1">
+              <Sparkles className="w-5 h-5 text-[#2563EB]" />
+              <p className="text-[11px] font-extrabold text-[var(--text-primary)]">
+                {aiVisualSubMode === 'DYNAMIC' ? 'AI Images Enabled' : 'No Image Pack Generated Yet'}
+              </p>
+              <p className="text-[9px] text-[var(--text-secondary)]">
+                {aiVisualSubMode === 'DYNAMIC' 
+                  ? 'An AI image will be automatically created with each scheduled post.' 
+                  : 'Click "Generate Pack" above to preview your campaign images.'}
+              </p>
+            </div>
+          ) : aiVisualSubMode === 'BATCH' ? (
+            <div className="relative group/slider pt-1">
+              <button 
+                type="button"
+                onClick={() => scrollSlider('left')}
+                className="absolute -left-3 top-[50%] -translate-y-[50%] z-10 p-2 bg-[var(--bg-card)] hover:bg-[#2563EB] hover:text-white border border-[var(--border-color)] rounded-full text-[var(--text-primary)] shadow-md transition-all cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button 
+                type="button"
+                onClick={() => scrollSlider('right')}
+                className="absolute -right-3 top-[50%] -translate-y-[50%] z-10 p-2 bg-[var(--bg-card)] hover:bg-[#2563EB] hover:text-white border border-[var(--border-color)] rounded-full text-[var(--text-primary)] shadow-md transition-all cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <div 
+                id="creative-slider-container"
+                className="grid grid-flow-col auto-cols-[calc(33.333%-8px)] gap-3 overflow-x-hidden pb-1 px-1 scroll-smooth"
+              >
+                {assets.map((asset) => (
+                  <div 
+                    key={asset.day} 
+                    onClick={() => onImageClick(asset.url, `Day ${asset.day} Image`)}
+                    className="group relative bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xs cursor-pointer hover:border-[#2563EB] transition-all shrink-0 snap-start"
+                  >
+                    <div className="h-28 w-full bg-slate-900 overflow-hidden relative">
+                      <img src={asset.url} alt={`Day ${asset.day}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <span className="absolute top-1.5 left-1.5 bg-black/75 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-md">
+                        Day {asset.day}
+                      </span>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                        🔍 View
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div 
+              onClick={() => onImageClick(assets[0].url, 'Flux Generated Creative')}
+              className="h-44 w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl overflow-hidden relative cursor-pointer group flex items-center justify-center p-2"
+            >
+              <img src={assets[0].url} alt="Flux Preview" className="max-h-40 w-full object-contain rounded-lg group-hover:scale-105 transition-transform" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 rounded-xl">
+                🔍 Click to preview full screen
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -292,7 +436,9 @@ export function SchedulingDispatcher() {
   const [formHashtagCount, setFormHashtagCount] = useState<string>('MODERATE');
   const [formContentLength, setFormContentLength] = useState<string>('BALANCED');
   const [formTopic, setFormTopic] = useState<string>('');
-  
+  const [promptAngles, setPromptAngles] = useState<Array<{ id: string; badge: string; title: string; prompt: string }>>([]);
+  const [showAnglePickerModal, setShowAnglePickerModal] = useState<boolean>(false);
+  const [selectedAngleIndex, setSelectedAngleIndex] = useState<number>(0);
   const [isEnhancingTopic, setIsEnhancingTopic] = useState<boolean>(false);
   const [isTopicExpanded, setIsTopicExpanded] = useState<boolean>(false);
   const [sampleDrafts, setSampleDrafts] = useState<Record<string, string> | null>(null);
@@ -307,6 +453,7 @@ export function SchedulingDispatcher() {
   const [generatedAssets, setGeneratedAssets] = useState<Array<{ day: number; url: string; prompt: string }>>([]);
 
   const [saving, setSaving] = useState<boolean>(false);
+  const [pendingUpdateIds, setPendingUpdateIds] = useState<string[]>([]);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
 
@@ -325,10 +472,15 @@ export function SchedulingDispatcher() {
     }
     setIsEnhancingTopic(true);
     try {
-      const result = await ApiService.enhancePrompt(formTopic, formPlatforms[0] || 'GENERAL', formTone);
+      const result: any = await ApiService.enhancePrompt(formTopic, formPlatforms[0] || 'GENERAL', formTone);
       if (result.enhancedPrompt) {
         setFormTopic(result.enhancedPrompt);
-        toast.success('Prompt magic-enhanced successfully!');
+        if (result.angles && result.angles.length > 0) {
+          setPromptAngles(result.angles);
+          toast.success('Generated 3 viral angle suggestions below!');
+        } else {
+          toast.success('Prompt magic-enhanced successfully!');
+        }
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to enhance prompt.');
@@ -466,9 +618,13 @@ export function SchedulingDispatcher() {
 
       if (editingSchedule) {
         await ApiService.updateSchedule(editingSchedule.id, payload);
+        setPendingUpdateIds(prev => Array.from(new Set([...prev, editingSchedule.id])));
         toast.success('Campaign updated successfully!');
       } else {
-        await ApiService.createSchedule(payload);
+        const newSched: any = await ApiService.createSchedule(payload);
+        if (newSched?.schedule?.id) {
+          setPendingUpdateIds(prev => Array.from(new Set([...prev, newSched.schedule.id])));
+        }
         toast.success('New smart campaign created!');
       }
       setIsModalOpen(false);
@@ -485,6 +641,7 @@ export function SchedulingDispatcher() {
     try {
       await ApiService.deleteSchedule(id);
       setSchedules(prev => prev.filter(s => s.id !== id));
+      setPendingUpdateIds(prev => prev.filter(item => item !== id));
       toast.success('Campaign deleted.');
     } catch (err) { toast.error('Failed to delete campaign.'); }
   };
@@ -496,6 +653,7 @@ export function SchedulingDispatcher() {
       const updateTargetId = existingPendingPost ? existingPendingPost.id : undefined;
 
       await ApiService.runScheduleNow(sched.id, updateTargetId);
+      setPendingUpdateIds(prev => prev.filter(id => id !== sched.id));
       toast.success(`🚀 Dispatched campaign "${sched.name}"!`);
       fetchSchedulesData();
       fetchPostsData();
@@ -642,25 +800,32 @@ export function SchedulingDispatcher() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0 border-t lg:border-t-0 border-[var(--border-color)] pt-3 lg:pt-0">
+                <div className="flex items-center gap-2 shrink-0 border-t lg:border-t-0 border-[var(--border-color)] pt-3 lg:pt-0">
+                  {/* Smart Change Detection: Show Play / Run Changes button ONLY if updated or never run */}
+                  {(!sched.lastRunAt || pendingUpdateIds.includes(sched.id)) && (
+                    <button
+                      onClick={() => handleRunNow(sched)}
+                      disabled={isRunning || !sched.isActive}
+                      title="Run AutoPilot Now with your latest updated changes"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all cursor-pointer disabled:opacity-50 animate-fadeIn"
+                    >
+                      {isRunning ? (
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin block" />
+                      ) : (
+                        <Play className="w-3.5 h-3.5 fill-white" />
+                      )}
+                      <span>{isRunning ? 'Dispatching...' : 'Run Changes'}</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleToggleActiveSwitch(sched)}
                     disabled={isToggling}
-                    className={`focus:outline-none transition-transform active:scale-95 mr-2 cursor-pointer ${sched.isActive ? 'text-[#2563EB]' : 'text-[var(--text-secondary)]'}`}
+                    className={`focus:outline-none transition-transform active:scale-95 cursor-pointer ${sched.isActive ? 'text-[#2563EB]' : 'text-[var(--text-secondary)]'}`}
+                    title={sched.isActive ? 'Pause Campaign' : 'Resume Campaign'}
                   >
                     {sched.isActive ? <ToggleRight className="h-8 w-8" /> : <ToggleLeft className="h-8 w-8" />}
                   </button>
-
-                  {!sched.lastRunAt && (
-                    <button
-                      onClick={() => handleRunNow(sched)}
-                      disabled={isRunning}
-                      title="Run Now"
-                      className="p-2 text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-blue-50 rounded-lg cursor-pointer"
-                    >
-                      {isRunning ? <span className="w-4 h-4 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin block" /> : <Play className="h-4 w-4" />}
-                    </button>
-                  )}
 
                   <button
                     onClick={() => handleOpenEditModal(sched)}
@@ -905,7 +1070,7 @@ export function SchedulingDispatcher() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <label className="text-xs font-bold text-[#2563EB] uppercase tracking-wider block flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5" /> Topic & Niche Instructions
+                      <Sparkles className="h-3.5 w-3.5" /> Post Topic & Instructions
                     </label>
                     <button
                       type="button"
@@ -932,7 +1097,7 @@ export function SchedulingDispatcher() {
                       className="flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-blue-50 dark:bg-blue-900/20 border border-blue-200 px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 cursor-pointer shadow-xs"
                     >
                       <Sparkles className={`w-3.5 h-3.5 ${isEnhancingTopic ? 'animate-spin' : ''}`} />
-                      {isEnhancingTopic ? 'Enhancing...' : '✨ Magic Enhance Prompt'}
+                      {isEnhancingTopic ? 'Improving...' : '✨ Improve with AI'}
                     </button>
 
                     <button
@@ -941,9 +1106,60 @@ export function SchedulingDispatcher() {
                       disabled={generatingSample || formPlatforms.length === 0}
                       className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#2563EB] hover:bg-blue-600 px-3 py-1.5 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-xs ml-auto"
                     >
-                      {generatingSample ? 'Generating...' : '✨ Sample Post Preview'}
+                      {generatingSample ? 'Generating...' : 'Preview Sample Post'}
                     </button>
                   </div>
+
+                  {/* AI Post Ideas (Clean Non-Blocking Inline Cards with Full Light/Dark Mode) */}
+                  {promptAngles && promptAngles.length > 0 && (
+                    <div className="mt-3 p-3 bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-2xl animate-fadeIn space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+                          <span className="text-xs font-extrabold text-[var(--text-primary)]">
+                            Suggested Post Ideas:
+                          </span>
+                          <span className="text-[10px] text-[var(--text-secondary)] font-medium">
+                            (Click any idea to use it)
+                          </span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setPromptAngles([])}
+                          className="text-[11px] text-[var(--text-secondary)] hover:text-red-500 font-bold px-2 py-0.5 rounded-lg hover:bg-[var(--bg-card)] transition-all cursor-pointer"
+                          title="Dismiss suggestions"
+                        >
+                          ✕ Dismiss
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        {promptAngles.map((angle) => (
+                          <button
+                            key={angle.id}
+                            type="button"
+                            onClick={() => {
+                              setFormTopic(angle.prompt);
+                              toast.success(`Applied ${angle.badge}!`);
+                            }}
+                            className="text-left p-3 bg-[var(--bg-card)] hover:bg-blue-50/50 dark:hover:bg-blue-950/20 border border-[var(--border-color)] hover:border-[#2563EB] rounded-xl transition-all group cursor-pointer shadow-xs"
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[11px] font-extrabold text-[#2563EB] bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                {angle.badge}
+                              </span>
+                              <span className="text-[10px] font-bold text-[#2563EB] opacity-0 group-hover:opacity-100 transition-opacity">
+                                Use this idea →
+                              </span>
+                            </div>
+                            <p className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] leading-relaxed font-medium transition-colors">
+                              {angle.prompt}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* ADVANCED TEXT CONTROLS */}
@@ -993,157 +1209,19 @@ export function SchedulingDispatcher() {
                     </select>
                   </div>
                 </div>
-
-                {/* 🖼️ VISUAL MEDIA ENGINE SELECTOR (Flux AI vs Custom Upload vs Text Only) */}
-                <div className="bg-[var(--bg-input)]/60 border border-[var(--border-color)] p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4 text-[#2563EB]" />
-                      <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
-                        Visual Media Engine
-                      </span>
-                    </div>
-                    <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] font-bold px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
-                      +2x Reach
-                    </span>
-                  </div>
-
-                  {/* 3 Selectable Modern Radio Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {/* Mode 1: AI Visual Flux */}
-                    <button
-                      type="button"
-                      onClick={() => setFormImageMode('AI_FLUX')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                        formImageMode === 'AI_FLUX'
-                          ? 'bg-[#2563EB]/10 border-[#2563EB] shadow-xs'
-                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-[#2563EB]/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> AI Visual
-                        </span>
-                        {formImageMode === 'AI_FLUX' && (
-                          <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[var(--text-secondary)] leading-tight">
-                        Auto-generates matching 1080x1080 graphic for each topic.
-                      </p>
-                    </button>
-
-                    {/* Mode 2: Custom Brand Upload */}
-                    <button
-                      type="button"
-                      onClick={() => setFormImageMode('CUSTOM_UPLOAD')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                        formImageMode === 'CUSTOM_UPLOAD'
-                          ? 'bg-emerald-500/10 border-emerald-500 shadow-xs'
-                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-emerald-500/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-[var(--text-primary)] flex items-center gap-1.5">
-                          <Upload className="w-3.5 h-3.5 text-emerald-500" /> Custom Brand
-                        </span>
-                        {formImageMode === 'CUSTOM_UPLOAD' && (
-                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[var(--text-secondary)] leading-tight">
-                        Tag fixed company graphic or logo.
-                      </p>
-                    </button>
-
-                    {/* Mode 3: Text Only */}
-                    <button
-                      type="button"
-                      onClick={() => setFormImageMode('NONE')}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                        formImageMode === 'NONE'
-                          ? 'bg-[var(--bg-card)] border-[#2563EB] shadow-xs'
-                          : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-[var(--text-secondary)]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-[var(--text-primary)]">
-                          📝 Text Only
-                        </span>
-                        {formImageMode === 'NONE' && (
-                          <span className="w-2 h-2 rounded-full bg-slate-400" />
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[var(--text-secondary)] leading-tight">
-                        Standard pure text posts without media attachments.
-                      </p>
-                    </button>
-                  </div>
-
-                  {/* Custom Upload Dropzone / Preview when Mode 2 is selected */}
-                  {formImageMode === 'CUSTOM_UPLOAD' && (
-                    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl space-y-2.5 pt-2">
-                      {formCustomImageUrl ? (
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <img src={formCustomImageUrl} alt="Custom Preview" className="w-12 h-12 rounded-lg object-cover border border-[var(--border-color)] shrink-0" />
-                            <div className="min-w-0">
-                              <span className="text-xs font-bold text-[var(--text-primary)] block truncate">Custom Graphic Attached</span>
-                              <span className="text-[10px] text-emerald-500 font-medium">Ready to tag in all scheduled posts</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-primary)] border border-[var(--border-color)] cursor-pointer">
-                              Replace
-                              <input
-                                type="file"
-                                accept="image/*,video/*"
-                                className="hidden"
-                                disabled={uploadingScheduleMedia}
-                                onChange={(e) => {
-                                  const f = e.target.files?.[0];
-                                  if (f) handleUploadScheduleCustomMedia(f);
-                                }}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => setFormCustomImageUrl('')}
-                              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <label className="border border-dashed border-[var(--border-color)] rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-emerald-500 transition-all bg-[var(--bg-input)]">
-                          <Upload className="w-5 h-5 text-emerald-500" />
-                          <span className="text-xs font-bold text-[var(--text-primary)]">
-                            {uploadingScheduleMedia ? 'Uploading Brand Image...' : 'Click to Upload Custom Brand Graphic'}
-                          </span>
-                          <span className="text-[10px] text-[var(--text-secondary)]">PNG, JPG, WebP up to 10MB</span>
-                          <input
-                            type="file"
-                            accept="image/*,video/*"
-                            className="hidden"
-                            disabled={uploadingScheduleMedia}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) handleUploadScheduleCustomMedia(f);
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
 
-              {/* RIGHT COLUMN: AI Visual Studio & Live Feed Previews (6 Cols) */}
+              {/* RIGHT COLUMN: Unified Visual Media Studio & Live Feed Previews (6 Cols) */}
               <div className="lg:col-span-6 space-y-4">
-                {/* AI Visual Studio with correctly linked state */}
+                {/* Unified Visual Media Studio */}
                 <CampaignCreativeStudio 
                   campaignTopic={formTopic} 
+                  imageMode={formImageMode}
+                  onImageModeChange={setFormImageMode}
+                  customImageUrl={formCustomImageUrl}
+                  onCustomImageUrlChange={setFormCustomImageUrl}
+                  uploadingMedia={uploadingScheduleMedia}
+                  onUploadCustomMedia={handleUploadScheduleCustomMedia}
                   onImageClick={(url, title) => setSelectedImageModal({ url, title })}
                   assets={generatedAssets}
                   onAssetsUpdate={setGeneratedAssets} 
