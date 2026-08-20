@@ -55,23 +55,17 @@ export class XAdapter extends SocialAdapter {
       }
     }
 
-    if (accessToken && accessToken.startsWith('mock_')) {
-      // Sandbox Mock Publisher
-      logger.info('[XAdapter] Executing in Sandbox/Simulation mode for mock account.');
-      const mockTweetId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    if (process.env.NODE_ENV === 'test' && accessToken && accessToken.startsWith('mock_')) {
+      // Sandbox Mock Publisher (Only for unit test suite)
+      logger.info('[XAdapter] Executing in Sandbox/Simulation mode for test suite.');
+      const mockId = `mock_tweet_${Date.now()}`;
 
       return {
         success: true,
         platform: 'X',
-        externalPostId: mockTweetId,
-        externalPostUrl: `https://x.com/user/status/${mockTweetId}`,
-        rawResponse: {
-          data: {
-            id: mockTweetId,
-            text: tweetText,
-            status: 'SIMULATED_SUCCESS',
-          },
-        },
+        externalPostId: mockId,
+        externalPostUrl: `https://x.com/i/status/${mockId}`,
+        rawResponse: { id: mockId, status: 'SIMULATED_SUCCESS' },
         isMock: true,
         strategyUsed: this.name,
       };

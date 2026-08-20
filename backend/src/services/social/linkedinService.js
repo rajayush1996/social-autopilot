@@ -120,9 +120,9 @@ export class LinkedinAdapter extends SocialAdapter {
       }
     }
 
-    if (accessToken && accessToken.startsWith('mock_')) {
-      // Sandbox Mock Publisher (Only for unit test suites)
-      logger.info('[LinkedinAdapter] Executing in Sandbox/Simulation mode for mock account.');
+    if (process.env.NODE_ENV === 'test' && accessToken && accessToken.startsWith('mock_')) {
+      // Sandbox Mock Publisher (Only for automated unit test suites)
+      logger.info('[LinkedinAdapter] Executing in Sandbox/Simulation mode for test suite.');
       const mockUrn = `urn:li:share:${Date.now()}`;
 
       return {
@@ -138,6 +138,10 @@ export class LinkedinAdapter extends SocialAdapter {
         isMock: true,
         strategyUsed: this.name,
       };
+    }
+
+    if (accessToken && accessToken.startsWith('mock_')) {
+      throw new Error('LinkedIn Publish Failed: Connected account is using a simulation token. Please reconnect your real LinkedIn account on the Accounts page.');
     }
 
     throw new Error('LinkedIn Publish Failed: No valid active LinkedIn access token found. Please reconnect your LinkedIn account in the Accounts page.');

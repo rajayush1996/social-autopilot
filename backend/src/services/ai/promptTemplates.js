@@ -30,6 +30,7 @@ Create an extraordinary, high-dwell-time LinkedIn post package that includes:
 - Mobile-First Formatting: Keep paragraphs strictly to 1-2 concise sentences with white space for maximum mobile dwell time.
 - 3 Strategic Actionable Takeaways formatted with clean Uppercase Titles and emojis (e.g. 📌 1. SOLVE THE INVISIBLE FRICTION: explanation). Never use fake Unicode mathematical glyphs.
 - 3-5 hyper-relevant industry hashtags at the end.
+- PRODUCT WEBSITE LINK MANDATE: Whenever the post is about a specific company, product, software tool, or platform (e.g. Huddle, ClickUp, Aircall, Cursor, Stripe, Supabase, Replit, Figma, etc.), ALWAYS include an official website link or URL for that platform in the post (e.g. 🌐 Website: https://... or 🔗 Try [Brand]: https://...), formatted cleanly so readers can directly visit the platform.
 - CRITICAL SINGLE-SUBJECT RULE: Focus 100% on EXACTLY ONE product/subject per post. Tell its complete story from start to finish with zero topic switching.
 - ALGORITHM-BOOSTING POLARIZING CTA (CRITICAL FOR COMMENTS & REACH):
   * NEVER ask broad, boring essay questions like "What innovative tool changed your life?".

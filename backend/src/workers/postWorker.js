@@ -90,7 +90,7 @@ export async function processPostPublishing(postId) {
         }
 
         // Convert any Markdown **bold** or *italic* text into native Unicode characters for LinkedIn/X/Instagram
-        platformCaption = convertMarkdownToUnicode(platformCaption);
+        platformCaption = convertMarkdownToUnicode(platformCaption || '');
 
         // Get valid access token (auto-refreshes if expired)
         const validAccessToken = await getValidAccessToken(post.userId, platform);

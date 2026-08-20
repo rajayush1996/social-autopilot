@@ -145,10 +145,16 @@ export class ImageService {
 
     try {
       const apiUrl = process.env.FLUX_API_URL?.replace('queue.fal.run', 'fal.run') || 'https://fal.run/fal-ai/flux/schnell';
-      const subjectToRender = visualSubject || brandName || topic || 'Modern AI Technology';
-      const prompt = `Minimalist 3D isometric tech banner illustration representing ${subjectToRender}. Deep indigo and electric cyan glowing accents, dark mode aesthetic, soft studio lighting, clean geometry, ultra-sharp 8k digital art, premium LinkedIn post banner visual. Zero distorted text.`;
+      const targetBrand = brandName || visualSubject || topic || 'Modern AI Technology';
+      const fullContext = `${targetBrand} ${topic || ''} ${visualSubject || ''}`;
+      
+      const isSpiritualOrDevotional = /shiv|durga|ganesh|krishna|ram|hanuman|god|deity|festival|diwali|navratri|shivratri|devotional|spiritual|bhakti|temple|puja|blessing/i.test(fullContext);
+      
+      const prompt = isSpiritualOrDevotional
+        ? `Majestic 3D digital artwork illustration representing ${targetBrand}, divine serene cosmic lighting, gold and deep indigo glowing aura, high-resolution artistic aesthetic, respectful cultural illustration, ultra-sharp 8k resolution, cinematic social media poster. Zero distorted text.`
+        : `Minimalist 3D tech visual for ${targetBrand}, featuring official company logo emblem and sleek modern product UI dashboard of ${targetBrand}, deep indigo and electric cyan glowing neon accents, dark mode studio aesthetic, clean geometry, ultra-sharp 8k digital art, premium social media post banner visual. Zero distorted text.`;
 
-      logger.info(`[ImageService] 🚀 Generating visual with Flux.1 Schnell via Fal.ai for subject: "${subjectToRender}"`);
+      logger.info(`[ImageService] 🚀 Generating visual with Flux.1 Schnell via Fal.ai for ${isSpiritualOrDevotional ? 'devotional/spiritual' : 'brand/tech'} subject: "${targetBrand}"`);
       const startTime = Date.now();
 
       const response = await axios.post(

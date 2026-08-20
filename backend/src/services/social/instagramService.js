@@ -184,27 +184,13 @@ export class InstagramAdapter extends SocialAdapter {
           metaErrorCode === 200 ||
           metaErrorCode === 190;
 
-        if (isDevOrPermissionError) {
-          logger.warn(`[InstagramAdapter] Meta Dev Mode / Sandbox Guard: Gracefully creating sandbox simulated publication (${metaErrorMsg}).`);
-          const mockPostId = `ig_post_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-          return {
-            success: true,
-            platform: 'INSTAGRAM',
-            externalPostId: mockPostId,
-            externalPostUrl: `https://www.instagram.com/p/${mockPostId}/`,
-            rawResponse: { id: mockPostId, status: 'SANDBOX_FALLBACK', originalError: metaErrorMsg },
-            isMock: true,
-            strategyUsed: this.name,
-          };
-        }
-
         throw new Error(`Instagram Publish Failed: ${metaErrorMsg}`);
       }
     }
 
-    if (accessToken && accessToken.startsWith('mock_')) {
-      // Dev / Sandbox Mock Publisher for mock account
-      logger.info('[InstagramAdapter] Executing in Sandbox/Simulation mode for mock account.');
+    if (process.env.NODE_ENV === 'test' && accessToken && accessToken.startsWith('mock_')) {
+      // Dev / Sandbox Mock Publisher for unit test suite
+      logger.info('[InstagramAdapter] Executing in Sandbox/Simulation mode for test suite.');
       const mockPostId = `ig_post_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       
       return {
@@ -222,6 +208,12 @@ export class InstagramAdapter extends SocialAdapter {
         strategyUsed: this.name,
       };
     }
+
+    if (accessToken && accessToken.startsWith('mock_')) {
+      throw new Error('Instagram Publish Failed: Connected account is using a simulation token. Please reconnect your real Instagram Business account on the Accounts page.');
+    }
+
+    throw new Error('Instagram Publish Failed: No valid active Instagram access token found. Please reconnect your Instagram account in the Accounts page.');
 
     throw new Error('Instagram Publish Failed: No valid active Instagram access token found. Please reconnect your Instagram account in the Accounts page.');
   }
