@@ -31,6 +31,10 @@ import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
 import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
+import {
+  DEFAULT_ALLOWED_PLATFORMS,
+  PLATFORM_REGISTRY,
+} from '@/constants/platforms';
 import { formatDateTime, formatDate } from '@/utils/date';
 import CarouselSlideDeck, { parseCarouselSlides } from '@/components/CarouselSlideDeck';
 import socketClient from '@/utils/socket';
@@ -98,6 +102,7 @@ export default function PostsPage() {
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState<'ALL' | 'SCHEDULED' | 'PUBLISHED' | 'DRAFT' | 'CANCELLED' | 'FAILED'>('ALL');
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<'ALL' | 'LINKEDIN' | 'INSTAGRAM' | 'X' | 'FACEBOOK'>('ALL');
+  const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([...DEFAULT_ALLOWED_PLATFORMS]);
   const [viralityDiagnosis, setViralityDiagnosis] = useState<any>(null);
   const [diagnosingVirality, setDiagnosingVirality] = useState(false);
   
@@ -252,6 +257,12 @@ export default function PostsPage() {
   useEffect(() => {
     setPortalMounted(true);
     fetchPosts();
+
+    ApiService.getMe().then((me) => {
+      if (me && Array.isArray(me.allowedPlatforms)) {
+        setAllowedPlatforms(me.allowedPlatforms.map((p: string) => p.toUpperCase()));
+      }
+    }).catch(() => {});
 
     socketClient.connect();
 
@@ -413,7 +424,7 @@ export default function PostsPage() {
           { key: 'INSTAGRAM', label: '📸 Instagram' },
           { key: 'X', label: '🐦 X (Twitter)' },
           { key: 'FACEBOOK', label: '📘 Facebook' },
-        ].map(({ key, label }) => {
+        ].filter(c => c.key === 'ALL' || allowedPlatforms.includes(c.key)).map(({ key, label }) => {
           const isSelected = selectedPlatformFilter === key;
           const count = key === 'ALL' 
             ? posts.length 

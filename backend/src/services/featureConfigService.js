@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { ACTIVE_LIVE_PLATFORMS, SUPER_ADMIN_PLATFORMS } from '../config/constants.js';
 
 /**
  * FeatureConfigService (Single Responsibility: Manage dynamic plan features & premium flags)
@@ -77,9 +78,9 @@ export class FeatureConfigService {
     });
 
     const defaultMatrix = {
-      FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'], maxAiCredits: 15, videoUpload: true },
-      PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 500, videoUpload: true },
-      ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'], maxAiCredits: 9999, videoUpload: true },
+      FREE: { allowedPlatforms: [...ACTIVE_LIVE_PLATFORMS], maxAiCredits: 30, videoUpload: true, autoFirstComment: true },
+      PRO: { allowedPlatforms: [...ACTIVE_LIVE_PLATFORMS], maxAiCredits: 500, videoUpload: true, autoFirstComment: true },
+      ENTERPRISE: { allowedPlatforms: [...SUPER_ADMIN_PLATFORMS], maxAiCredits: 9999, videoUpload: true, autoFirstComment: true },
     };
 
     if (!setting) {

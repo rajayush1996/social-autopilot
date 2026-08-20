@@ -72,7 +72,7 @@ export function decrypt(encryptedText) {
       current = decrypted;
       attempts++;
     } catch (err) {
-      break;
+      return null;
     }
   }
 

@@ -1,4 +1,12 @@
-export type PlatformId = string;
+import {
+  SOCIAL_PLATFORMS,
+  ALL_PLATFORMS,
+  DEFAULT_ALLOWED_PLATFORMS,
+  SUPER_ADMIN_PLATFORMS,
+  type PlatformKey,
+} from '@/constants/platforms';
+
+export type PlatformId = PlatformKey;
 
 export interface PlatformDefinition {
   id: PlatformId;
@@ -13,7 +21,7 @@ export interface PlatformDefinition {
 
 export const PLATFORM_REGISTRY: PlatformDefinition[] = [
   {
-    id: 'LINKEDIN',
+    id: SOCIAL_PLATFORMS.LINKEDIN,
     label: 'LinkedIn',
     shortLabel: 'in',
     description: 'Professional updates, thought leadership, and B2B conversations.',
@@ -21,7 +29,7 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
     badgeClass: 'bg-blue-600/20 text-blue-400 border-blue-500/30',
   },
   {
-    id: 'X',
+    id: SOCIAL_PLATFORMS.X,
     label: 'X',
     shortLabel: 'X',
     description: 'Fast, concise updates built for timely conversations and trends.',
@@ -30,7 +38,7 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
     characterLimit: 280,
   },
   {
-    id: 'INSTAGRAM',
+    id: SOCIAL_PLATFORMS.INSTAGRAM,
     label: 'Instagram',
     shortLabel: 'IG',
     description: 'Visual-first feed posts and reels with engaging captions.',
@@ -39,7 +47,7 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
     requiresMedia: true,
   },
   {
-    id: 'FACEBOOK',
+    id: SOCIAL_PLATFORMS.FACEBOOK,
     label: 'Facebook Page',
     shortLabel: 'f',
     description: 'Community-focused Page updates, photos, and video posts.',
@@ -48,8 +56,8 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
   },
 ];
 
-export const DEFAULT_COMPOSER_PLATFORMS: PlatformId[] = ['LINKEDIN'];
-export const DEFAULT_SCHEDULE_PLATFORMS: PlatformId[] = ['LINKEDIN'];
+export const DEFAULT_COMPOSER_PLATFORMS: PlatformId[] = [...DEFAULT_ALLOWED_PLATFORMS];
+export const DEFAULT_SCHEDULE_PLATFORMS: PlatformId[] = [...DEFAULT_ALLOWED_PLATFORMS];
 
 const platformById = new Map(
   PLATFORM_REGISTRY.map((platform) => [platform.id, platform])
@@ -63,7 +71,7 @@ function humanizePlatformId(platformId: PlatformId) {
 }
 
 export function getPlatformDefinition(platformId: PlatformId): PlatformDefinition {
-  const normalizedId = platformId.toUpperCase();
+  const normalizedId = platformId.toUpperCase() as PlatformKey;
   const configuredPlatform = platformById.get(normalizedId);
 
   if (configuredPlatform) {
@@ -82,8 +90,8 @@ export function getPlatformDefinition(platformId: PlatformId): PlatformDefinitio
 
 export function getPlatformDefinitions(platformIds?: PlatformId[]) {
   const ids = platformIds?.length
-    ? platformIds.map((platformId) => platformId.toUpperCase())
+    ? platformIds.map((platformId) => platformId.toUpperCase() as PlatformKey)
     : PLATFORM_REGISTRY.map((platform) => platform.id);
 
-  return ids.map(getPlatformDefinition);
+  return ids.map((id) => getPlatformDefinition(id as PlatformKey));
 }

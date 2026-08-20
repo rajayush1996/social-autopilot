@@ -61,13 +61,14 @@ function XIcon(props: React.SVGProps<SVGSVGElement>) {
 
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
+import { SOCIAL_PLATFORMS, DEFAULT_ALLOWED_PLATFORMS, PlatformKey } from '@/constants/platforms';
 
 export default function SocialAccountsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [simulateMode, setSimulateMode] = useState(false);
-  const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([]);
+  const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([...DEFAULT_ALLOWED_PLATFORMS]);
   const toast = useToast();
 
   const isFetchingRef = useRef(false);
@@ -99,9 +100,9 @@ export default function SocialAccountsPage() {
         ]);
 
         if (meRes && Array.isArray(meRes.allowedPlatforms)) {
-          setAllowedPlatforms(meRes.allowedPlatforms.map((p) => p.toUpperCase()));
+          setAllowedPlatforms(meRes.allowedPlatforms.map((p: string) => p.toUpperCase()));
         } else {
-          setAllowedPlatforms(['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK']);
+          setAllowedPlatforms([...DEFAULT_ALLOWED_PLATFORMS]);
         }
 
         if (Array.isArray(activeAccounts)) {
@@ -109,7 +110,7 @@ export default function SocialAccountsPage() {
         }
       } catch (err) {
         console.warn('Failed to load accounts permissions:', err);
-        setAllowedPlatforms(['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK']);
+        setAllowedPlatforms([...DEFAULT_ALLOWED_PLATFORMS]);
       } finally {
         setLoading(false);
       }

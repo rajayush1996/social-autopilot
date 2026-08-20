@@ -99,7 +99,7 @@ export class PostService {
     let initialStatus = POST_STATUS.DRAFT;
 
     if (publishNow) {
-      initialStatus = POST_STATUS.PUBLISHING;
+      initialStatus = POST_STATUS.DRAFT;
     } else if (parseScheduledDate) {
       initialStatus = POST_STATUS.SCHEDULED;
     }

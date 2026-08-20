@@ -35,6 +35,13 @@ import { useToast } from '@/context/ToastContext';
 import PlatformIcon from '@/components/PlatformIcon';
 import { getReviewPipelineNarrative, formatTimeDisplay } from '@/utils/date';
 
+import {
+  SOCIAL_PLATFORMS,
+  PLATFORM_REGISTRY,
+  DEFAULT_ALLOWED_PLATFORMS,
+  type PlatformKey,
+} from '@/constants/platforms';
+
 export interface MediaAssetItem {
   id: string;
   url: string;
@@ -403,10 +410,10 @@ const DAYS_OF_WEEK = [
   { key: 'THU', label: 'Thu' }, { key: 'FRI', label: 'Fri' }, { key: 'SAT', label: 'Sat' }, { key: 'SUN', label: 'Sun' },
 ];
 
-const PLATFORMS = [
-  { id: 'LINKEDIN', label: 'LinkedIn' }, { id: 'FACEBOOK', label: 'Facebook Page' },
-  { id: 'INSTAGRAM', label: 'Instagram' }, { id: 'X', label: 'X (Twitter)' },
-];
+const PLATFORMS = DEFAULT_ALLOWED_PLATFORMS.map((platformKey) => ({
+  id: platformKey,
+  label: PLATFORM_REGISTRY[platformKey]?.name || platformKey,
+}));
 
 export function SchedulingDispatcher() {
   const [schedules, setSchedules] = useState<AutomationSchedule[]>([]);
@@ -455,13 +462,29 @@ export function SchedulingDispatcher() {
   const [saving, setSaving] = useState<boolean>(false);
   const [pendingUpdateIds, setPendingUpdateIds] = useState<string[]>([]);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+  const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([...DEFAULT_ALLOWED_PLATFORMS]);
   const [posts, setPosts] = useState<Post[]>([]);
 
   useEffect(() => {
-    ApiService.getConnectedAccounts()
-      .then((accs) => setConnectedPlatforms(accs.map((a) => a.platform.toUpperCase())))
+    Promise.all([
+      ApiService.getConnectedAccounts(),
+      ApiService.getMe(),
+    ])
+      .then(([accs, me]) => {
+        if (me && Array.isArray(me.allowedPlatforms)) {
+          setAllowedPlatforms(me.allowedPlatforms.map((p: string) => p.toUpperCase()));
+        }
+        if (Array.isArray(accs)) {
+          setConnectedPlatforms(accs.map((a) => a.platform.toUpperCase()));
+        }
+      })
       .catch(() => {});
   }, []);
+
+  const displayPlatforms = (allowedPlatforms.length > 0 ? allowedPlatforms : [...DEFAULT_ALLOWED_PLATFORMS]).map((platformKey) => ({
+    id: platformKey as any,
+    label: PLATFORM_REGISTRY[platformKey as PlatformKey]?.name || platformKey,
+  }));
 
   const toast = useToast();
 
@@ -1048,7 +1071,7 @@ export function SchedulingDispatcher() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Target Channels</label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {PLATFORMS.map((p) => {
+                    {displayPlatforms.map((p) => {
                       const isSelected = formPlatforms.includes(p.id as any);
                       return (
                         <button

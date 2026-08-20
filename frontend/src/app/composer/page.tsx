@@ -54,6 +54,7 @@ import {
   type PlatformId,
   type PlatformDefinition,
 } from '@/config/platforms';
+import { SOCIAL_PLATFORMS, DEFAULT_ALLOWED_PLATFORMS, ALL_PLATFORMS, type PlatformKey } from '@/constants/platforms';
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -73,8 +74,6 @@ import {
   setComposerModeAction,
   resetDraftsAndInputsAction,
 } from '@/store/composerSlice';
-
-type PlatformKey = PlatformId;
 
 const PRESET_PROMPTS = [
   { label: '🚀 Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
@@ -139,6 +138,7 @@ export default function ComposerPage() {
   const [mediaMode, setMediaMode] = useState<'AI_IMAGE' | 'UPLOAD' | 'NONE'>('AI_IMAGE');
   const [generatingAiImage, setGeneratingAiImage] = useState<boolean>(false);
   const [aiImagePrompt, setAiImagePrompt] = useState<string>('');
+  const [firstComment, setFirstComment] = useState<string>('');
 
   const [generating, setGenerating] = useState(false);
   const [composerAngles, setComposerAngles] = useState<Array<{ id: string; badge: string; title: string; prompt: string }>>([]);
@@ -374,7 +374,7 @@ export default function ComposerPage() {
   }, [showPublishDropdown]);
 
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformKey[]>([]);
-  const [allowedPlatforms, setAllowedPlatforms] = useState<PlatformKey[]>(() => PLATFORM_REGISTRY.map((platform) => platform.id));
+  const [allowedPlatforms, setAllowedPlatforms] = useState<PlatformKey[]>([...DEFAULT_ALLOWED_PLATFORMS]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [initialChecked, setInitialChecked] = useState(false);
 
@@ -417,15 +417,22 @@ export default function ComposerPage() {
         ApiService.getConnectedAccounts(),
         ApiService.getMe(),
       ]);
+
+      const userAllowed = (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0)
+        ? user.allowedPlatforms.map((platform: string) => platform.toUpperCase() as PlatformKey)
+        : [...DEFAULT_ALLOWED_PLATFORMS];
+      setAllowedPlatforms(userAllowed);
+
       if (Array.isArray(accounts)) {
         const activePlatforms = accounts
           .filter((acc: any) => acc.isActive !== false)
-          .map((acc: any) => acc.platform.toUpperCase() as PlatformKey);
+          .map((acc: any) => acc.platform.toUpperCase() as PlatformKey)
+          .filter((p: PlatformKey) => userAllowed.includes(p));
         setConnectedPlatforms(activePlatforms);
 
         if (activePlatforms.length > 0) {
           const currentSelected = reduxComposer.selectedPlatforms || [];
-          const validSelected = currentSelected.filter((p) => activePlatforms.includes(p));
+          const validSelected = currentSelected.filter((p) => activePlatforms.includes(p) && userAllowed.includes(p));
           if (validSelected.length > 0) {
             dispatch(setSelectedPlatforms(validSelected));
           } else {
@@ -434,9 +441,6 @@ export default function ComposerPage() {
         } else {
           dispatch(setSelectedPlatforms([]));
         }
-      }
-      if (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0) {
-        setAllowedPlatforms(user.allowedPlatforms.map((platform) => platform.toUpperCase()));
       }
     } catch (err) {
       console.error('Failed to load connected accounts:', err);
@@ -703,6 +707,7 @@ export default function ComposerPage() {
         targetPlatforms: platforms,
         scheduledAt: publishMode === 'SCHEDULE' ? new Date(scheduledDate).toISOString() : null,
         publishNow: publishMode === 'NOW',
+        firstComment: firstComment.trim() || undefined,
       };
 
       await ApiService.createPost(payload);
@@ -714,6 +719,7 @@ export default function ComposerPage() {
       setMediaFileUrl('');
       setMediaType(null);
       setScheduledDate('');
+      setFirstComment('');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to schedule post.');
     } finally {
@@ -1440,6 +1446,26 @@ export default function ComposerPage() {
                   </div>
                 )}
 
+                {/* 💬 Auto-Post First Comment (LinkedIn Algorithm Reach Protection) */}
+                <div className="bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
+                      <span>💬 Auto-Post First Comment</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 font-bold">LinkedIn Boost</span>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Protect your reach by keeping links out of the main post. Our server will auto-comment 5s after publishing.
+                  </p>
+                  <textarea
+                    value={firstComment}
+                    onChange={(e) => setFirstComment(e.target.value)}
+                    placeholder="e.g. 🔗 Here's the link to check it out: https://... (or 'Leave a comment to get the playbook!')"
+                    rows={2}
+                    className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium"
+                  />
+                </div>
+
                 {/* Integrated Split Button Component */}
                 <div className="relative flex shadow-md rounded-xl publish-dropdown-container">
                   <button
@@ -1650,7 +1676,7 @@ export default function ComposerPage() {
 
                         {/* Character Limit & Virality Diagnostics Action Bar */}
                         {(() => {
-                          const charLimit = platform === 'TWITTER' ? 280 : platform === 'LINKEDIN' ? 3000 : platform === 'INSTAGRAM' ? 2200 : 5000;
+                          const charLimit = platform === SOCIAL_PLATFORMS.X ? 280 : platform === SOCIAL_PLATFORMS.LINKEDIN ? 3000 : platform === SOCIAL_PLATFORMS.INSTAGRAM ? 2200 : 5000;
                           const charCount = (generatedDrafts[platform] || '').length;
                           const isOverLimit = charCount > charLimit;
                           return (

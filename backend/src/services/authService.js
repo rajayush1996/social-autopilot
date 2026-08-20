@@ -12,6 +12,7 @@ import SocialAdapterFactory from './social/socialAdapterFactory.js';
 import { emitAccountStatusChange } from './socketService.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 import emailService from './emailService.js';
+import { ACTIVE_LIVE_PLATFORMS, SUPER_ADMIN_PLATFORMS } from '../config/constants.js';
 
 const JWT_SECRET = config.jwt.secret;
 const JWT_REFRESH_SECRET = config.jwt.refreshSecret;
@@ -520,7 +521,7 @@ export class AuthService {
     delete user.password;
 
     const isSuperAdmin = user.role?.toUpperCase() === 'SUPER_ADMIN';
-    let allowedPlatforms = ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+    let allowedPlatforms = isSuperAdmin ? [...SUPER_ADMIN_PLATFORMS] : [...ACTIVE_LIVE_PLATFORMS];
 
     if (!isSuperAdmin) {
       try {
@@ -530,16 +531,18 @@ export class AuthService {
 
         const userPlan = (user.plan || 'FREE').toUpperCase();
         const matrix = setting?.value || {
-          FREE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'FACEBOOK'] },
-          PRO: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
-          ENTERPRISE: { allowedPlatforms: ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'] },
+          FREE: { allowedPlatforms: [...ACTIVE_LIVE_PLATFORMS] },
+          PRO: { allowedPlatforms: [...ACTIVE_LIVE_PLATFORMS] },
+          ENTERPRISE: { allowedPlatforms: [...SUPER_ADMIN_PLATFORMS] },
         };
 
         if (matrix[userPlan]?.allowedPlatforms) {
           allowedPlatforms = matrix[userPlan].allowedPlatforms;
+        } else {
+          allowedPlatforms = [...ACTIVE_LIVE_PLATFORMS];
         }
       } catch (e) {
-        allowedPlatforms = ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+        allowedPlatforms = [...ACTIVE_LIVE_PLATFORMS];
       }
     }
 

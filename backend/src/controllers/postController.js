@@ -22,21 +22,21 @@ import { prisma } from '../config/db.js';
 import { defaultLinkedinAdapter } from '../services/social/linkedinService.js';
 import ImageService from '../services/ai/imageService.js';
 import { extractBrandFromContent } from '../utils/brandExtractor.js';
-
+import { ACTIVE_LIVE_PLATFORMS, SUPER_ADMIN_PLATFORMS } from '../config/constants.js';
 
 /**
  * Helper: Retrieve allowed platforms for a user based on role and plan matrix.
  */
 async function getUserAllowedPlatforms(user) {
   if (user.role?.toUpperCase() === 'SUPER_ADMIN') {
-    return ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+    return [...SUPER_ADMIN_PLATFORMS];
   }
   try {
     const matrix = await FeatureConfigService.getPlanFeaturesMatrix();
     const userPlan = (user.plan || 'FREE').toUpperCase();
-    return matrix[userPlan]?.allowedPlatforms || ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+    return matrix[userPlan]?.allowedPlatforms || [...ACTIVE_LIVE_PLATFORMS];
   } catch (e) {
-    return ['INSTAGRAM', 'LINKEDIN', 'X', 'FACEBOOK'];
+    return [...ACTIVE_LIVE_PLATFORMS];
   }
 }
 
@@ -178,11 +178,12 @@ export const createPost = catchAsync(async (req, res) => {
     content,
     mediaUrls = [],
     mediaType,
-    targetPlatforms = ['INSTAGRAM', 'LINKEDIN', 'X'],
+    targetPlatforms = ['LINKEDIN'],
     scheduledAt,
     publishNow = false,
     aiGenerated = false,
     aiPrompt,
+    firstComment,
   } = req.body;
   const userId = req.user.id;
 
@@ -227,6 +228,10 @@ export const createPost = catchAsync(async (req, res) => {
     initialStatus = POST_STATUS.SCHEDULED;
   }
 
+  const finalAiPrompt = firstComment?.trim()
+    ? `${aiPrompt || ''} FirstComment:${firstComment.trim()}`
+    : aiPrompt;
+
   // Delegate post creation, BullMQ enqueue, and cache eviction to PostService
   const { post, queueResult } = await PostService.createPost({
     userId,
@@ -237,7 +242,7 @@ export const createPost = catchAsync(async (req, res) => {
     scheduledAt,
     publishNow,
     aiGenerated,
-    aiPrompt,
+    aiPrompt: finalAiPrompt,
   });
 
   return successResponse(

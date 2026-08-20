@@ -4,11 +4,27 @@
  */
 
 export const SOCIAL_PLATFORM = Object.freeze({
-  INSTAGRAM: 'INSTAGRAM',
   LINKEDIN: 'LINKEDIN',
+  INSTAGRAM: 'INSTAGRAM',
   X: 'X',
   FACEBOOK: 'FACEBOOK',
 });
+
+// All platforms supported across the entire codebase
+export const ALL_SUPPORTED_PLATFORMS = Object.freeze([
+  SOCIAL_PLATFORM.LINKEDIN,
+  SOCIAL_PLATFORM.INSTAGRAM,
+  SOCIAL_PLATFORM.X,
+  SOCIAL_PLATFORM.FACEBOOK,
+]);
+
+// Currently active & live platforms for standard users (Single-platform LinkedIn focus)
+export const ACTIVE_LIVE_PLATFORMS = Object.freeze([
+  SOCIAL_PLATFORM.LINKEDIN,
+]);
+
+// Platforms accessible exclusively to SUPER_ADMIN
+export const SUPER_ADMIN_PLATFORMS = ALL_SUPPORTED_PLATFORMS;
 
 export const POST_STATUS = Object.freeze({
   DRAFT: 'DRAFT',

@@ -55,25 +55,29 @@ export class XAdapter extends SocialAdapter {
       }
     }
 
-    // Sandbox Mock Publisher
-    logger.info('[XAdapter] Executing in Sandbox/Simulation mode.');
-    const mockTweetId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    if (accessToken && accessToken.startsWith('mock_')) {
+      // Sandbox Mock Publisher
+      logger.info('[XAdapter] Executing in Sandbox/Simulation mode for mock account.');
+      const mockTweetId = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
-    return {
-      success: true,
-      platform: 'X',
-      externalPostId: mockTweetId,
-      externalPostUrl: `https://x.com/user/status/${mockTweetId}`,
-      rawResponse: {
-        data: {
-          id: mockTweetId,
-          text: tweetText,
-          status: 'SIMULATED_SUCCESS',
+      return {
+        success: true,
+        platform: 'X',
+        externalPostId: mockTweetId,
+        externalPostUrl: `https://x.com/user/status/${mockTweetId}`,
+        rawResponse: {
+          data: {
+            id: mockTweetId,
+            text: tweetText,
+            status: 'SIMULATED_SUCCESS',
+          },
         },
-      },
-      isMock: true,
-      strategyUsed: this.name,
-    };
+        isMock: true,
+        strategyUsed: this.name,
+      };
+    }
+
+    throw new Error('X Tweet Publish Failed: No valid active X access token found. Please reconnect your X account in the Accounts page.');
   }
 
   /**

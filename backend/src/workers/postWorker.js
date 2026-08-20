@@ -121,6 +121,21 @@ export async function processPostPublishing(postId) {
             },
           });
           executionLogs.push(log);
+
+          // Auto-Post First Comment (LinkedIn Link & Outreach Protection)
+          if (platform === 'LINKEDIN' && typeof adapter.postComment === 'function' && result.externalPostId) {
+            const firstCommentText = post.firstComment || (post.aiPrompt?.includes('FirstComment:') ? post.aiPrompt.split('FirstComment:')[1]?.trim() : null);
+            if (firstCommentText) {
+              setTimeout(() => {
+                adapter.postComment({
+                  accessToken: validAccessToken,
+                  authorUrn: platformAccountId,
+                  postUrn: result.externalPostId,
+                  commentText: firstCommentText,
+                }).catch(cErr => logger.warn(`[BullMQ Worker] First comment trigger warning: ${cErr.message}`));
+              }, 4000);
+            }
+          }
         }
       } catch (err) {
         failureCount++;

@@ -32,8 +32,14 @@ const loadPersistedState = (): Partial<ComposerState> => {
 
 const initialPersisted = loadPersistedState();
 
+const sanitizeInitialPlatforms = (persisted?: PlatformKey[]): PlatformKey[] => {
+  if (!Array.isArray(persisted) || persisted.length === 0) return DEFAULT_COMPOSER_PLATFORMS;
+  const valid = persisted.filter((p) => p === 'LINKEDIN');
+  return valid.length > 0 ? valid : DEFAULT_COMPOSER_PLATFORMS;
+};
+
 const initialState: ComposerState = {
-  selectedPlatforms: initialPersisted.selectedPlatforms || DEFAULT_COMPOSER_PLATFORMS,
+  selectedPlatforms: sanitizeInitialPlatforms(initialPersisted.selectedPlatforms),
   topic: initialPersisted.topic || '',
   tone: initialPersisted.tone || 'ENGAGING',
   inputSource: initialPersisted.inputSource || 'PROMPT',

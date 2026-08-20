@@ -202,24 +202,28 @@ export class InstagramAdapter extends SocialAdapter {
       }
     }
 
-    // Dev / Sandbox Mock Publisher when using sandbox credentials
-    logger.info('[InstagramAdapter] Executing in Sandbox/Simulation mode.');
-    const mockPostId = `ig_post_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    
-    return {
-      success: true,
-      platform: 'INSTAGRAM',
-      externalPostId: mockPostId,
-      externalPostUrl: `https://www.instagram.com/p/${mockPostId}/`,
-      rawResponse: {
-        id: mockPostId,
-        caption: caption.substring(0, 50) + '...',
-        media_count: mediaUrls.length || 1,
-        status: 'SIMULATED_SUCCESS',
-      },
-      isMock: true,
-      strategyUsed: this.name,
-    };
+    if (accessToken && accessToken.startsWith('mock_')) {
+      // Dev / Sandbox Mock Publisher for mock account
+      logger.info('[InstagramAdapter] Executing in Sandbox/Simulation mode for mock account.');
+      const mockPostId = `ig_post_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      
+      return {
+        success: true,
+        platform: 'INSTAGRAM',
+        externalPostId: mockPostId,
+        externalPostUrl: `https://www.instagram.com/p/${mockPostId}/`,
+        rawResponse: {
+          id: mockPostId,
+          caption: caption.substring(0, 50) + '...',
+          media_count: mediaUrls.length || 1,
+          status: 'SIMULATED_SUCCESS',
+        },
+        isMock: true,
+        strategyUsed: this.name,
+      };
+    }
+
+    throw new Error('Instagram Publish Failed: No valid active Instagram access token found. Please reconnect your Instagram account in the Accounts page.');
   }
 
   /**

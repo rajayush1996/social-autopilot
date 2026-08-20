@@ -7,7 +7,7 @@ import UserService from './userService.js';
 import { generatePostContent } from './aiService.js';
 import CampaignMemoryService from './campaignMemoryService.js';
 import { enqueuePostJob } from '../queues/postQueue.js';
-import { POST_STATUS } from '../config/constants.js';
+import { POST_STATUS, ACTIVE_LIVE_PLATFORMS } from '../config/constants.js';
 import logger from '../utils/logger.js';
 import emailService from './emailService.js';
 import CacheService from './cacheService.js';
@@ -98,7 +98,7 @@ export class ScheduleService {
         isActive: isActive !== undefined ? !!isActive : true,
         targetPlatforms: Array.isArray(targetPlatforms) && targetPlatforms.length > 0 
           ? targetPlatforms 
-          : ['LINKEDIN'],
+          : [...ACTIVE_LIVE_PLATFORMS],
         tone: tone || 'ENGAGING',
         topicPrompt: topicPrompt || '',
         includeImage: !!includeImage || imageMode === 'AI_FLUX',

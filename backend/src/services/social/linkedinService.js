@@ -27,7 +27,38 @@ export class LinkedinAdapter extends SocialAdapter {
 
         const firstMediaUrl = mediaUrls[0] || '';
         const isVideo = mediaType === 'VIDEO' || firstMediaUrl.endsWith('.mp4') || firstMediaUrl.endsWith('.mov') || firstMediaUrl.includes('/uploads/videos/');
-        const shareCategory = mediaUrls.length > 0 ? (isVideo ? 'VIDEO' : 'IMAGE') : 'NONE';
+        
+        let uploadedAssetUrn = null;
+        if (firstMediaUrl && !isVideo) {
+          uploadedAssetUrn = await this.uploadImageAsset({
+            accessToken,
+            authorUrn,
+            imageUrl: firstMediaUrl,
+          });
+        }
+
+        let shareCategory = 'NONE';
+        let mediaPayload;
+
+        if (uploadedAssetUrn) {
+          shareCategory = 'IMAGE';
+          mediaPayload = [
+            {
+              status: 'READY',
+              description: { text: 'Post Graphic' },
+              media: uploadedAssetUrn,
+              title: { text: 'Post Graphic' },
+            },
+          ];
+        } else if (firstMediaUrl) {
+          shareCategory = isVideo ? 'VIDEO' : 'ARTICLE';
+          mediaPayload = [
+            {
+              status: 'READY',
+              originalUrl: firstMediaUrl,
+            },
+          ];
+        }
 
         const postBody = {
           author: authorUrn,
@@ -38,14 +69,7 @@ export class LinkedinAdapter extends SocialAdapter {
                 text: caption,
               },
               shareMediaCategory: shareCategory,
-              ...(mediaUrls.length > 0 && {
-                media: [
-                  {
-                    status: 'READY',
-                    originalUrl: firstMediaUrl,
-                  },
-                ],
-              }),
+              ...(mediaPayload && { media: mediaPayload }),
             },
           },
           visibility: {
@@ -96,23 +120,132 @@ export class LinkedinAdapter extends SocialAdapter {
       }
     }
 
-    // Sandbox Mock Publisher
-    logger.info('[LinkedinAdapter] Executing in Sandbox/Simulation mode.');
-    const mockUrn = `urn:li:share:${Date.now()}`;
+    if (accessToken && accessToken.startsWith('mock_')) {
+      // Sandbox Mock Publisher (Only for unit test suites)
+      logger.info('[LinkedinAdapter] Executing in Sandbox/Simulation mode for mock account.');
+      const mockUrn = `urn:li:share:${Date.now()}`;
 
-    return {
-      success: true,
-      platform: 'LINKEDIN',
-      externalPostId: mockUrn,
-      externalPostUrl: `https://www.linkedin.com/feed/update/${mockUrn}/`,
-      rawResponse: {
-        id: mockUrn,
-        status: 'SIMULATED_SUCCESS',
-        author: platformAccountId || 'urn:li:person:mock_user',
-      },
-      isMock: true,
-      strategyUsed: this.name,
-    };
+      return {
+        success: true,
+        platform: 'LINKEDIN',
+        externalPostId: mockUrn,
+        externalPostUrl: `https://www.linkedin.com/feed/update/${mockUrn}/`,
+        rawResponse: {
+          id: mockUrn,
+          status: 'SIMULATED_SUCCESS',
+          author: platformAccountId || 'urn:li:person:mock_user',
+        },
+        isMock: true,
+        strategyUsed: this.name,
+      };
+    }
+
+    throw new Error('LinkedIn Publish Failed: No valid active LinkedIn access token found. Please reconnect your LinkedIn account in the Accounts page.');
+  }
+
+  /**
+   * Upload binary image to LinkedIn via 2-Step RegisterUpload DigitalMedia Asset API
+   */
+  async uploadImageAsset({ accessToken, authorUrn, imageUrl }) {
+    try {
+      logger.info(`[LinkedinAdapter] 📸 Registering digital media image asset with LinkedIn for ${authorUrn}...`);
+      
+      // Step 1: Register Upload
+      const registerRes = await axios.post(
+        `${config.social.linkedin.apiBaseUrl}/assets?action=registerUpload`,
+        {
+          registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+            owner: authorUrn,
+            serviceRelationships: [
+              {
+                relationshipType: 'OWNER',
+                identifier: 'urn:li:userGeneratedContent',
+              },
+            ],
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        }
+      );
+
+      const uploadUrl = registerRes.data?.value?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+      const assetUrn = registerRes.data?.value?.asset;
+
+      if (!uploadUrl || !assetUrn) {
+        logger.warn(`[LinkedinAdapter] Incomplete registerUpload response. Falling back to Article format.`);
+        return null;
+      }
+
+      // Step 2: Download image binary from source URL
+      logger.info(`[LinkedinAdapter] Downloading image binary from ${imageUrl.slice(0, 60)}...`);
+      const imgBufferRes = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 12000,
+      });
+
+      // Step 3: Upload binary buffer to LinkedIn Media CDN URL
+      logger.info(`[LinkedinAdapter] Uploading image binary to LinkedIn Media CDN (${assetUrn})...`);
+      await axios.put(uploadUrl, imgBufferRes.data, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'image/jpeg',
+        },
+        timeout: 15000,
+      });
+
+      logger.info(`[LinkedinAdapter] ✅ Successfully registered & uploaded native image asset: ${assetUrn}`);
+      return assetUrn;
+    } catch (err) {
+      logger.warn(`[LinkedinAdapter] Direct digital image upload warning: ${err.message}. Falling back to Article URL format.`);
+      return null;
+    }
+  }
+
+  /**
+   * Post First Comment on LinkedIn Post (Auto-Post First Comment Hack)
+   */
+  async postComment({ accessToken, authorUrn, postUrn, commentText }) {
+    if (!accessToken || !postUrn || !commentText || !commentText.trim()) {
+      return null;
+    }
+
+    try {
+      logger.info(`[LinkedinAdapter] 💬 Posting Auto First Comment for ${postUrn}...`);
+      const targetUrn = encodeURIComponent(postUrn);
+      const actor = authorUrn.startsWith('urn:li:') ? authorUrn : `urn:li:person:${authorUrn}`;
+
+      const res = await axios.post(
+        `${config.social.linkedin.apiBaseUrl}/socialActions/${targetUrn}/comments`,
+        {
+          actor,
+          message: {
+            text: commentText.trim(),
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+            'Content-Type': 'application/json',
+          },
+          timeout: 10000,
+        }
+      );
+
+      const commentUrn = res.data?.id || res.data?.['$URN'];
+      logger.info(`[LinkedinAdapter] ✅ Auto First Comment posted successfully! URN: ${commentUrn || 'OK'}`);
+      return { success: true, commentUrn };
+    } catch (err) {
+      logger.warn(`[LinkedinAdapter] Auto First Comment warning: ${err.response?.data?.message || err.message}`);
+      return null;
+    }
   }
 
   /**

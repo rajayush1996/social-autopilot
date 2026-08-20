@@ -34,6 +34,11 @@ export async function getValidAccessToken(userId, platform) {
   const decryptedAccessToken = decrypt(account.accessToken);
   const decryptedRefreshToken = decrypt(account.refreshToken);
 
+  if (!decryptedAccessToken || (typeof decryptedAccessToken === 'string' && decryptedAccessToken.includes(':'))) {
+    logger.error(`[TokenManager] Access token for ${platformUpper} cannot be decrypted (invalid/mismatched encryption key or expired session).`);
+    throw new Error(`Your ${platformUpper} authorization has expired or is invalid. Please go to Accounts and reconnect your ${platformUpper} account.`);
+  }
+
   // Check if token is expired or expires within the next 5 minutes (300 seconds)
   const isExpired = account.expiresAt
     ? new Date(account.expiresAt).getTime() - Date.now() < 5 * 60 * 1000
