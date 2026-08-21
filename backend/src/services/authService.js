@@ -392,35 +392,36 @@ export class AuthService {
     });
 
     const verificationLink = `${protocol}://${hostHeader || 'localhost:5000'}/api/auth/verify-email?token=${verificationToken}`;
+    logger.info(`[AuthService] 📧 Registration verification link generated for ${email}: ${verificationLink}`);
     
-    // Deliver real verification email via Brevo SMTP
-    try {
-      await emailService.sendEmail({
-        to: email,
-        subject: 'Verify your OmniSync Account',
-        html: `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0b0f19; color:#f3f4f6; padding:30px 20px;">
-            <div style="max-width:550px; margin:0 auto; background:#111827; border:1px solid #1f2937; border-radius:16px; padding:32px;">
-              <h2 style="color:#ffffff; margin-top:0;">Welcome to OmniSync! ⚡</h2>
-              <p style="color:#9ca3af; font-size:14px; line-height:1.6;">
-                Hi ${name}, thank you for registering with OmniSync Social Autopilot. Please confirm your email address to activate your account:
-              </p>
-              <div style="text-align:center; margin:28px 0;">
-                <a href="${verificationLink}" style="background:#2563EB; color:#ffffff; font-weight:bold; font-size:14px; text-decoration:none; padding:12px 28px; border-radius:10px; display:inline-block;">
-                  Verify Email Address
-                </a>
-              </div>
-              <p style="color:#6b7280; font-size:12px; line-height:1.5;">
-                If you did not sign up for this account, you can safely ignore this email.
-              </p>
+    // Deliver real verification email asynchronously in background without blocking HTTP response
+    emailService.sendEmail({
+      to: email,
+      subject: 'Verify your OmniSync Account',
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0b0f19; color:#f3f4f6; padding:30px 20px;">
+          <div style="max-width:550px; margin:0 auto; background:#111827; border:1px solid #1f2937; border-radius:16px; padding:32px;">
+            <h2 style="color:#ffffff; margin-top:0;">Welcome to OmniSync! ⚡</h2>
+            <p style="color:#9ca3af; font-size:14px; line-height:1.6;">
+              Hi ${name}, thank you for registering with OmniSync Social Autopilot. Please confirm your email address to activate your account:
+            </p>
+            <div style="text-align:center; margin:28px 0;">
+              <a href="${verificationLink}" style="background:#2563EB; color:#ffffff; font-weight:bold; font-size:14px; text-decoration:none; padding:12px 28px; border-radius:10px; display:inline-block;">
+                Verify Email Address
+              </a>
             </div>
+            <p style="color:#6b7280; font-size:12px; line-height:1.5;">
+              If you did not sign up for this account, you can safely ignore this email.
+            </p>
           </div>
-        `,
-        text: `Welcome to OmniSync! Please confirm your email address by visiting this link: ${verificationLink}`,
-      });
-    } catch (emailErr) {
-      logger.warn(`[AuthService] Verification email delivery warning: ${emailErr.message}`);
-    }
+        </div>
+      `,
+      text: `Welcome to OmniSync! Please confirm your email address by visiting this link: ${verificationLink}`,
+    }).then((res) => {
+      logger.info(`[AuthService] ✉️ Verification email delivered in background to ${email}`);
+    }).catch((emailErr) => {
+      logger.warn(`[AuthService] ⚠️ Verification email background delivery error: ${emailErr.message}`);
+    });
 
     delete user.password;
     return user;

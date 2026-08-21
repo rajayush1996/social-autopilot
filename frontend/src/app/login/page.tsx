@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Sparkles, Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, ArrowLeft, BookOpen } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import { useToast } from '@/context/ToastContext';
 
@@ -19,24 +19,23 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error('Please fill in all credentials.');
+      toast.error('Please fill in both email and password.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const data = await ApiService.login({ email, password });
-      if (data && data.token) {
-        localStorage.setItem('auth_token', data.token);
-        if (data.refreshToken) {
-          localStorage.setItem('refresh_token', data.refreshToken);
-        }
-        toast.success('Successfully logged in!');
-        router.push('/dashboard');
-      } else {
-        toast.error('Login failed: Invalid server token response.');
-      }
+      const response = await ApiService.login({ email, password });
+      
+      // Save tokens
+      localStorage.setItem('auth_token', response.tokens.accessToken);
+      localStorage.setItem('refresh_token', response.tokens.refreshToken);
+      
+      toast.success('Login successful! Redirecting...');
+      
+      // Fast immediate route push
+      router.push('/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
       toast.error(err.response?.data?.message || 'Invalid email or password.');
@@ -46,24 +45,46 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-[440px] p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6 animate-fadeIn transition-all">
-      {/* Brand Header */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
-          <Sparkles className="h-6 w-6 animate-pulse" />
-        </div>
-        <div>
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] dark:text-[#60A5FA] text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
-            Enterprise Autopilot
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
-            Welcome Back
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium max-w-xs mx-auto">
-            Sign in to your OmniSync dashboard to manage campaigns and autopilot schedules
-          </p>
-        </div>
+    <div className="w-full max-w-[440px] space-y-4 animate-fadeIn transition-all">
+      {/* Top Navigation Bar: Back to Home & Docs */}
+      <div className="flex items-center justify-between px-1">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] dark:hover:text-[#60A5FA] transition-colors py-1.5 px-3 rounded-xl hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-color)] group"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform" />
+          <span>Back to Home</span>
+        </Link>
+        <Link
+          href="/docs"
+          className="inline-flex items-center gap-1 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] dark:hover:text-[#60A5FA] transition-colors py-1.5 px-3 rounded-xl hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-color)]"
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          <span>Docs</span>
+        </Link>
       </div>
+
+      {/* Main Login Card */}
+      <div className="w-full p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6">
+        {/* Brand Header */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Link href="/" className="group" title="Go to Home">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
+              <Sparkles className="h-6 w-6 animate-pulse" />
+            </div>
+          </Link>
+          <div>
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] dark:text-[#60A5FA] text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
+              Enterprise Autopilot
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
+              Welcome Back
+            </h1>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium max-w-xs mx-auto">
+              Sign in to your OmniSync dashboard to manage campaigns and autopilot schedules
+            </p>
+          </div>
+        </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -172,5 +193,6 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
-  );
+  </div>
+);
 }

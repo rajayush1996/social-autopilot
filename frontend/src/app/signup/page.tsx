@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Mail, Lock, User, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Mail, Lock, User, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2, ArrowLeft, BookOpen } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import { useToast } from '@/context/ToastContext';
 
@@ -62,51 +62,92 @@ export default function SignupPage() {
 
   if (registered) {
     return (
-      <div className="w-full max-w-[440px] p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6 text-center animate-fadeIn">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-500 shadow-md">
-            <CheckCircle2 className="h-7 w-7" />
-          </div>
-          <h1 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">
-            Verify Your Email
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-xs mx-auto font-medium">
-            We sent a verification link to <span className="text-[var(--text-primary)] font-bold">{email}</span>. Please click the link in your inbox to activate your account.
-          </p>
-          <div className="p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl text-[11px] text-[var(--text-secondary)] text-left leading-relaxed w-full">
-            💡 <strong className="text-[var(--text-primary)]">Sandbox Mode:</strong> The verification URL is also logged directly in the backend terminal console for quick testing.
-          </div>
-          <Link 
-            href="/login" 
-            className="w-full py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 mt-2"
+      <div className="w-full max-w-[440px] space-y-4 animate-fadeIn transition-all">
+        {/* Top Navigation Bar: Back to Home & Docs */}
+        <div className="flex items-center justify-between px-1">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] dark:hover:text-[#60A5FA] transition-colors py-1.5 px-3 rounded-xl hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-color)] group"
           >
-            <span>Proceed to Sign In</span>
-            <ArrowRight className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform" />
+            <span>Back to Home</span>
           </Link>
+          <Link
+            href="/docs"
+            className="inline-flex items-center gap-1 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] dark:hover:text-[#60A5FA] transition-colors py-1.5 px-3 rounded-xl hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-color)]"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>Docs</span>
+          </Link>
+        </div>
+
+        <div className="w-full p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-500 shadow-md">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <h1 className="text-2xl font-black text-[var(--text-primary)] tracking-tight">
+              Verify Your Email
+            </h1>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-xs mx-auto font-medium">
+              We sent a verification link to <span className="text-[var(--text-primary)] font-bold">{email}</span>. Please click the link in your inbox to activate your account.
+            </p>
+            <div className="p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl text-[11px] text-[var(--text-secondary)] text-left leading-relaxed w-full">
+              💡 <strong className="text-[var(--text-primary)]">Sandbox Mode:</strong> The verification URL is also logged directly in the backend terminal console for quick testing.
+            </div>
+            <Link 
+              href="/login" 
+              className="w-full py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 mt-2"
+            >
+              <span>Proceed to Sign In</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-[440px] p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6 animate-fadeIn transition-all">
-      {/* Brand Header */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
-          <Sparkles className="h-6 w-6 animate-pulse" />
-        </div>
-        <div>
-          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] dark:text-[#60A5FA] text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
-            Start Free
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
-            Create Your Account
-          </h1>
-          <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium max-w-xs mx-auto">
-            Get started with autonomous multi-channel AI content scheduling
-          </p>
-        </div>
+    <div className="w-full max-w-[440px] space-y-4 animate-fadeIn transition-all">
+      {/* Top Navigation Bar: Back to Home & Docs */}
+      <div className="flex items-center justify-between px-1">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] dark:hover:text-[#60A5FA] transition-colors py-1.5 px-3 rounded-xl hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-color)] group"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform" />
+          <span>Back to Home</span>
+        </Link>
+        <Link
+          href="/docs"
+          className="inline-flex items-center gap-1 text-xs font-bold text-[var(--text-secondary)] hover:text-[#2563EB] dark:hover:text-[#60A5FA] transition-colors py-1.5 px-3 rounded-xl hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-color)]"
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          <span>Docs</span>
+        </Link>
       </div>
+
+      <div className="w-full p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6">
+        {/* Brand Header */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Link href="/" className="group" title="Go to Home">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
+              <Sparkles className="h-6 w-6 animate-pulse" />
+            </div>
+          </Link>
+          <div>
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#2563EB]/10 border border-[#2563EB]/25 text-[#2563EB] dark:text-[#60A5FA] text-[10px] font-extrabold uppercase tracking-wider mb-1.5">
+              Start Free
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
+              Create Your Account
+            </h1>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium max-w-xs mx-auto">
+              Get started with autonomous multi-channel AI content scheduling
+            </p>
+          </div>
+        </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -252,5 +293,6 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
-  );
+  </div>
+);
 }
