@@ -12,6 +12,7 @@ import { convertMarkdownToUnicode } from '../utils/textFormatter.js';
 import { updateUserMemory } from '../services/ai/memoryService.js';
 import CacheService from '../services/cacheService.js';
 import { CACHE_KEYS } from '../config/cacheKeys.js';
+import { generateSmartFirstComment } from '../services/aiService.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -122,18 +123,56 @@ export async function processPostPublishing(postId) {
           });
           executionLogs.push(log);
 
-          // Auto-Post First Comment (LinkedIn Link & Outreach Protection)
+          // LinkedIn Algorithm Anti-Spam Safety Shield Engine
           if (platform === 'LINKEDIN' && typeof adapter.postComment === 'function' && result.externalPostId) {
-            const firstCommentText = post.firstComment || (post.aiPrompt?.includes('FirstComment:') ? post.aiPrompt.split('FirstComment:')[1]?.trim() : null);
-            if (firstCommentText) {
-              setTimeout(() => {
-                adapter.postComment({
-                  accessToken: validAccessToken,
-                  authorUrn: platformAccountId,
-                  postUrn: result.externalPostId,
-                  commentText: firstCommentText,
-                }).catch(cErr => logger.warn(`[BullMQ Worker] First comment trigger warning: ${cErr.message}`));
-              }, 4000);
+            try {
+              // Shield 1: Check Daily Rate Limit Cap (Max 12 auto-comments per 24 hrs to stay 100% safe from LinkedIn bans)
+              const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+              const dailyCommentCount = await prisma.socialPostLog.count({
+                where: {
+                  platform: 'LINKEDIN',
+                  status: SOCIAL_POST_STATUS.SUCCESS,
+                  errorMessage: { contains: 'first_comment_posted' },
+                  createdAt: { gte: twentyFourHoursAgo },
+                },
+              });
+
+              if (dailyCommentCount >= 12) {
+                logger.warn(`[BullMQ Worker] 🛡️ Anti-Spam Safety Shield: Daily auto-comment limit (12/day) reached for LinkedIn. Skipping first comment to protect account health.`);
+              } else {
+                let firstCommentText = post.firstComment || (post.aiPrompt?.includes('FirstComment:') ? post.aiPrompt.split('FirstComment:')[1]?.trim() : null);
+                
+                // Shield 2: AI Contextual Unique Comment (Prevents repetitive spam flagging)
+                if (!firstCommentText) {
+                  try {
+                    firstCommentText = await generateSmartFirstComment({ postContent: platformCaption, topic: post.aiPrompt, platform });
+                  } catch (cgErr) {
+                    logger.warn(`[BullMQ Worker] Smart comment generation warning: ${cgErr.message}`);
+                  }
+                }
+
+                if (firstCommentText) {
+                  // Shield 3: Randomized Human Jitter Delay (4.5s to 9.5s) to prevent bot pattern detection
+                  const humanJitterDelayMs = Math.floor(Math.random() * 5000) + 4500;
+                  logger.info(`[BullMQ Worker] 🛡️ Anti-Spam Shield: Scheduling LinkedIn first comment with ${humanJitterDelayMs}ms human jitter delay...`);
+
+                  setTimeout(async () => {
+                    try {
+                      await adapter.postComment({
+                        accessToken: validAccessToken,
+                        authorUrn: platformAccountId,
+                        postUrn: result.externalPostId,
+                        commentText: firstCommentText,
+                      });
+                      logger.info(`[BullMQ Worker] ✅ First comment posted safely to LinkedIn post ${result.externalPostId}!`);
+                    } catch (cErr) {
+                      logger.warn(`[BullMQ Worker] 🛡️ First comment safety guard warning: ${cErr.message}`);
+                    }
+                  }, humanJitterDelayMs);
+                }
+              }
+            } catch (shieldErr) {
+              logger.warn(`[BullMQ Worker] Anti-spam shield check warning: ${shieldErr.message}`);
             }
           }
         }

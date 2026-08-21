@@ -1065,6 +1065,44 @@ export default function PostsPage() {
                   )}
                 </div>
 
+                {/* Auto-Post First Comment & Auto-Like Autopilot Shield Card */}
+                <div className="space-y-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
+                    <div className="flex items-center gap-2 text-xs font-extrabold text-[var(--text-primary)]">
+                      <MessageSquare className="h-4 w-4 text-[#2563EB]" />
+                      <span>AUTO-COMMENT & AUTO-LIKE SHIELD</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Autopilot Active
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-[var(--text-secondary)]">
+                    <div className="flex items-start gap-2.5 bg-[var(--bg-input)] p-3 rounded-xl border border-[var(--border-color)]">
+                      <ThumbsUp className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-bold text-[var(--text-primary)] text-xs">Auto-Like & Algorithm Signal</p>
+                        <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
+                          {selectedPost.status === 'PUBLISHED'
+                            ? '✅ Post was automatically liked post-publication to boost initial algorithm reach.'
+                            : '⚡ Auto-Like will automatically trigger 2s after publication to boost initial reach.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5 bg-[var(--bg-input)] p-3 rounded-xl border border-[var(--border-color)]">
+                      <MessageSquare className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-bold text-[var(--text-primary)] text-xs">Auto-Post First Comment (Reach Protection)</p>
+                        <p className="text-[11px] leading-relaxed text-[var(--text-secondary)] font-mono bg-[var(--bg-card)] p-2 rounded-lg border border-[var(--border-color)] mt-1">
+                          {(selectedPost as any).firstComment || (selectedPost.aiPrompt?.includes('FirstComment:') ? selectedPost.aiPrompt.split('FirstComment:')[1]?.trim() : '💬 Official product links & Call-To-Action posted as first comment 4s after publication.')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Live Post Engagement & Performance Analytics Deck (For Published Posts) */}
                 {selectedPost.status === 'PUBLISHED' && (
                   <div className="space-y-3 bg-[var(--bg-input)] border border-[#2563EB]/30 rounded-2xl p-4 shadow-sm">

@@ -512,3 +512,46 @@ Return ONLY valid JSON matching this schema:
     };
   }
 }
+
+/**
+ * AI Smart Contextual First Comment Generator.
+ * Reads the post content/topic and generates a relevant first comment (key takeaway, discussion question, or product link CTA).
+ */
+export async function generateSmartFirstComment({ postContent, topic = '', platform = 'LINKEDIN' }) {
+  const cleanTopic = extractCoreThought(topic || postContent || 'Innovation');
+  const openai = getOpenAIClient();
+
+  if (openai) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: config.openai.model || 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an elite social media growth manager writing a high-impact, attractive first comment for your own post. Include 2-3 engaging emojis (e.g. ✨, 📌, 🚀, 💬, 👇, 💡). Ask a thoughtful discussion question or share a key takeaway to drive user comments and engagement. Keep it under 2 lines.'
+          },
+          {
+            role: 'user',
+            content: `Post Topic/Content: "${cleanTopic.substring(0, 300)}"\nPlatform: ${platform}`
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.7,
+      });
+
+      const text = response.choices[0]?.message?.content?.trim();
+      if (text) {
+        return convertMarkdownToUnicode(text);
+      }
+    } catch (err) {
+      logger.warn(`[AIService] generateSmartFirstComment OpenAI warning: ${err.message}`);
+    }
+  }
+
+  // Fast Rule-Based Fallback
+  const isCaseStudy = /product|startup|loom|skyscanner|aircall|clickup|acquisition|tool|saas/i.test(cleanTopic);
+  if (isCaseStudy) {
+    return `📌 What's your biggest takeaway from this breakdown? Drop your thoughts or questions below! 👇\n\n#Growth #Tech #ProductStrategy`;
+  }
+  return `💬 What's your perspective on this? I'd love to hear how your team handles this! 👇\n\n#Innovation #Strategy`;
+}

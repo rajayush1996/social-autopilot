@@ -15,7 +15,8 @@ import {
   LogOut,
   Zap,
   MoreVertical,
-  CreditCard
+  CreditCard,
+  MessageSquare
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -71,6 +72,7 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Composer', href: '/composer', icon: PenTool },
     { name: 'Schedule', href: '/posts', icon: Calendar },
+    { name: 'Engagement Studio', href: '/engagement', icon: MessageSquare },
   ];
 
   const managementNav = [
