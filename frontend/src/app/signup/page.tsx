@@ -92,8 +92,9 @@ export default function SignupPage() {
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-xs mx-auto font-medium">
               We sent a verification link to <span className="text-[var(--text-primary)] font-bold">{email}</span>. Please click the link in your inbox to activate your account.
             </p>
-            <div className="p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl text-[11px] text-[var(--text-secondary)] text-left leading-relaxed w-full">
-              💡 <strong className="text-[var(--text-primary)]">Sandbox Mode:</strong> The verification URL is also logged directly in the backend terminal console for quick testing.
+            <div className="p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl text-xs text-[var(--text-secondary)] text-left leading-relaxed w-full space-y-1">
+              <p className="font-bold text-[var(--text-primary)]">Didn&apos;t receive the email?</p>
+              <p>Please check your <strong>Spam / Junk</strong> folder or Promotions tab. Emails typically arrive within 1-2 minutes.</p>
             </div>
             <Link 
               href="/login" 

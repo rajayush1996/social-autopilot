@@ -8,6 +8,7 @@ export const globalLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     code: 429,
@@ -23,6 +24,7 @@ export const authLimiter = rateLimit({
   max: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     code: 429,
@@ -38,9 +40,11 @@ export const aiLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     success: false,
     code: 429,
     error: 'AI generation request limit reached. Please wait a few minutes before generating more content.',
   },
 });
+

@@ -12,17 +12,16 @@ class EmailService {
     this.initTransporter();
   }
 
-  initTransporter() {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  createTransporter(port, secure) {
+    const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
 
     if (smtpHost && smtpUser && smtpPass) {
-      this.transporter = nodemailer.createTransport({
+      return nodemailer.createTransport({
         host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
+        port: port,
+        secure: secure !== undefined ? secure : port === 465,
         auth: {
           user: smtpUser,
           pass: smtpPass,
@@ -30,15 +29,27 @@ class EmailService {
         tls: {
           rejectUnauthorized: false,
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 12000,
       });
-      logger.info(`[EmailService] 📧 SMTP Transporter initialized (${smtpHost}:${smtpPort})`);
+    }
+    return null;
+  }
+
+  initTransporter() {
+    const defaultPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    this.transporter = this.createTransporter(defaultPort, defaultPort === 465);
+
+    if (this.transporter) {
+      logger.info(`[EmailService] 📧 SMTP Transporter initialized (smtp-relay.brevo.com:${defaultPort})`);
     } else {
       logger.warn('[EmailService] ⚠️ SMTP credentials missing. Email service running in Console Log fallback mode.');
     }
   }
 
   /**
-   * Send Generic Transactional Email
+   * Send Generic Transactional Email with Multi-Port Failover
    */
   async sendEmail({ to, subject, html, text, from }) {
     if (!this.transporter) this.initTransporter();
@@ -52,14 +63,34 @@ class EmailService {
     };
 
     if (this.transporter) {
-      try {
-        const info = await this.transporter.sendMail(mailOptions);
-        logger.info(`[EmailService] ✉️ Email delivered to ${to} (Message ID: ${info.messageId})`);
-        return { success: true, messageId: info.messageId };
-      } catch (err) {
-        logger.error(`[EmailService] ❌ Failed to deliver email to ${to}: ${err.message}`);
-        return { success: false, error: err.message };
+      const configuredPort = parseInt(process.env.SMTP_PORT || '587', 10);
+      const portsToTry = [
+        { port: configuredPort, secure: configuredPort === 465 },
+        { port: 465, secure: true },
+        { port: 2525, secure: false },
+      ].filter((v, idx, arr) => arr.findIndex(t => t.port === v.port) === idx);
+
+      let lastError = null;
+
+      for (const target of portsToTry) {
+        try {
+          const transport = (target.port === configuredPort && this.transporter) 
+            ? this.transporter 
+            : this.createTransporter(target.port, target.secure);
+
+          if (!transport) continue;
+
+          const info = await transport.sendMail(mailOptions);
+          logger.info(`[EmailService] ✉️ Email delivered to ${to} via Port ${target.port} (Message ID: ${info.messageId})`);
+          return { success: true, messageId: info.messageId, port: target.port };
+        } catch (err) {
+          lastError = err;
+          logger.warn(`[EmailService] ⚠️ Port ${target.port} attempt failed (${err.message}). Trying fallback port...`);
+        }
       }
+
+      logger.error(`[EmailService] ❌ All SMTP delivery ports failed for ${to}: ${lastError?.message}`);
+      return { success: false, error: lastError?.message };
     } else {
       logger.info(`[EmailService Console Fallback] ✉️ To: ${to} | Subject: ${subject}\n${text || html}`);
       return { success: true, isConsoleFallback: true };
