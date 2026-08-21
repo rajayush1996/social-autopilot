@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Mail, Lock, User, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2, ArrowLeft, BookOpen } from 'lucide-react';
+import { Sparkles, Mail, Lock, User, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2, ArrowLeft, BookOpen, Clock, RefreshCw } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import { useToast } from '@/context/ToastContext';
 
@@ -16,7 +16,41 @@ export default function SignupPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(120);
+  const [resending, setResending] = useState(false);
   const toast = useToast();
+
+  // 2-minute live countdown timer ticker
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (registered && resendCountdown > 0) {
+      timer = setInterval(() => {
+        setResendCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [registered, resendCountdown]);
+
+  const handleResendVerification = async () => {
+    if (resendCountdown > 0 || resending) return;
+    setResending(true);
+    try {
+      await ApiService.resendVerification({ email });
+      toast.success('Fresh verification email sent! (Valid for 2 minutes)');
+      setResendCountdown(120); // Reset timer to 2 minutes
+    } catch (err: any) {
+      console.error('Resend verification error:', err);
+      toast.error(err.response?.data?.message || 'Failed to resend verification email.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   // Simple visual password strength calculation
   const getPasswordStrength = (pwd: string) => {
@@ -51,6 +85,7 @@ export default function SignupPage() {
     try {
       await ApiService.register({ name, email, password });
       setRegistered(true);
+      setResendCountdown(120); // Start 2-min countdown
       toast.success('Registration successful! Please check your email.');
     } catch (err: any) {
       console.error('Registration error:', err);
@@ -81,7 +116,7 @@ export default function SignupPage() {
           </Link>
         </div>
 
-        <div className="w-full p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-6 text-center">
+        <div className="w-full p-7 sm:p-9 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl backdrop-blur-2xl shadow-2xl space-y-5 text-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-500 shadow-md">
               <CheckCircle2 className="h-7 w-7" />
@@ -90,15 +125,53 @@ export default function SignupPage() {
               Verify Your Email
             </h1>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-xs mx-auto font-medium">
-              We sent a verification link to <span className="text-[var(--text-primary)] font-bold">{email}</span>. Please click the link in your inbox to activate your account.
+              We sent a verification link to <span className="text-[var(--text-primary)] font-bold">{email}</span>. Please click the link to activate your account.
             </p>
+
+            {/* 2-Minute Expiration Security Pill */}
+            <div className="w-full p-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center justify-center gap-2">
+              <Clock className="h-4 w-4 shrink-0" />
+              <span>Link expires in <strong>2 minutes</strong> for security.</span>
+            </div>
+
+            {/* Spam Check Help Box */}
             <div className="p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl text-xs text-[var(--text-secondary)] text-left leading-relaxed w-full space-y-1">
               <p className="font-bold text-[var(--text-primary)]">Didn&apos;t receive the email?</p>
-              <p>Please check your <strong>Spam / Junk</strong> folder or Promotions tab. Emails typically arrive within 1-2 minutes.</p>
+              <p>Please check your <strong>Spam / Junk</strong> folder or Promotions tab.</p>
             </div>
+
+            {/* Resend Verification Button with Live 2-Min Countdown */}
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendCountdown > 0 || resending}
+              className={`w-full py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+                resendCountdown > 0 || resending
+                  ? 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] cursor-not-allowed opacity-80'
+                  : 'bg-[var(--bg-card)] hover:bg-[#2563EB]/10 text-[#2563EB] dark:text-[#60A5FA] border-[#2563EB]/30 hover:border-[#2563EB]'
+              }`}
+            >
+              {resending ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+                  <span>Generating Fresh Link...</span>
+                </>
+              ) : resendCountdown > 0 ? (
+                <>
+                  <Clock className="h-3.5 w-3.5 text-[#2563EB]" />
+                  <span>Resend Link in <strong>{formatTime(resendCountdown)}</strong></span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Resend Fresh Verification Link</span>
+                </>
+              )}
+            </button>
+
             <Link 
               href="/login" 
-              className="w-full py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 mt-2"
+              className="w-full py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold transition-all shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 mt-1"
             >
               <span>Proceed to Sign In</span>
               <ArrowRight className="h-4 w-4" />

@@ -389,6 +389,14 @@ export class ApiService {
   }
 
   /**
+   * Resend a fresh 2-minute verification email
+   */
+  static async resendVerification(payload: { email: string }): Promise<any> {
+    const response = await apiClient.post('/api/auth/resend-verification', payload);
+    return response.data;
+  }
+
+  /**
    * Authenticate credentials and return JWT token
    */
   static async login(payload: any): Promise<any> {

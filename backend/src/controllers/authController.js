@@ -203,55 +203,106 @@ export const updateUserProfile = catchAsync(async (req, res) => {
 });
 
 /**
- * Controller: Verify User email address (Thin Handler).
+ * Controller: Verify User email address (Thin Handler with Ultra-Clean Light Theme).
  */
 export const verifyEmail = catchAsync(async (req, res) => {
   const { token } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
   if (!token) {
     throw ApiError.badRequest('Verification token is missing.');
   }
 
+  // Check 2-minute token timestamp expiration
+  let isExpired = false;
+  if (typeof token === 'string' && token.includes('_')) {
+    const parts = token.split('_');
+    const exp = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(exp) && Date.now() > exp) {
+      isExpired = true;
+    }
+  }
+
   const user = await UserService.findUserByVerificationToken(token);
 
-  if (!user) {
+  if (!user || isExpired) {
     res.setHeader('Content-Type', 'text/html');
     return res.send(`
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
-        <title>Verification Failed - OmniSync</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Verification Expired - OmniSync</title>
         <style>
+          * { box-sizing: border-box; }
           body {
-            background-color: #0b0f19;
-            color: #f1f5f9;
-            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            padding: 20px;
           }
           .card {
-            background: rgba(17, 24, 39, 0.4);
-            border: 1px solid rgba(225, 29, 72, 0.3);
-            padding: 2.5rem;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            padding: 2.75rem 2.25rem;
             border-radius: 1.5rem;
             text-align: center;
-            max-width: 400px;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+            max-width: 440px;
+            width: 100%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
           }
-          h1 { color: #f43f5e; margin-top: 0; font-size: 1.5rem; }
-          p { color: #94a3b8; font-size: 0.875rem; line-height: 1.5; }
-          .btn { display: inline-block; margin-top: 1.5rem; background: #334155; color: #f1f5f9; padding: 0.625rem 1.25rem; border-radius: 0.75rem; text-decoration: none; font-size: 0.875rem; font-weight: bold; }
+          .icon-badge {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+            color: #e11d48;
+            font-size: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem auto;
+            font-weight: bold;
+          }
+          h1 { color: #0f172a; margin: 0 0 0.75rem 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.4px; }
+          p { color: #475569; font-size: 0.925rem; line-height: 1.6; margin: 0 0 1.75rem 0; }
+          .notice { background: #fff1f2; border: 1px solid #ffe4e6; padding: 10px 14px; border-radius: 12px; font-size: 0.825rem; color: #be123c; margin-bottom: 1.75rem; text-align: left; }
+          .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #2563EB, #1d4ed8);
+            color: #ffffff;
+            padding: 0.85rem 1.75rem;
+            border-radius: 0.85rem;
+            text-decoration: none;
+            font-size: 0.925rem;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+            transition: all 0.2s;
+            width: 100%;
+          }
+          .btn:hover { opacity: 0.95; transform: translateY(-1px); }
         </style>
       </head>
       <body>
         <div class="card">
-          <h1>Verification Failed</h1>
-          <p>The verification link is invalid, expired, or has already been used.</p>
-          <a href="http://localhost:3000/signup" class="btn">Back to Registration</a>
+          <div class="icon-badge">✕</div>
+          <h1>${isExpired ? 'Link Expired' : 'Link Invalid'}</h1>
+          <p>
+            ${isExpired 
+              ? 'This email verification link was valid for <strong>2 minutes</strong> and has expired.' 
+              : 'This verification link is invalid or has already been used.'}
+          </p>
+          <div class="notice">
+            ⏱️ <strong>Note:</strong> Verification links are limited to 2 minutes for your security. Please log in or request a fresh link.
+          </div>
+          <a href="${frontendUrl}/signup" class="btn">Request New Link / Sign In</a>
         </div>
       </body>
       </html>
@@ -263,24 +314,88 @@ export const verifyEmail = catchAsync(async (req, res) => {
   res.setHeader('Content-Type', 'text/html');
   return res.send(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-      <title>Email Verified - OmniSync</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Email Confirmed - OmniSync</title>
       <style>
-        body { background-color: #0b0f19; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: rgba(17, 24, 39, 0.4); border: 1px solid rgba(30, 41, 59, 0.8); padding: 2.5rem; border-radius: 1.5rem; text-align: center; max-width: 400px; backdrop-filter: blur(12px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-        h1 { color: #818cf8; margin-top: 0; font-size: 1.5rem; }
-        p { color: #94a3b8; font-size: 0.875rem; line-height: 1.5; }
-        .btn { display: inline-block; margin-top: 1.5rem; background: #4f46e5; color: white; padding: 0.625rem 1.25rem; border-radius: 0.75rem; text-decoration: none; font-size: 0.875rem; font-weight: bold; }
+        * { box-sizing: border-box; }
+        body {
+          background-color: #f8fafc;
+          color: #0f172a;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          margin: 0;
+          padding: 20px;
+        }
+        .card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          padding: 2.75rem 2.25rem;
+          border-radius: 1.5rem;
+          text-align: center;
+          max-width: 440px;
+          width: 100%;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+        }
+        .icon-badge {
+          width: 60px;
+          height: 60px;
+          border-radius: 18px;
+          background: #ecfdf5;
+          border: 1px solid #a7f3d0;
+          color: #059669;
+          font-size: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 1.5rem auto;
+          font-weight: bold;
+        }
+        h1 { color: #0f172a; margin: 0 0 0.75rem 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.4px; }
+        p { color: #475569; font-size: 0.925rem; line-height: 1.6; margin: 0 0 1.75rem 0; }
+        .btn {
+          display: inline-block;
+          background: linear-gradient(135deg, #2563EB, #1d4ed8);
+          color: #ffffff;
+          padding: 0.85rem 1.75rem;
+          border-radius: 0.85rem;
+          text-decoration: none;
+          font-size: 0.925rem;
+          font-weight: 700;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+          transition: all 0.2s;
+          width: 100%;
+        }
+        .btn:hover { opacity: 0.95; transform: translateY(-1px); }
       </style>
     </head>
     <body>
       <div class="card">
+        <div class="icon-badge">✓</div>
         <h1>Email Confirmed!</h1>
-        <p>Your email address has been verified successfully. You can now log into your portal.</p>
-        <a href="http://localhost:3000/login" class="btn">Proceed to Sign In</a>
+        <p>Your email address has been verified successfully. Your autonomous workspace is now fully active.</p>
+        <a href="${frontendUrl}/login" class="btn">Proceed to Sign In →</a>
       </div>
     </body>
     </html>
   `);
+});
+
+/**
+ * Controller: Resend Email Verification Token (Thin Handler).
+ */
+export const resendVerification = catchAsync(async (req, res) => {
+  const { email } = req.body;
+  const result = await AuthService.resendVerification({
+    email,
+    hostHeader: req.get('host'),
+    protocol: req.protocol,
+  });
+
+  return successResponse(res, HttpStatus.OK, result.message);
 });

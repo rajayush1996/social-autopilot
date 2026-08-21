@@ -374,7 +374,8 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 2 * 60 * 1000; // Strictly 2 minutes from now
+    const verificationToken = `${crypto.randomBytes(32).toString('hex')}_${expiresAt}`;
     const uniqueId = `USR-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const assignedRole = email.toLowerCase() === 'ayushraj8571@gmail.com' ? 'SUPER_ADMIN' : 'USER';
@@ -394,29 +395,92 @@ export class AuthService {
     const verificationLink = `${protocol}://${hostHeader || 'localhost:5000'}/api/auth/verify-email?token=${verificationToken}`;
     logger.info(`[AuthService] 📧 Registration verification link generated for ${email}: ${verificationLink}`);
     
-    // Deliver real verification email asynchronously in background without blocking HTTP response
+    // Deliver real verification email asynchronously in background with Ultra-Clean Light Theme
     emailService.sendEmail({
       to: email,
       subject: 'Verify your OmniSync Account',
       html: `
-        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0b0f19; color:#f3f4f6; padding:30px 20px;">
-          <div style="max-width:550px; margin:0 auto; background:#111827; border:1px solid #1f2937; border-radius:16px; padding:32px;">
-            <h2 style="color:#ffffff; margin-top:0;">Welcome to OmniSync! ⚡</h2>
-            <p style="color:#9ca3af; font-size:14px; line-height:1.6;">
-              Hi ${name}, thank you for registering with OmniSync Social Autopilot. Please confirm your email address to activate your account:
-            </p>
-            <div style="text-align:center; margin:28px 0;">
-              <a href="${verificationLink}" style="background:#2563EB; color:#ffffff; font-weight:bold; font-size:14px; text-decoration:none; padding:12px 28px; border-radius:10px; display:inline-block;">
-                Verify Email Address
-              </a>
-            </div>
-            <p style="color:#6b7280; font-size:12px; line-height:1.5;">
-              If you did not sign up for this account, you can safely ignore this email.
-            </p>
-          </div>
-        </div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify your OmniSync Account</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a;">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8fafc; padding:36px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:540px; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:24px; overflow:hidden; box-shadow:0 10px 25px -5px rgba(0,0,0,0.04);">
+                  <!-- Top Electric Blue Accent Bar -->
+                  <tr>
+                    <td height="6" style="background:linear-gradient(90deg, #2563EB, #0ea5e9);"></td>
+                  </tr>
+                  <!-- Main Body -->
+                  <tr>
+                    <td style="padding:36px 32px 32px 32px;">
+                      <!-- Brand Logo Header -->
+                      <table border="0" cellspacing="0" cellpadding="0" style="margin-bottom:24px;">
+                        <tr>
+                          <td width="42" height="42" align="center" valign="middle" style="background:linear-gradient(135deg, #2563EB, #0ea5e9); border-radius:12px; color:#ffffff; font-size:20px; font-weight:bold;">
+                            ⚡
+                          </td>
+                          <td style="padding-left:12px;">
+                            <span style="font-size:18px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">OmniSync</span><br/>
+                            <span style="font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Social AutoPilot</span>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 10px 0; line-height:1.3; letter-spacing:-0.4px;">
+                        Verify your email address
+                      </h1>
+                      <p style="font-size:14px; line-height:1.6; color:#475569; margin:0 0 20px 0;">
+                        Hi <strong>${name || 'Creator'}</strong>, thanks for joining OmniSync! Please confirm your email address to activate your autonomous workspace:
+                      </p>
+
+                      <!-- 2-Minute Expiration Security Pill -->
+                      <div style="background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:12px 16px; margin-bottom:24px;">
+                        <table border="0" cellspacing="0" cellpadding="0">
+                          <tr>
+                            <td valign="top" style="font-size:16px; padding-right:10px;">⏱️</td>
+                            <td style="font-size:13px; color:#1e40af; line-height:1.5; font-weight:500;">
+                              <strong style="font-weight:700;">Security Notice:</strong> This verification link is valid for <strong>2 minutes</strong>. If it expires, you can request a new link directly from the app.
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- Primary CTA Button -->
+                      <div style="text-align:center; margin:28px 0;">
+                        <a href="${verificationLink}" style="background:linear-gradient(135deg, #2563EB, #1d4ed8); color:#ffffff; font-size:14px; font-weight:700; text-decoration:none; padding:14px 34px; border-radius:12px; display:inline-block; box-shadow:0 4px 14px rgba(37,99,235,0.25);">
+                          Verify Email Address →
+                        </a>
+                      </div>
+
+                      <p style="font-size:12px; color:#64748b; line-height:1.6; margin:24px 0 0 0; word-break:break-all;">
+                        Or copy and paste this URL into your browser:<br/>
+                        <a href="${verificationLink}" style="color:#2563EB; text-decoration:underline;">${verificationLink}</a>
+                      </p>
+                    </td>
+                  </tr>
+                  <!-- Clean Light Footer -->
+                  <tr>
+                    <td style="background-color:#f1f5f9; padding:20px 32px; border-top:1px solid #e2e8f0; text-align:center;">
+                      <p style="font-size:11px; color:#64748b; margin:0; line-height:1.5;">
+                        If you did not create an account on OmniSync, you can safely ignore this email.<br/>
+                        © ${new Date().getFullYear()} OmniSync Social AutoPilot. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
       `,
-      text: `Welcome to OmniSync! Please confirm your email address by visiting this link: ${verificationLink}`,
+      text: `Welcome to OmniSync! Please confirm your email address within 2 minutes: ${verificationLink}`,
     }).then((res) => {
       logger.info(`[AuthService] ✉️ Verification email delivered in background to ${email}`);
     }).catch((emailErr) => {
@@ -425,6 +489,126 @@ export class AuthService {
 
     delete user.password;
     return user;
+  }
+
+  /**
+   * Resend a fresh 2-minute verification email to an unverified user.
+   */
+  static async resendVerification({ email, hostHeader, protocol }) {
+    if (!email) {
+      throw ApiError.badRequest('Field "email" is required.');
+    }
+
+    const user = await UserService.findUserByEmail(email.toLowerCase());
+    if (!user) {
+      throw ApiError.notFound('No account found with this email.');
+    }
+
+    if (user.emailVerified) {
+      throw ApiError.badRequest('This account is already verified. Please sign in.');
+    }
+
+    const expiresAt = Date.now() + 2 * 60 * 1000; // Strictly 2 minutes from now
+    const verificationToken = `${crypto.randomBytes(32).toString('hex')}_${expiresAt}`;
+
+    // Overwrite old token in DB (instantly permanently invalidates the previous link)
+    await UserService.updateUserProfile(user.id, { verificationToken });
+
+    const verificationLink = `${protocol}://${hostHeader || 'localhost:5000'}/api/auth/verify-email?token=${verificationToken}`;
+    logger.info(`[AuthService] 📧 Fresh 2-min verification link generated for ${email}: ${verificationLink}`);
+
+    emailService.sendEmail({
+      to: email,
+      subject: 'Verify your OmniSync Account (New Link)',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify your OmniSync Account</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a;">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8fafc; padding:36px 16px;">
+            <tr>
+              <td align="center">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:540px; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:24px; overflow:hidden; box-shadow:0 10px 25px -5px rgba(0,0,0,0.04);">
+                  <!-- Top Electric Blue Accent Bar -->
+                  <tr>
+                    <td height="6" style="background:linear-gradient(90deg, #2563EB, #0ea5e9);"></td>
+                  </tr>
+                  <!-- Main Body -->
+                  <tr>
+                    <td style="padding:36px 32px 32px 32px;">
+                      <!-- Brand Logo Header -->
+                      <table border="0" cellspacing="0" cellpadding="0" style="margin-bottom:24px;">
+                        <tr>
+                          <td width="42" height="42" align="center" valign="middle" style="background:linear-gradient(135deg, #2563EB, #0ea5e9); border-radius:12px; color:#ffffff; font-size:20px; font-weight:bold;">
+                            ⚡
+                          </td>
+                          <td style="padding-left:12px;">
+                            <span style="font-size:18px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">OmniSync</span><br/>
+                            <span style="font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Social AutoPilot</span>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 10px 0; line-height:1.3; letter-spacing:-0.4px;">
+                        Fresh Verification Link
+                      </h1>
+                      <p style="font-size:14px; line-height:1.6; color:#475569; margin:0 0 20px 0;">
+                        Hi <strong>${user.name || 'Creator'}</strong>, here is your requested fresh verification link. Please click below to activate your account:
+                      </p>
+
+                      <!-- 2-Minute Expiration Security Pill -->
+                      <div style="background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:12px 16px; margin-bottom:24px;">
+                        <table border="0" cellspacing="0" cellpadding="0">
+                          <tr>
+                            <td valign="top" style="font-size:16px; padding-right:10px;">⏱️</td>
+                            <td style="font-size:13px; color:#1e40af; line-height:1.5; font-weight:500;">
+                              <strong style="font-weight:700;">Security Notice:</strong> This verification link is strictly valid for <strong>2 minutes</strong>. Any previous verification link has been invalidated.
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+
+                      <!-- Primary CTA Button -->
+                      <div style="text-align:center; margin:28px 0;">
+                        <a href="${verificationLink}" style="background:linear-gradient(135deg, #2563EB, #1d4ed8); color:#ffffff; font-size:14px; font-weight:700; text-decoration:none; padding:14px 34px; border-radius:12px; display:inline-block; box-shadow:0 4px 14px rgba(37,99,235,0.25);">
+                          Verify Email Address →
+                        </a>
+                      </div>
+
+                      <p style="font-size:12px; color:#64748b; line-height:1.6; margin:24px 0 0 0; word-break:break-all;">
+                        Or copy and paste this URL into your browser:<br/>
+                        <a href="${verificationLink}" style="color:#2563EB; text-decoration:underline;">${verificationLink}</a>
+                      </p>
+                    </td>
+                  </tr>
+                  <!-- Clean Light Footer -->
+                  <tr>
+                    <td style="background-color:#f1f5f9; padding:20px 32px; border-top:1px solid #e2e8f0; text-align:center;">
+                      <p style="font-size:11px; color:#64748b; margin:0; line-height:1.5;">
+                        If you did not request this email, you can safely ignore it.<br/>
+                        © ${new Date().getFullYear()} OmniSync Social AutoPilot. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+      text: `Welcome to OmniSync! Your fresh 2-minute verification link is: ${verificationLink}`,
+    }).then(() => {
+      logger.info(`[AuthService] ✉️ Fresh verification email delivered in background to ${email}`);
+    }).catch((emailErr) => {
+      logger.warn(`[AuthService] ⚠️ Fresh verification email delivery warning: ${emailErr.message}`);
+    });
+
+    return { success: true, message: 'Fresh verification email dispatched successfully. Valid for 2 minutes.' };
   }
 
   /**

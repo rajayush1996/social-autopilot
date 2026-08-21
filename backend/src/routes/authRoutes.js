@@ -15,6 +15,7 @@ import {
   getMe,
   updateUserProfile,
   verifyEmail,
+  resendVerification,
 } from '../controllers/authController.js';
 import { validate } from '../middlewares/validate.js';
 import { connectAccountSchema } from '../validations/authValidation.js';
@@ -100,5 +101,10 @@ router.patch('/profile', authenticateJwt, updateUserProfile);
  * GET /api/auth/verify-email - User email verification handler
  */
 router.get('/verify-email', verifyEmail);
+
+/**
+ * POST /api/auth/resend-verification - Resend fresh 2-minute verification email
+ */
+router.post('/resend-verification', authLimiter, resendVerification);
 
 export default router;
