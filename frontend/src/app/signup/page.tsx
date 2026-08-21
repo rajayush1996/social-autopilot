@@ -140,31 +140,31 @@ export default function SignupPage() {
               <p>Please check your <strong>Spam / Junk</strong> folder or Promotions tab.</p>
             </div>
 
-            {/* Resend Verification Button with Live 2-Min Countdown */}
+            {/* Resend Verification Button with In-Button Live 2-Min Countdown */}
             <button
               type="button"
               onClick={handleResendVerification}
               disabled={resendCountdown > 0 || resending}
-              className={`w-full py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              className={`w-full h-11 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 border shadow-sm ${
                 resendCountdown > 0 || resending
-                  ? 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] cursor-not-allowed opacity-80'
-                  : 'bg-[var(--bg-card)] hover:bg-[#2563EB]/10 text-[#2563EB] dark:text-[#60A5FA] border-[#2563EB]/30 hover:border-[#2563EB]'
+                  ? 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] cursor-not-allowed opacity-90 select-none'
+                  : 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-blue-600 hover:to-blue-700 text-white border-transparent shadow-md shadow-blue-500/20 cursor-pointer active:scale-98'
               }`}
             >
               {resending ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
-                  <span>Generating Fresh Link...</span>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <span>Sending Fresh Link...</span>
                 </>
               ) : resendCountdown > 0 ? (
                 <>
-                  <Clock className="h-3.5 w-3.5 text-[#2563EB]" />
-                  <span>Resend Link in <strong>{formatTime(resendCountdown)}</strong></span>
+                  <Clock className="h-4 w-4 text-[#2563EB] dark:text-[#60A5FA] shrink-0 animate-pulse" />
+                  <span>Resend in <span className="font-mono font-black text-[var(--text-primary)] px-1.5 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)] ml-1">{formatTime(resendCountdown)}</span></span>
                 </>
               ) : (
                 <>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Resend Fresh Verification Link</span>
+                  <RefreshCw className="h-4 w-4 shrink-0" />
+                  <span>Resend Verification Email</span>
                 </>
               )}
             </button>
