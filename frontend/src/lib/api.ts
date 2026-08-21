@@ -49,7 +49,7 @@ const processQueue = (error: any, token: string | null = null) => {
 export const isPublicPath = (pathname?: string | null): boolean => {
   if (!pathname) return true;
   const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
-  const publicRoutes = ['/', '/login', '/signup', '/privacy', '/terms'];
+  const publicRoutes = ['/', '/login', '/signup', '/privacy', '/terms', '/docs'];
   return publicRoutes.includes(clean);
 };
 

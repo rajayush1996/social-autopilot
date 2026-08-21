@@ -154,6 +154,7 @@ export default function Home() {
               <a href="#features" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">Architecture</a>
               <a href="#autopilot" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">AI Compactor</a>
               <a href="#pricing" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">Pricing Tiers</a>
+              <Link href="/docs" className="px-4 py-2 rounded-xl text-xs font-extrabold text-[#2563EB] hover:bg-[#2563EB]/10 border border-transparent hover:border-[#2563EB]/20 transition-all duration-200">Docs</Link>
             </nav>
 
             {/* Action Bar & Theme Switcher */}
@@ -504,8 +505,13 @@ export default function Home() {
           </div>
         </section>
 
-        <footer className="border-t border-[var(--border-color)] py-10 text-center text-xs text-[var(--text-secondary)]">
-          <p>© {new Date().getFullYear()} OmniSync. Developed with verified modern SaaS aesthetics.</p>
+        <footer className="border-t border-[var(--border-color)] py-10 text-center text-xs text-[var(--text-secondary)] space-y-3">
+          <div className="flex items-center justify-center gap-6 font-bold text-xs">
+            <Link href="/docs" className="hover:text-[#2563EB] transition-colors">Documentation</Link>
+            <Link href="/privacy" className="hover:text-[#2563EB] transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#2563EB] transition-colors">Terms of Service</Link>
+          </div>
+          <p>© {new Date().getFullYear()} OmniSync Social AI. Developed with verified modern SaaS aesthetics.</p>
         </footer>
       </div>
     );

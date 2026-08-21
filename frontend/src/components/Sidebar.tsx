@@ -16,7 +16,8 @@ import {
   Zap,
   MoreVertical,
   CreditCard,
-  MessageSquare
+  MessageSquare,
+  BookOpen
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -79,6 +80,7 @@ export function Sidebar() {
   const managementNav = [
     { name: 'Channels', href: '/accounts', icon: Users },
     { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Documentation', href: '/docs', icon: BookOpen },
     { name: 'Billing & Plan', href: '/profile', icon: UserIcon },
   ];
 
