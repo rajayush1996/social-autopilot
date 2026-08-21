@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
+import BrandLogo from './BrandLogo';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -88,15 +89,10 @@ export function Sidebar() {
   return (
     <aside className="sticky top-0 left-0 h-screen w-64 bg-[var(--bg-card)] border-r border-[var(--border-color)] text-[var(--text-primary)] flex flex-col justify-between p-5 z-40 transition-all shrink-0">
       <div className="space-y-6">
-        {/* Simplified Brand Header - Logo + Brand Name Only */}
-        <Link href="/" className="flex items-center gap-3 px-2 py-1 group">
-          <div className="bg-[#2563EB] p-2.5 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 text-white transition-transform group-hover:scale-105">
-            <Zap className="h-5 w-5 fill-white" />
-          </div>
-          <span className="font-extrabold text-lg tracking-tight text-[var(--text-primary)] uppercase">
-            {CONFIG.APP_NAME}
-          </span>
-        </Link>
+        {/* Unified Brand Header */}
+        <div className="px-2 py-1">
+          <BrandLogo href="/" size="md" />
+        </div>
 
         {/* Section 1: Main Workspace */}
         <div className="space-y-2">

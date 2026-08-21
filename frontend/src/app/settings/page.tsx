@@ -67,13 +67,22 @@ export default function AutopilotSettingsPage() {
     e.preventDefault();
     setUpdatingSettings(true);
     try {
+      // 1. Update Autopilot flags & brand context
       await ApiService.updateAutopilotSettings({
         userId: 'me',
         autopilotEnabled,
         brandContext,
       });
 
-      // Also ensure default schedule timings match
+      // 2. Update User Brand Name & Logo Avatar if modified
+      if (user) {
+        await ApiService.updateUserProfile({
+          name: user.name || undefined,
+          avatarUrl: user.avatarUrl || undefined,
+        }).catch(() => {});
+      }
+
+      // 3. Also ensure default schedule timings match
       const schedRes = await ApiService.getUserSchedules().catch(() => null);
       if (schedRes && schedRes.schedules && schedRes.schedules.length > 0) {
         for (const s of schedRes.schedules) {
@@ -85,7 +94,7 @@ export default function AutopilotSettingsPage() {
         }
       }
 
-      toast.success('Autopilot engine and workflow timings saved successfully!');
+      toast.success('Brand Identity & Autopilot settings saved successfully!');
       fetchAutopilotProfile();
     } catch (err: any) {
       console.error('Failed to save settings:', err);
@@ -164,21 +173,68 @@ export default function AutopilotSettingsPage() {
             )}
 
             <form onSubmit={handleSaveSettings} className="space-y-5">
-              <div>
-                <label className="text-xs text-[var(--text-primary)] font-bold block mb-1.5 flex items-center gap-1.5">
+              {/* Brand Identity Section */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-color)]">
                   <Building2 className="h-4 w-4 text-[#2563EB]" />
-                  Brand / Company Niche & Context Setup
-                </label>
-                <textarea
-                  value={brandContext}
-                  onChange={(e) => setBrandContext(e.target.value)}
-                  placeholder="Define your niche, target demographics, product offerings, tone of voice, and keywords (e.g. 'We are a boutique coffee shop in Chicago specializing in single-origin cold brews...')"
-                  rows={6}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans"
-                />
-                <span className="text-[10px] text-[var(--text-secondary)] block mt-1.5 leading-normal font-medium">
-                  💡 The Autopilot AI Agent consumes this context to formulate daily relevant updates across your connected accounts.
-                </span>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-primary)]">
+                    Brand Identity & Visual Customization
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Brand Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                      Brand / Company Name
+                    </label>
+                    <input
+                      type="text"
+                      value={user?.name || ''}
+                      onChange={(e) => setUser(user ? { ...user, name: e.target.value } : null)}
+                      placeholder="e.g. Ayush Raj / OmniSync"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-[#2563EB]"
+                    />
+                  </div>
+
+                  {/* Brand Logo URL */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                      Brand Logo / Avatar URL
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={user?.avatarUrl || ''}
+                        onChange={(e) => setUser(user ? { ...user, avatarUrl: e.target.value } : null)}
+                        placeholder="https://example.com/logo.png"
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[#2563EB]"
+                      />
+                      {user?.avatarUrl && (
+                        <div className="w-9 h-9 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden shrink-0 shadow-xs">
+                          <img src={user.avatarUrl} alt="Logo Preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Brand Niche & AI Context */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                    Brand Niche, Voice & Audience Context
+                  </label>
+                  <textarea
+                    value={brandContext}
+                    onChange={(e) => setBrandContext(e.target.value)}
+                    placeholder="Define your niche, target demographics, product offerings, tone of voice, and keywords (e.g. 'We build SaaS automation workflows, AI dev tools, and growth teardowns for tech founders...')"
+                    rows={5}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans"
+                  />
+                  <span className="text-[10px] text-[var(--text-secondary)] block mt-1 leading-normal font-medium">
+                    💡 The AI Engine consumes this context to formulate daily relevant updates, match brand voice, and personalize graphics.
+                  </span>
+                </div>
               </div>
 
               {/* 2-Stage Review & Publishing Pipeline Controls */}
@@ -294,23 +350,23 @@ export default function AutopilotSettingsPage() {
 
         {/* Right Column: Engine Info & Guidelines */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 pb-3 border-b border-slate-850">
-              <Zap className="h-4 w-4 text-indigo-400" /> How Autopilot Automation Works
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 backdrop-blur-md space-y-4 shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2 pb-3 border-b border-[var(--border-color)]">
+              <Zap className="h-4 w-4 text-[#2563EB]" /> How Autopilot Automation Works
             </h3>
 
-            <ul className="text-xs text-slate-300 space-y-3 leading-relaxed">
+            <ul className="text-xs text-[var(--text-secondary)] space-y-3 leading-relaxed">
               <li className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                <span><strong>AI Context Research:</strong> Uses your brand context to craft tailored captions and select matching visual assets.</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
+                <span><strong className="text-[var(--text-primary)]">AI Context Research:</strong> Uses your brand context to craft tailored captions and select matching visual assets.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                <span><strong>BullMQ Worker Queue:</strong> Automatically dispatches posts to Instagram, LinkedIn, and X without manual intervention.</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
+                <span><strong className="text-[var(--text-primary)]">BullMQ Worker Queue:</strong> Automatically dispatches posts to Instagram, LinkedIn, and X without manual intervention.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                <span><strong>Real-time Notifications:</strong> Emits instant WebSocket updates when posts publish or require manual retries.</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
+                <span><strong className="text-[var(--text-primary)]">Real-time Notifications:</strong> Emits instant WebSocket updates when posts publish or require manual retries.</span>
               </li>
             </ul>
           </div>
@@ -319,7 +375,7 @@ export default function AutopilotSettingsPage() {
       </div>
 
       {/* Embedded Scheduling Dispatcher Section */}
-      <div className="pt-6 border-t border-slate-850">
+      <div className="pt-6 border-t border-[var(--border-color)]">
         <SchedulingDispatcher />
       </div>
     </div>

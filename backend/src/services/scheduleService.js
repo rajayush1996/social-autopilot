@@ -226,13 +226,15 @@ export class ScheduleService {
 3. Vary the opening hook and industry category (e.g. FinTech, DevTools, Design, AI, E-Commerce, EdTech).`
       : `DIVERSITY MANDATE: Pick a fresh, innovative real-world product or company from diverse categories (e.g. DevTools, FinTech, Design, AI, SaaS).`;
 
-    // 3. Generate AI content with anti-repetition memory contract
+    // 3. Generate AI content with anti-repetition memory contract (single-pass including visualMeta if image requested)
+    const isImageRequested = schedule.includeImage || schedule.imageMode === 'AI_FLUX';
     const aiResult = await generatePostContent({
       prompt: `Schedule: "${schedule.name}". Context: "${context}". Write a compelling, unique social media post.`,
       platform: schedule.targetPlatforms[0] || 'GENERAL',
       tone: schedule.tone || 'ENGAGING',
       brandContext: context,
       contentSummary: memorySummaryStr,
+      includeImage: isImageRequested,
     });
 
     if (!aiResult || !aiResult.content) {
@@ -240,7 +242,7 @@ export class ScheduleService {
     }
 
     // 4. Auto-detect generated brand name and dual-sync update to Campaign Memory
-    const detectedBrand = extractBrandFromContent(aiResult.content);
+    const detectedBrand = aiResult.visualMeta?.brandName || extractBrandFromContent(aiResult.content);
     await CampaignMemoryService.updateCampaignMemory(schedule.id, {
       brandName: detectedBrand,
       hookText: aiResult.content.split('\n')[0] || '',
@@ -335,6 +337,7 @@ export class ScheduleService {
           topic: schedule.name,
           brandName: detectedBrand,
           content: aiResult.content,
+          visualMeta: aiResult.visualMeta, // ZERO extra AI call - single-pass synthesis!
           tone: schedule.tone,
         });
         if (visualRes && visualRes.imageUrl) {

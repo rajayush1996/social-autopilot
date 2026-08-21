@@ -6,6 +6,7 @@ import { Sun, Moon, Sparkles, Plus, Activity } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import NotificationBell from './NotificationBell';
 import UserProfileDropdown from './UserProfileDropdown';
+import BrandLogo from './BrandLogo';
 
 export function Header({ userName, userRole }: { userName?: string; userRole?: string }) {
   const { theme, toggleTheme } = useTheme();
@@ -14,16 +15,7 @@ export function Header({ userName, userRole }: { userName?: string; userRole?: s
     <header className="sticky top-0 z-40 w-full bg-[var(--bg-card)]/85 backdrop-blur-2xl border-b border-[var(--border-color)] px-6 md:px-10 py-3.5 flex items-center justify-between transition-colors shadow-xs">
       {/* Left Branding */}
       <div className="flex items-center gap-4">
-        {/* Brand Logo & Title */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-            <Sparkles className="h-5 w-5 animate-pulse" />
-          </div>
-          <div className="hidden sm:block">
-            <span className="font-extrabold text-base tracking-tight text-[var(--text-primary)] uppercase block">OmniSync</span>
-            <span className="text-xs text-[var(--text-secondary)] font-medium block -mt-1">Social AI</span>
-          </div>
-        </Link>
+        <BrandLogo href="/" size="md" />
       </div>
 
       {/* Right Action Bar */}

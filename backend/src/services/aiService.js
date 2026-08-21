@@ -82,6 +82,7 @@ export async function generatePostContent({
   articleUrl,
   articleContext,
   isXPremium = false,
+  includeImage = false,
 }) {
   const openai = getOpenAIClient();
   const inputTopic = prompt || topic;
@@ -190,6 +191,20 @@ CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
 9. LINK & TAG MANDATE: If the user prompt mentions a website URL, link, or custom tag value (such as www.google.com or {{link}}), you MUST include that exact URL link or tag in the final post content (preferably near the CTA at the end).
 10. Output ONLY the ready-to-publish post content without meta-commentary, quotation marks, or prompt headers.`;
 
+    // If includeImage is requested, mandate structured Single-Pass payload to eliminate Call #2
+    if (includeImage) {
+      systemPrompt += `\n\n[MANDATORY SINGLE-PASS MULTI-MODAL OUTPUT FORMAT]\nYou MUST return ONLY a strictly valid JSON object containing both the post copy and visual metadata for image generation:
+{
+  "content": "Full formatted post content here with emoji headers, takeaways, and CTA question.",
+  "visualMeta": {
+    "brandName": "Exact primary company/startup/brand/deity name featured in post, or null if none",
+    "coreSubject": "Primary hero subject or problem solved (max 5 words)",
+    "niche": "TECH_STARTUP | DEVTOOLS | SPIRITUAL | SPORTS | FINTECH | PRODUCTIVITY | GENERAL_BUSINESS",
+    "visualPrompt": "A single compelling 3D minimalist image generation prompt (max 35 words) specifying visual elements, lighting, and product UI/metaphor for this exact subject. No distorted text."
+  }
+}`;
+    }
+
     const completion = await openai.chat.completions.create({
       model: model,
       messages: [
@@ -198,14 +213,31 @@ CRITICAL SINGLE-SUBJECT SYNTHESIS INSTRUCTIONS:
       ],
       temperature: 0.85,
       max_tokens: 1200,
+      ...(includeImage && { response_format: { type: 'json_object' } }),
     });
 
-    const generatedText = completion.choices[0]?.message?.content?.trim() || '';
-    const formattedContent = convertMarkdownToUnicode(generatedText);
+    const rawResponse = completion.choices[0]?.message?.content?.trim() || '';
+    let finalContent = rawResponse;
+    let visualMeta = null;
+
+    if (includeImage) {
+      try {
+        const parsed = JSON.parse(rawResponse);
+        if (parsed.content) {
+          finalContent = parsed.content;
+          visualMeta = parsed.visualMeta || null;
+        }
+      } catch (jsonErr) {
+        logger.warn(`[AIService] Single-pass JSON parse fallback: ${jsonErr.message}`);
+      }
+    }
+
+    const formattedContent = convertMarkdownToUnicode(finalContent);
 
     return {
       success: true,
       content: formattedContent,
+      visualMeta,
       platform,
       tone,
       modelUsed: model,

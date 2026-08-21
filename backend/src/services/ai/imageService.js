@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import axios from 'axios';
 import config from '../../config/env.js';
 import logger from '../../utils/logger.js';
+import { extractBrandAndVisualIntentWithAI } from '../../utils/brandExtractor.js';
 
 const getOpenAIClient = () => {
   if (process.env.NODE_ENV === 'test') return null;
@@ -137,7 +138,7 @@ export class ImageService {
   /**
    * Generates ultra-fast, photorealistic 3D visuals using Fal.ai Flux.1 Schnell ($0.003/image cost-optimized)
    */
-  static async generateFluxVisual({ topic, brandName, visualSubject, tone = 'ENGAGING' }) {
+  static async generateFluxVisual({ visualPrompt, visualSubject }) {
     const falKey = process.env.FLUX_API_KEY || process.env.FAL_KEY;
     if (!falKey || falKey === 'your_flux_api_key_here' || falKey.includes('placeholder')) {
       return null;
@@ -145,16 +146,9 @@ export class ImageService {
 
     try {
       const apiUrl = process.env.FLUX_API_URL?.replace('queue.fal.run', 'fal.run') || 'https://fal.run/fal-ai/flux/schnell';
-      const targetBrand = brandName || visualSubject || topic || 'Modern AI Technology';
-      const fullContext = `${targetBrand} ${topic || ''} ${visualSubject || ''}`;
-      
-      const isSpiritualOrDevotional = /shiv|durga|ganesh|krishna|ram|hanuman|god|deity|festival|diwali|navratri|shivratri|devotional|spiritual|bhakti|temple|puja|blessing/i.test(fullContext);
-      
-      const prompt = isSpiritualOrDevotional
-        ? `Majestic 3D digital artwork illustration representing ${targetBrand}, divine serene cosmic lighting, gold and deep indigo glowing aura, high-resolution artistic aesthetic, respectful cultural illustration, ultra-sharp 8k resolution, cinematic social media poster. Zero distorted text.`
-        : `Minimalist 3D tech visual for ${targetBrand}, featuring official company logo emblem and sleek modern product UI dashboard of ${targetBrand}, deep indigo and electric cyan glowing neon accents, dark mode studio aesthetic, clean geometry, ultra-sharp 8k digital art, premium social media post banner visual. Zero distorted text.`;
+      const prompt = visualPrompt || `Minimalist 3D tech visual for ${visualSubject || 'Modern Technology'}, featuring official company logo emblem and sleek modern product UI dashboard of ${visualSubject || 'Modern Technology'}, deep indigo and electric cyan glowing neon accents, dark mode studio aesthetic, clean geometry, ultra-sharp 8k digital art, premium social media post banner visual. Zero distorted text.`;
 
-      logger.info(`[ImageService] 🚀 Generating visual with Flux.1 Schnell via Fal.ai for ${isSpiritualOrDevotional ? 'devotional/spiritual' : 'brand/tech'} subject: "${targetBrand}"`);
+      logger.info(`[ImageService] 🚀 Generating visual with Flux.1 Schnell via Fal.ai for subject: "${visualSubject}" | Prompt: "${prompt.slice(0, 80)}..."`);
       const startTime = Date.now();
 
       const response = await axios.post(
@@ -189,7 +183,7 @@ export class ImageService {
         };
       }
     } catch (err) {
-      logger.warn(`[ImageService] Flux generation warning: ${err.response?.data?.detail || err.message}. Falling back to Branded Infographic Card.`);
+      logger.warn(`[ImageService] Flux generation warning: ${err.response?.data?.detail || err.message}. Falling back to DALL-E/Branded Card.`);
     }
 
     return null;
@@ -198,25 +192,21 @@ export class ImageService {
   /**
    * Main High-Level AI Visual Generator with Multi-Tier Strategy (Flux -> DALL-E -> Branded Card)
    */
-  static async generatePostVisual({ topic, brandName, content = '', tone = 'ENGAGING' }) {
-    // 1. Extract specific post title/subject from content if available!
+  static async generatePostVisual({ topic, brandName, content = '', visualMeta = null, tone = 'ENGAGING' }) {
+    // 1. If visualMeta was already provided from Single-Pass text generation, use it directly (0 EXTRA AI CALLS!)
+    const intentMeta = visualMeta || await extractBrandAndVisualIntentWithAI({ content, topic, tone });
+    const resolvedBrand = brandName || intentMeta.brandName;
+    const visualSubject = resolvedBrand || intentMeta.coreSubject || topic || 'Modern Tech Innovation';
+    const visualPrompt = intentMeta.visualPrompt;
+
+    logger.info(`[ImageService] 🪄 Visual Generation Target -> Brand: "${resolvedBrand || 'None'}", Subject: "${visualSubject}", Niche: "${intentMeta.niche}"`);
+
     const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
     const hookText = lines[0] || '';
-    
-    // Clean emojis, leading symbols & markdown formatting (e.g. "🚀 Replit Agent" -> "Replit Agent")
-    const cleanSubject = hookText
-      .replace(/^[^\p{L}\p{N}]+/gu, '')
-      .replace(/[*_#`]/g, '')
-      .split('\n')[0]
-      .trim();
-
-    const visualSubject = cleanSubject || brandName || topic || 'Modern Tech Innovation';
-    logger.info(`[ImageService] 🪄 Requesting AI Visual Generation for: "${visualSubject}" (Source topic: "${topic}")`);
-
     const takeaways = lines.filter(l => /(?:📌|🎯|💡|\b\d+\.\s+)/.test(l));
 
     // 1. First Priority: Fal.ai Flux.1 Schnell (Fastest 0.15s, Ultra-HD, lowest cost: $0.0035)
-    const fluxResult = await this.generateFluxVisual({ topic, brandName, visualSubject, tone });
+    const fluxResult = await this.generateFluxVisual({ visualPrompt, visualSubject });
     if (fluxResult && fluxResult.imageUrl) {
       return fluxResult;
     }
@@ -225,11 +215,11 @@ export class ImageService {
     const openai = getOpenAIClient();
     if (openai) {
       try {
-        const prompt = `A sleek, minimalist modern 3D tech graphic illustration representing "${visualSubject}". Clean lighting, isometric dark mode aesthetic, vibrant blue and cyan glowing accents, ultra-high resolution, premium aesthetic for LinkedIn social post banner. No distorted text.`;
+        const dallePrompt = visualPrompt || `A sleek, minimalist modern 3D tech graphic illustration representing "${visualSubject}". Clean lighting, isometric dark mode aesthetic, vibrant blue and cyan glowing accents, ultra-high resolution, premium aesthetic for LinkedIn social post banner. No distorted text.`;
         
         const dallePromise = openai.images.generate({
           model: 'dall-e-3',
-          prompt,
+          prompt: dallePrompt,
           n: 1,
           size: '1024x1024',
           quality: 'standard',
@@ -257,7 +247,7 @@ export class ImageService {
     // 3. High-Performance Zero-Cost Branded Graphic Card
     const cardResult = await this.generateBrandedGraphicCard({
       topic,
-      brandName,
+      brandName: resolvedBrand || visualSubject,
       hookText,
       takeaways,
     });
@@ -274,4 +264,5 @@ export class ImageService {
 }
 
 export default ImageService;
+
 

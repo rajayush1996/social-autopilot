@@ -151,69 +151,184 @@ export class SlideGeneratorService {
   }
 
   /**
-   * Generate sleek 1080x1080 Instagram Slide Image JPEG for a given slide text
+   * Generate sleek, modern 1080x1080 graphic slide matching frontend CarouselGraphicSlide
    */
-  static async generateSlideImage({ text, slideIndex = 1, totalSlides = 1, brandName = 'OmniSync' }) {
+  static async generateSlideImage({ text, slideIndex = 1, totalSlides = 1, brandName = 'OmniSync AI' }) {
     const width = 1080;
     const height = 1080;
-    const rawLines = this.wrapText(text, 34);
+    const isCover = slideIndex === 1;
+    const isCTA = slideIndex === totalSlides && totalSlides > 1;
 
-    // Escape text lines for SVG
-    const escapedLines = rawLines.map(line => this.escapeXml(line));
+    const cleanText = this.normalizeUnicodeForGraphic(text).trim();
+    const rawLines = cleanText.split(/\n+/).map(l => l.trim()).filter(Boolean);
 
-    // Calculate Y positioning to center content vertically
-    const lineHeight = 58;
-    const totalTextHeight = escapedLines.length * lineHeight;
-    const startY = Math.max(260, Math.round((height - totalTextHeight) / 2));
+    let centerContentSvg = '';
 
-    const textLinesSvg = escapedLines.map((line, idx) => {
-      if (!line) return '';
-      return `<text x="120" y="${startY + idx * lineHeight}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="600" fill="#F8FAFC">${line}</text>`;
-    }).filter(Boolean).join('\n');
+    if (isCover) {
+      // 1. COVER SLIDE: Perfectly Centered Typography with Glow Badge & Swipe Indicator
+      const coverTitle = rawLines[0] || 'Strategic Breakdown';
+      const coverSubtitle = rawLines.slice(1).join(' ') || 'Swipe left for the full step-by-step breakdown 👇';
+      
+      const wrappedTitleLines = this.wrapText(coverTitle, 26).map(l => this.escapeXml(l));
+      const wrappedSubLines = this.wrapText(coverSubtitle, 42).map(l => this.escapeXml(l));
+
+      const titleY = 460 - (wrappedTitleLines.length * 32);
+      const titleLinesSvg = wrappedTitleLines.map((l, i) => 
+        `<text x="540" y="${titleY + i * 68}" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="-0.5">${l}</text>`
+      ).join('\n');
+
+      const subStartY = titleY + (wrappedTitleLines.length * 68) + 40;
+      const subLinesSvg = wrappedSubLines.slice(0, 3).map((l, i) => 
+        `<text x="540" y="${subStartY + i * 40}" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="500" fill="#94A3B8" text-anchor="middle">${l}</text>`
+      ).join('\n');
+
+      centerContentSvg = `
+        <!-- Cover Pill Badge -->
+        <g transform="translate(370, 240)">
+          <rect width="340" height="46" rx="23" fill="#2563EB" fill-opacity="0.18" stroke="#2563EB" stroke-width="1.5"/>
+          <circle cx="24" cy="23" r="6" fill="#38BDF8"/>
+          <text x="180" y="29" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#60A5FA" text-anchor="middle" letter-spacing="2">CAROUSEL BREAKDOWN</text>
+        </g>
+
+        <!-- Centered Hero Title -->
+        ${titleLinesSvg}
+
+        <!-- Centered Subtitle -->
+        ${subLinesSvg}
+      `;
+    } else if (isCTA) {
+      // 2. CTA SLIDE: Centered Save / Bookmark Card with Action Prompt
+      const ctaHeader = rawLines[0] || 'Save For Later & Join The Discussion!';
+      const ctaBody = rawLines.slice(1).join(' ') || 'What is your single biggest takeaway? Drop a comment below 👇';
+
+      const wrappedHeader = this.wrapText(ctaHeader, 30).map(l => this.escapeXml(l));
+      const wrappedBody = this.wrapText(ctaBody, 38).map(l => this.escapeXml(l));
+
+      const headerSvg = wrappedHeader.map((l, i) => 
+        `<text x="540" y="${390 + i * 54}" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="900" fill="#FFFFFF" text-anchor="middle">${l}</text>`
+      ).join('\n');
+
+      const bodySvg = wrappedBody.map((l, i) => 
+        `<text x="540" y="${580 + i * 42}" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#E2E8F0" text-anchor="middle">${l}</text>`
+      ).join('\n');
+
+      centerContentSvg = `
+        <!-- Bookmark Icon Box -->
+        <g transform="translate(485, 230)">
+          <rect width="110" height="110" rx="28" fill="#10B981" fill-opacity="0.15" stroke="#10B981" stroke-width="2"/>
+          <path d="M42 32 H68 V78 L55 68 L42 78 Z" fill="#10B981"/>
+        </g>
+
+        <!-- Centered Header -->
+        ${headerSvg}
+
+        <!-- Discussion Card Box -->
+        <rect x="140" y="500" width="800" height="240" rx="24" fill="#1E293B" fill-opacity="0.85" stroke="#334155" stroke-width="2"/>
+        ${bodySvg}
+      `;
+    } else {
+      // 3. CONTENT SLIDE: Centered Glassmorphic Cards with Numbered Icon Badges
+      const slideTitle = rawLines[0] || `Key Strategy #${slideIndex - 1}`;
+      const bulletLines = rawLines.slice(1);
+      const cleanBullets = (bulletLines.length > 0 ? bulletLines : [cleanText]).slice(0, 4);
+
+      const headerText = this.escapeXml(slideTitle.slice(0, 48));
+
+      const cardElements = cleanBullets.map((bullet, idx) => {
+        const yPos = 310 + idx * 145;
+        const cleanBullet = this.escapeXml(bullet.replace(/^[📌🎯💡\s\d\.\:]+/, '').slice(0, 95));
+        const wrappedBullet = this.wrapText(cleanBullet, 36);
+
+        const bulletLinesSvg = wrappedBullet.slice(0, 2).map((line, lIdx) => 
+          `<text x="210" y="${yPos + 48 + lIdx * 34}" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#F8FAFC">${line}</text>`
+        ).join('\n');
+
+        return `
+          <g transform="translate(100, ${yPos})">
+            <rect width="880" height="120" rx="20" fill="#1E293B" fill-opacity="0.85" stroke="#334155" stroke-width="1.5" />
+            <circle cx="55" cy="60" r="22" fill="#2563EB" fill-opacity="0.25" stroke="#2563EB" stroke-width="2" />
+            <text x="55" y="67" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="900" fill="#60A5FA" text-anchor="middle">${idx + 1}</text>
+            ${bulletLinesSvg}
+          </g>
+        `;
+      }).join('\n');
+
+      centerContentSvg = `
+        <!-- Slide Header Title with Blue Dot -->
+        <g transform="translate(100, 230)">
+          <circle cx="12" cy="18" r="8" fill="#2563EB" />
+          <text x="35" y="27" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="900" fill="#FFFFFF" letter-spacing="-0.5">${headerText}</text>
+        </g>
+
+        <!-- Centered Card Boxes -->
+        ${cardElements}
+      `;
+    }
 
     const svgString = `
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#0B0F17"/>
-            <stop offset="50%" stop-color="#1E1B4B"/>
-            <stop offset="100%" stop-color="#0F172A"/>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#090D16"/>
+            <stop offset="50%" stop-color="#0F172A"/>
+            <stop offset="100%" stop-color="#020617"/>
           </linearGradient>
-          <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stop-color="#2563EB"/>
             <stop offset="100%" stop-color="#38BDF8"/>
           </linearGradient>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="70" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
 
         <!-- Background -->
-        <rect width="100%" height="100%" fill="url(#bg)"/>
+        <rect width="${width}" height="${height}" fill="url(#bgGrad)"/>
         
-        <!-- Subtle Glow Orbs -->
-        <circle cx="180" cy="180" r="260" fill="#2563EB" opacity="0.22" />
-        <circle cx="900" cy="900" r="300" fill="#38BDF8" opacity="0.16" />
+        <!-- Glowing Accent Orbs -->
+        <circle cx="950" cy="150" r="220" fill="#2563EB" fill-opacity="0.18" filter="url(#glow)"/>
+        <circle cx="100" cy="950" r="260" fill="#0EA5E9" fill-opacity="0.12" filter="url(#glow)"/>
 
-        <!-- Header Brand Bar -->
-        <rect x="120" y="90" width="6" height="40" rx="3" fill="url(#accent)" />
-        <text x="144" y="118" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700" letter-spacing="2">
-          ${this.escapeXml(brandName.toUpperCase())}
-        </text>
+        <!-- Top Header Bar -->
+        <g transform="translate(100, 85)">
+          <rect width="36" height="36" rx="10" fill="#2563EB"/>
+          <text x="18" y="24" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="900" fill="#FFFFFF" text-anchor="middle">OS</text>
+          <text x="52" y="25" fill="#F8FAFC" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" letter-spacing="1">
+            ${this.escapeXml(brandName)}
+          </text>
+        </g>
 
         <!-- Slide Index Pill -->
         ${totalSlides > 1 ? `
-        <rect x="840" y="90" width="120" height="40" rx="20" fill="#1E293B" stroke="#334155" stroke-width="1.5"/>
-        <text x="900" y="116" fill="#E2E8F0" font-family="-apple-system, sans-serif" font-size="18" font-weight="700" text-anchor="middle">
-          ${slideIndex} / ${totalSlides}
-        </text>
+        <g transform="translate(860, 85)">
+          <rect width="120" height="38" rx="19" fill="#1E293B" stroke="#334155" stroke-width="1.5"/>
+          <text x="60" y="24" fill="#E2E8F0" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="800" text-anchor="middle">
+            ${slideIndex} / ${totalSlides}
+          </text>
+        </g>
         ` : ''}
 
-        <!-- Main Slide Body Text with 120px Left Padding -->
-        ${textLinesSvg}
+        <!-- Main Body Content -->
+        ${centerContentSvg}
 
-        <!-- Footer Bottom Bar -->
-        <line x1="120" y1="960" x2="960" y2="960" stroke="#334155" stroke-width="1.5" />
-        <text x="120" y="1005" fill="#64748B" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="500">
-          Created with OmniSync ✨
-        </text>
+        <!-- Bottom Footer Bar -->
+        <line x1="100" y1="960" x2="980" y2="960" stroke="#334155" stroke-width="1.5" />
+        
+        <g transform="translate(100, 990)">
+          <text x="0" y="18" fill="#38BDF8" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="800" letter-spacing="1">
+            @${this.escapeXml(brandName.toLowerCase().replace(/\s+/g, ''))}
+          </text>
+          
+          ${!isCTA ? `
+          <g transform="translate(740, -5)">
+            <rect width="140" height="34" rx="17" fill="#2563EB" fill-opacity="0.15" stroke="#2563EB" stroke-width="1.5"/>
+            <text x="70" y="22" fill="#60A5FA" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" text-anchor="middle">SWIPE LEFT ➔</text>
+          </g>
+          ` : `
+          <text x="880" y="18" fill="#64748B" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" text-anchor="end">linkedin.com</text>
+          `}
+        </g>
       </svg>
     `;
 
@@ -223,7 +338,7 @@ export class SlideGeneratorService {
       .jpeg({ quality: 95 })
       .toBuffer();
 
-    // Auto-upload generated slide image to Cloudflare R2 / Cloudinary public CDN so Meta API receives a real public HTTPS URL
+    // Auto-upload generated slide image to Cloudflare R2 / Cloudinary public CDN
     try {
       const uploader = UploadStrategyFactory.getPrimaryConfiguredStrategy();
       if (uploader && uploader.name !== 'LocalStorage') {
@@ -252,3 +367,4 @@ export class SlideGeneratorService {
 }
 
 export default SlideGeneratorService;
+

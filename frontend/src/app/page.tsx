@@ -35,6 +35,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { formatDateTime } from '@/utils/date';
 import DashboardWidgets from '@/components/DashboardWidgets';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
+import BrandLogo from '@/components/BrandLogo';
 
 interface AutopilotReport {
   userId: string;
@@ -146,18 +147,7 @@ export default function Home() {
         <header className="border-b border-[var(--border-color)] bg-[var(--bg-card)]/85 backdrop-blur-2xl sticky top-0 z-50 transition-colors py-1">
           <div className="max-w-7xl mx-auto px-6 md:px-8 py-3.5 flex items-center justify-between">
             {/* Logo Badge & Title */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                <Sparkles className="h-5 w-5 animate-pulse" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-base tracking-tight text-[var(--text-primary)] uppercase">OmniSync</span>
-                  <span className="bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/25 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">v2.0 AI</span>
-                </div>
-                <span className="text-xs text-[var(--text-secondary)] font-medium block -mt-0.5">Autonomous Social AI</span>
-              </div>
-            </div>
+            <BrandLogo href="/" size="md" showVersionBadge={true} subtitleText="Autonomous Social AI" />
 
             {/* Pill Navigation Links */}
             <nav className="hidden md:flex items-center gap-1 bg-[var(--bg-input)] p-1.5 rounded-2xl border border-[var(--border-color)]">
