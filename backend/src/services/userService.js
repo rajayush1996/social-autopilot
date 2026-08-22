@@ -126,9 +126,9 @@ export class UserService {
    * Find user by unique email.
    */
   static async findUserByEmail(email) {
-    if (!email) return null;
+    if (!email || typeof email !== 'string') return null;
     return prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: email.trim().toLowerCase() },
     });
   }
 

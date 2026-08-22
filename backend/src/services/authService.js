@@ -648,7 +648,15 @@ export class AuthService {
 
     delete user.password;
 
-    return { token, refreshToken, user };
+    return {
+      token,
+      refreshToken,
+      tokens: {
+        accessToken: token,
+        refreshToken,
+      },
+      user,
+    };
   }
 
   /**

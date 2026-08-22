@@ -18,7 +18,8 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
       toast.error('Please fill in both email and password.');
       return;
     }
@@ -26,16 +27,22 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await ApiService.login({ email, password });
+      const response = await ApiService.login({ email: cleanEmail, password });
       
-      // Save tokens
-      localStorage.setItem('auth_token', response.tokens.accessToken);
-      localStorage.setItem('refresh_token', response.tokens.refreshToken);
-      
-      toast.success('Login successful! Redirecting...');
-      
-      // Fast immediate route push
-      router.push('/dashboard');
+      // Robust token extraction: supports both response.token and response.tokens.accessToken
+      const authToken = response?.token || response?.tokens?.accessToken;
+      const refreshToken = response?.refreshToken || response?.tokens?.refreshToken;
+
+      if (authToken) {
+        localStorage.setItem('auth_token', authToken);
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken);
+        }
+        toast.success('Login successful! Redirecting...');
+        router.push('/dashboard');
+      } else {
+        toast.error('Login failed: Token not received from server.');
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       toast.error(err.response?.data?.message || 'Invalid email or password.');
