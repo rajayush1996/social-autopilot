@@ -93,7 +93,7 @@ export class PostService {
    * Create a new post in DB, enqueue to BullMQ/Worker, and invalidate cache.
    */
   static async createPost(payload) {
-    const { userId, content, mediaUrls = [], mediaType = null, targetPlatforms, scheduledAt, publishNow = false, aiGenerated = false, aiPrompt = null } = payload;
+    const { userId, content, mediaUrls = [], mediaType = null, targetPlatforms, targetAccountIds = [], scheduledAt, publishNow = false, aiGenerated = false, aiPrompt = null } = payload;
 
     const parseScheduledDate = scheduledAt ? new Date(scheduledAt) : null;
     let initialStatus = POST_STATUS.DRAFT;
@@ -104,10 +104,26 @@ export class PostService {
       initialStatus = POST_STATUS.SCHEDULED;
     }
 
+    // Embed targetAccountIds into content JSON if provided
+    let finalContent = content;
+    if (targetAccountIds && targetAccountIds.length > 0) {
+      try {
+        if (content && content.trim().startsWith('{')) {
+          const parsed = JSON.parse(content);
+          parsed._targetAccountIds = targetAccountIds;
+          finalContent = JSON.stringify(parsed);
+        } else {
+          finalContent = JSON.stringify({ content, _targetAccountIds: targetAccountIds });
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
         userId,
-        content,
+        content: finalContent,
         mediaUrls,
         mediaType,
         targetPlatforms,

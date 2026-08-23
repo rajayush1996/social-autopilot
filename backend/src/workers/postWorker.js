@@ -66,13 +66,51 @@ export async function processPostPublishing(postId) {
     ? post.targetPlatforms
     : [SOCIAL_PLATFORM.INSTAGRAM, SOCIAL_PLATFORM.LINKEDIN, SOCIAL_PLATFORM.X];
 
+  // Specific target accounts/pages selection (from DB column or JSON payload)
+  let resolvedTargetAccountIds = (Array.isArray(post.targetAccountIds) && post.targetAccountIds.length > 0)
+    ? post.targetAccountIds
+    : [];
+
+  if (resolvedTargetAccountIds.length === 0 && post.content && post.content.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(post.content);
+      if (Array.isArray(parsed._targetAccountIds) && parsed._targetAccountIds.length > 0) {
+        resolvedTargetAccountIds = parsed._targetAccountIds;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  let accountsToPublish = [];
+  if (resolvedTargetAccountIds.length > 0) {
+    accountsToPublish = userAccounts.filter((acc) => resolvedTargetAccountIds.includes(acc.id));
+  }
+  
+  if (accountsToPublish.length === 0) {
+    accountsToPublish = targetPlatforms
+      .map((p) => userAccounts.find((acc) => acc.platform === p))
+      .filter(Boolean);
+  }
+
+  // Fallback if accounts list is empty
+  if (accountsToPublish.length === 0) {
+    accountsToPublish = targetPlatforms.map((p) => ({
+      id: null,
+      platform: p,
+      platformAccountId: `mock_${p.toLowerCase()}_user`,
+      username: `user_${p.toLowerCase()}`,
+      accountType: 'PERSONAL',
+    }));
+  }
+
   let successCount = 0;
   let failureCount = 0;
   const executionLogs = [];
 
   try {
-    for (const platform of targetPlatforms) {
-      const account = userAccounts.find((acc) => acc.platform === platform);
+    for (const account of accountsToPublish) {
+      const platform = account.platform;
 
       try {
         // Resolve platform-specific caption if post.content is a platform draft JSON map

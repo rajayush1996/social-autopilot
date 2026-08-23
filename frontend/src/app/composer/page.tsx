@@ -44,8 +44,9 @@ import CONFIG from '@/config';
 import { useToast } from '@/context/ToastContext';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import LiquidUploadButton from '@/components/LiquidUploadButton';
-import CarouselSlideDeck from '@/components/CarouselSlideDeck';
 import PlatformIcon from '@/components/PlatformIcon';
+import ChannelTargetChips from '@/components/ChannelTargetChips';
+import { SocialAccount } from '@/lib/api';
 import { RichPromptEditor } from '@/components/RichPromptEditor';
 import {
   getPlatformDefinition,
@@ -172,6 +173,10 @@ export default function ComposerPage() {
   const [tagValueInput, setTagValueInput] = useState('');
 
   const [trendingHashtags, setTrendingHashtags] = useState<Array<{ tag: string; reachMultiplier: string }>>([]);
+
+  // Granular Destination Selection (Personal Profile vs Company Page(s))
+  const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchPlaceholders = async () => {
@@ -424,11 +429,16 @@ export default function ComposerPage() {
       setAllowedPlatforms(userAllowed);
 
       if (Array.isArray(accounts)) {
-        const activePlatforms = accounts
-          .filter((acc: any) => acc.isActive !== false)
+        setConnectedAccounts(accounts);
+        const activeAccounts = accounts.filter((acc: any) => acc.isActive !== false);
+        const activePlatforms = activeAccounts
           .map((acc: any) => acc.platform.toUpperCase() as PlatformKey)
           .filter((p: PlatformKey) => userAllowed.includes(p));
         setConnectedPlatforms(activePlatforms);
+
+        // Auto-select single-account destinations or keep active targets
+        const activeIds = activeAccounts.map((a: any) => a.id);
+        setSelectedAccountIds((prev) => (prev.length > 0 ? prev.filter((id) => activeIds.includes(id)) : activeIds));
 
         if (activePlatforms.length > 0) {
           const currentSelected = reduxComposer.selectedPlatforms || [];
@@ -673,9 +683,30 @@ export default function ComposerPage() {
     }
   };
 
+  const hasZeroSelectedActivePlatform = platforms.some((p) => {
+    const accountsForP = connectedAccounts.filter(
+      (acc) => acc.platform?.toUpperCase() === p.toUpperCase()
+    );
+    if (accountsForP.length > 1) {
+      const selectedCount = accountsForP.filter((acc) => selectedAccountIds.includes(acc.id)).length;
+      return selectedCount === 0;
+    }
+    return false;
+  });
+
   const handleSchedulePost = async () => {
     const platformDraftMap: Record<string, string> = {};
     let hasAnyDraft = false;
+
+    if (platforms.length === 0) {
+      toast.error('Please select at least one target social channel.');
+      return;
+    }
+
+    if (hasZeroSelectedActivePlatform) {
+      toast.error('Please select at least one account or company page in the channel dropdown.');
+      return;
+    }
 
     platforms.forEach((p) => {
       let draftText = generatedDrafts[p] || topic;
@@ -705,6 +736,7 @@ export default function ComposerPage() {
         mediaUrls: mediaFileUrl ? [mediaFileUrl] : [],
         mediaType: mediaType || null,
         targetPlatforms: platforms,
+        targetAccountIds: selectedAccountIds,
         scheduledAt: publishMode === 'SCHEDULE' ? new Date(scheduledDate).toISOString() : null,
         publishNow: publishMode === 'NOW',
         firstComment: firstComment.trim() || undefined,
@@ -736,6 +768,17 @@ export default function ComposerPage() {
     const isSelecting = !platforms.includes(p);
     dispatch(togglePlatformAction(p));
     if (isSelecting) socketClient.checkPlatform(p);
+  };
+
+  const handleToggleAccount = (accountId: string, platformId: PlatformKey) => {
+    setSelectedAccountIds((prev) => {
+      const isSelected = prev.includes(accountId);
+      const next = isSelected ? prev.filter((id) => id !== accountId) : [...prev, accountId];
+      return next;
+    });
+    if (!platforms.includes(platformId)) {
+      dispatch(togglePlatformAction(platformId));
+    }
   };
 
   const handleTextChange = (plt: PlatformKey, val: string) => {
@@ -1070,50 +1113,20 @@ export default function ComposerPage() {
                     );
                   })()}
 
-                  {/* Target Channels & Status (Directly Visible) */}
+                  {/* Target Channels & Destinations (Directly Visible with Smart Page Dropdown) */}
                   <div className="pt-4 border-t border-[var(--border-color)] space-y-2.5">
                     <label className="text-xs font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
-                      Target Channels & Status
+                      Target Channels & Destinations
                     </label>
-                    <div className="flex flex-wrap gap-2.5">
-                      {selectablePlatforms.map((platform) => {
-                        const isConnected = connectedPlatforms.includes(platform.id);
-                        const active = platforms.includes(platform.id as PlatformKey) && isConnected;
-                        return (
-                          <button
-                            key={platform.id}
-                            onClick={() => togglePlatform(platform.id)}
-                            className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                              active
-                                ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md'
-                                : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-[#2563EB]/50 hover:bg-[var(--bg-card)]'
-                            }`}
-                            title={isConnected ? `${platform.label} is Connected` : `${platform.label} is Offline. Click to connect.`}
-                          >
-                            <span
-                              className={`w-2 h-2 rounded-full shrink-0 ${
-                                isConnected
-                                  ? (active ? 'bg-emerald-300 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]')
-                                  : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
-                              }`}
-                            />
-                            <div className="flex items-center gap-1.5 border-r border-current pr-2 pb-0.5 pt-0.5 border-opacity-20">
-                              <PlatformIcon platform={platform.id} className="w-4 h-4" />
-                              <span>{platform.label}</span>
-                            </div>
-                            <span className={`text-[10px] px-1 rounded font-extrabold uppercase tracking-widest ${
-                              active
-                                ? 'text-blue-100'
-                                : isConnected
-                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                  : 'text-rose-600 dark:text-rose-400'
-                            }`}>
-                              {isConnected ? 'Active' : 'Offline'}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <ChannelTargetChips
+                      selectablePlatforms={selectablePlatforms}
+                      connectedPlatforms={connectedPlatforms}
+                      connectedAccounts={connectedAccounts}
+                      selectedPlatforms={platforms}
+                      selectedAccountIds={selectedAccountIds}
+                      onTogglePlatform={togglePlatform}
+                      onToggleAccount={handleToggleAccount}
+                    />
                   </div>
 
                   {/* Advanced Directives Accordion (Expand / Shrink Toggle) */}
@@ -1470,15 +1483,31 @@ export default function ComposerPage() {
                 <div className="relative flex shadow-md rounded-xl publish-dropdown-container">
                   <button
                     onClick={handleSchedulePost}
-                    disabled={submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0}
-                    className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-l-xl font-extrabold text-[13px] transition-all disabled:opacity-50"
+                    disabled={submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0 || hasZeroSelectedActivePlatform}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-l-xl font-extrabold text-[13px] transition-all cursor-pointer ${
+                      submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0 || hasZeroSelectedActivePlatform
+                        ? 'bg-slate-400 dark:bg-slate-700 text-slate-200 cursor-not-allowed opacity-60'
+                        : 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-blue-600 hover:to-blue-700 text-white shadow-md shadow-blue-500/20'
+                    }`}
                   >
-                    {submitting ? 'Processing...' : publishMode === 'NOW' ? '⚡ Publish Now' : '🗓️ Schedule Post'}
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : hasZeroSelectedActivePlatform ? (
+                      '⚠️ Select Target Destination Above'
+                    ) : publishMode === 'NOW' ? (
+                      '⚡ Publish Now'
+                    ) : (
+                      '🗓️ Schedule Post'
+                    )}
                   </button>
                   <div className="w-[1px] bg-blue-700/50"></div>
                   <button
                     onClick={() => setShowPublishDropdown(!showPublishDropdown)}
-                    className="px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-r-xl flex items-center justify-center transition-all disabled:opacity-50"
+                    disabled={submitting || hasZeroSelectedActivePlatform}
+                    className="px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-r-xl flex items-center justify-center transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {showPublishDropdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>

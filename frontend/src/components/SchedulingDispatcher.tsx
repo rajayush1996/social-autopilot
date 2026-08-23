@@ -33,6 +33,8 @@ import ApiService, { AutomationSchedule } from '@/services/apiService';
 import { Post } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import PlatformIcon from '@/components/PlatformIcon';
+import ChannelTargetChips from '@/components/ChannelTargetChips';
+import { SocialAccount } from '@/lib/api';
 import { getReviewPipelineNarrative, formatTimeDisplay } from '@/utils/date';
 
 import {
@@ -461,6 +463,8 @@ export function SchedulingDispatcher() {
 
   const [saving, setSaving] = useState<boolean>(false);
   const [pendingUpdateIds, setPendingUpdateIds] = useState<string[]>([]);
+  const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>([]);
+  const [formAccountIds, setFormAccountIds] = useState<string[]>([]);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([...DEFAULT_ALLOWED_PLATFORMS]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -475,7 +479,10 @@ export function SchedulingDispatcher() {
           setAllowedPlatforms(me.allowedPlatforms.map((p: string) => p.toUpperCase()));
         }
         if (Array.isArray(accs)) {
+          setConnectedAccounts(accs);
           setConnectedPlatforms(accs.map((a) => a.platform.toUpperCase()));
+          const allIds = accs.map((a: any) => a.id);
+          setFormAccountIds((prev) => (prev.length > 0 ? prev : allIds));
         }
       })
       .catch(() => {});
@@ -585,6 +592,7 @@ export function SchedulingDispatcher() {
     setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat('WEEKLY');
     setFormPlatforms(['LINKEDIN']);
+    setFormAccountIds(connectedAccounts.map((a) => a.id));
     setFormTone('ENGAGING');
     setFormFormatStyle('SINGLE');
     setFormEmojiDensity('MEDIUM');
@@ -607,6 +615,7 @@ export function SchedulingDispatcher() {
     setFormDays(sched.daysOfWeek || ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat(sched.repeatType || 'WEEKLY');
     setFormPlatforms((sched.targetPlatforms as any) || ['LINKEDIN']);
+    setFormAccountIds((sched as any).targetAccountIds?.length > 0 ? (sched as any).targetAccountIds : connectedAccounts.map((a) => a.id));
     setFormTone(sched.tone || 'ENGAGING');
     setFormFormatStyle('SINGLE');
     setFormEmojiDensity('MEDIUM');
@@ -631,6 +640,7 @@ export function SchedulingDispatcher() {
         daysOfWeek: formDays,
         repeatType: formRepeat,
         targetPlatforms: formPlatforms,
+        targetAccountIds: formAccountIds,
         tone: formTone,
         topicPrompt: formTopic.trim(),
         includeImage: formImageMode === 'AI_FLUX',
@@ -1069,24 +1079,25 @@ export function SchedulingDispatcher() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider block">Target Channels</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {displayPlatforms.map((p) => {
-                      const isSelected = formPlatforms.includes(p.id as any);
-                      return (
-                        <button
-                          type="button"
-                          key={p.id}
-                          onClick={() => handleTogglePlatform(p.id as any)}
-                          className={`py-2 px-3 rounded-2xl font-bold text-xs flex items-center justify-between border cursor-pointer ${
-                            isSelected ? 'bg-blue-50 text-[#2563EB] border-blue-300 shadow-xs' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)]'
-                          }`}
-                        >
-                          <span className="truncate">{p.label}</span>
-                        </button>
+                  <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
+                    Target Channels & Destinations
+                  </label>
+                  <ChannelTargetChips
+                    selectablePlatforms={displayPlatforms as any}
+                    connectedPlatforms={connectedPlatforms}
+                    connectedAccounts={connectedAccounts}
+                    selectedPlatforms={formPlatforms as any}
+                    selectedAccountIds={formAccountIds}
+                    onTogglePlatform={(platId) => handleTogglePlatform(platId as any)}
+                    onToggleAccount={(accId, platId) => {
+                      setFormAccountIds((prev) =>
+                        prev.includes(accId) ? prev.filter((id) => id !== accId) : [...prev, accId]
                       );
-                    })}
-                  </div>
+                      if (!formPlatforms.includes(platId as any)) {
+                        setFormPlatforms((prev) => [...prev, platId as any]);
+                      }
+                    }}
+                  />
                 </div>
 
                 {/* Topic Instructions */}

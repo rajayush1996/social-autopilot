@@ -112,6 +112,7 @@ model Post {
   mediaUrls      String[]        @default([])
   mediaType      String?
   targetPlatforms SocialPlatform[]
+  targetAccountIds String[]        @default([])
   status         PostStatus      @default(DRAFT)
   scheduledAt    DateTime?
   publishedAt    DateTime?
@@ -171,6 +172,7 @@ model AutomationSchedule {
   repeatType      String           @default("WEEKLY")
   isActive        Boolean          @default(true)
   targetPlatforms SocialPlatform[] @default([LINKEDIN, X])
+  targetAccountIds String[]        @default([])
   tone            AITone?          @default(ENGAGING)
   topicPrompt     String?
   includeImage    Boolean          @default(false)
