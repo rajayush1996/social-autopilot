@@ -306,7 +306,7 @@ function IntroSection() {
             <Zap className="h-5 w-5 text-[#2563EB]" /> 100% Autonomous Pipeline
           </h3>
           <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
-            Background BullMQ worker queues handle research, drafting, 3D image rendering, and live publishing without manual intervention.
+            Autonomous AI engines handle topic research, drafting, 3D visual generation, and multi-channel publishing automatically.
           </p>
         </div>
 
@@ -712,7 +712,7 @@ function SchedulesGuideSection() {
             8. Schedule Manager & Automated Recurring Slots
           </h2>
           <p className="text-sm text-[var(--text-secondary)] font-medium mt-0.5">
-            Setting up daily recurring time slots and managing BullMQ dispatch queues.
+            Setting up daily recurring publishing time slots across your connected channels.
           </p>
         </div>
       </div>
@@ -723,12 +723,12 @@ function SchedulesGuideSection() {
             How to Create a Recurring Schedule:
           </h3>
           <ol className="space-y-2 list-decimal list-inside text-[var(--text-secondary)] leading-relaxed">
-            <li>Open <Link href="/posts" className="text-[#2563EB] font-bold hover:underline">Schedule (/posts)</Link> from the left sidebar.</li>
-            <li>In the <strong>Scheduling Dispatcher</strong>, click <strong>&quot;Create Schedule Slot&quot;</strong>.</li>
+            <li>Open <Link href="/schedules" className="text-[#2563EB] font-bold hover:underline">Schedules (/schedules)</Link> or <Link href="/posts" className="text-[#2563EB] font-bold hover:underline">Posts (/posts)</Link> from the left sidebar.</li>
+            <li>Click <strong>&quot;Create Schedule Slot&quot;</strong>.</li>
             <li>Select the <strong>Days of the Week</strong> (e.g. <code>MON, TUE, WED, THU, FRI</code>).</li>
-            <li>Set the <strong>Dispatch Time</strong> (e.g. <code>21:00 / 9:00 PM</code>).</li>
-            <li>Choose <strong>Image Mode</strong>: <em>AI Flux.1 Schnell</em> (auto 3D visuals) or <em>None</em>.</li>
-            <li>Click <strong>&quot;Save Schedule&quot;</strong>. The background worker queues the job in Redis and displays the next execution timestamp.</li>
+            <li>Set the <strong>Publishing Time</strong> (e.g. <code>21:00 / 9:00 PM</code>).</li>
+            <li>Choose <strong>Visual Mode</strong>: <em>AI 3D Visuals</em> (auto-generated images) or <em>Text Only</em>.</li>
+            <li>Click <strong>&quot;Save Schedule&quot;</strong>. OmniSync activates your schedule and displays your next automated publishing slot.</li>
           </ol>
         </div>
       </div>
@@ -817,15 +817,15 @@ function SecuritySection() {
       <ul className="space-y-3 text-xs sm:text-sm text-[var(--text-secondary)] font-medium">
         <li className="flex items-start gap-2.5 p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl">
           <Lock className="h-4 w-4 text-[#2563EB] shrink-0 mt-0.5" />
-          <span><strong>AES-256-GCM Token Encryption:</strong> All OAuth tokens and refresh tokens are encrypted at rest with unique initialization vectors (IVs).</span>
+          <span><strong>Bank-Grade AES-256 Encryption:</strong> All social media connections and credentials are encrypted at rest with industry-standard bank-grade security protocols.</span>
         </li>
         <li className="flex items-start gap-2.5 p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl">
           <Clock className="h-4 w-4 text-[#2563EB] shrink-0 mt-0.5" />
-          <span><strong>Proactive Daily Token Sweep:</strong> The background token refresh job automatically scans and renews tokens expiring within 7 days.</span>
+          <span><strong>Continuous Connection Health:</strong> OmniSync monitors your channel connections in the background to ensure your scheduled posts are never interrupted.</span>
         </li>
         <li className="flex items-start gap-2.5 p-3.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl">
           <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-          <span><strong>Auto-Disconnect Shield:</strong> If a token is revoked by the user on LinkedIn, the system gracefully deactivates the account and alerts you via WebSocket without crashing.</span>
+          <span><strong>Full Account Control:</strong> You have complete control over your channels. You can connect, disconnect, or switch accounts with a single click anytime.</span>
         </li>
       </ul>
     </div>
