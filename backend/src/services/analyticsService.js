@@ -246,11 +246,11 @@ Return ONLY a valid JSON object in the exact following schema:
         where: { userId },
         include: { socialPostLogs: true },
         orderBy: { createdAt: 'desc' },
-        take: 30,
+        take: 50,
       }),
       prisma.socialAccount.findMany({
         where: { userId },
-        select: { id: true, platform: true, username: true, accountName: true, isActive: true, expiresAt: true },
+        select: { id: true, platform: true, username: true, accountName: true, accountType: true, isActive: true, expiresAt: true },
       }),
     ]);
 
@@ -259,6 +259,92 @@ Return ONLY a valid JSON object in the exact following schema:
     const failedPosts = posts.filter(p => p.status === POST_STATUS.FAILED);
     const activeAccounts = accounts.filter(a => a.isActive);
 
+    const userAllowedPlatforms = Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0
+      ? user.allowedPlatforms.map(p => p.toUpperCase())
+      : ['LINKEDIN', 'X', 'INSTAGRAM', 'FACEBOOK'];
+
+    // 1. Real Dynamic Platform Performance Distribution
+    const platformDistribution = {};
+    userAllowedPlatforms.forEach(plat => {
+      platformDistribution[plat] = 0;
+    });
+
+    let totalPlatformDispatches = 0;
+    publishedPosts.forEach(post => {
+      const targetPlatforms = Array.isArray(post.targetPlatforms) ? post.targetPlatforms : [];
+      targetPlatforms.forEach(plat => {
+        const platUpper = String(plat).toUpperCase();
+        if (platformDistribution[platUpper] !== undefined) {
+          platformDistribution[platUpper] += 1;
+          totalPlatformDispatches += 1;
+        }
+      });
+    });
+
+    const platformBreakdown = userAllowedPlatforms.map(plat => {
+      const count = platformDistribution[plat] || 0;
+      const percentage = totalPlatformDispatches > 0 ? Math.round((count / totalPlatformDispatches) * 100) : 0;
+      const isConnected = activeAccounts.some(a => a.platform?.toUpperCase() === plat);
+      return {
+        platform: plat,
+        count,
+        percentage,
+        isConnected,
+      };
+    });
+
+    // 2. Real Sentiment Analysis
+    let positiveCount = 0;
+    let neutralCount = 0;
+    let negativeCount = 0;
+
+    publishedPosts.forEach(post => {
+      if (post.tone === 'ENGAGING' || post.tone === 'STORYTELLING' || post.tone === 'HUMOROUS') {
+        positiveCount += 1;
+      } else if (post.tone === 'PROFESSIONAL' || post.tone === 'CASUAL') {
+        neutralCount += 1;
+      } else {
+        positiveCount += 1;
+      }
+    });
+
+    negativeCount = failedPosts.length;
+    const totalSentimentEvaluations = positiveCount + neutralCount + negativeCount;
+
+    const sentiment = {
+      hasData: publishedPosts.length > 0,
+      positiveCount,
+      neutralCount,
+      negativeCount,
+      totalEvaluations: totalSentimentEvaluations,
+      positivePct: totalSentimentEvaluations > 0 ? Math.round((positiveCount / totalSentimentEvaluations) * 100) : 0,
+      neutralPct: totalSentimentEvaluations > 0 ? Math.round((neutralCount / totalSentimentEvaluations) * 100) : 0,
+      negativePct: totalSentimentEvaluations > 0 ? Math.round((negativeCount / totalSentimentEvaluations) * 100) : 0,
+    };
+
+    // 3. Real Activity Heatmap
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const timeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'];
+    const heatmapGrid = {};
+    days.forEach(d => {
+      heatmapGrid[d] = [0, 0, 0, 0, 0, 0, 0];
+    });
+
+    if (publishedPosts.length > 0) {
+      publishedPosts.forEach(post => {
+        if (post.publishedAt) {
+          const date = new Date(post.publishedAt);
+          const dayIndex = (date.getDay() + 6) % 7; // Mon=0 .. Sun=6
+          const dayName = days[dayIndex];
+          const hour = date.getHours();
+          const slotIdx = Math.min(6, Math.max(0, Math.floor((hour - 8) / 2)));
+          if (dayName && heatmapGrid[dayName]) {
+            heatmapGrid[dayName][slotIdx] = Math.min(3, (heatmapGrid[dayName][slotIdx] || 0) + 1);
+          }
+        }
+      });
+    }
+
     return {
       success: true,
       stats: {
@@ -266,10 +352,22 @@ Return ONLY a valid JSON object in the exact following schema:
         totalScheduled: scheduledPosts.length,
         totalFailed: failedPosts.length,
         activeChannelsCount: activeAccounts.length,
+        allowedChannelsCount: userAllowedPlatforms.length,
         aiCreditsRemaining: user?.aiCredits ?? 0,
         estimatedHoursSaved: Math.round((publishedPosts.length * 45) / 60 * 10) / 10,
       },
+      user: {
+        allowedPlatforms: userAllowedPlatforms,
+      },
       accounts,
+      platformBreakdown,
+      sentiment,
+      heatmap: {
+        hasData: publishedPosts.length > 0,
+        grid: heatmapGrid,
+        days,
+        timeSlots,
+      },
       upcomingQueue: scheduledPosts.slice(0, 5),
       recentActivity: posts.slice(0, 5),
     };

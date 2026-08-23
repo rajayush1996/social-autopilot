@@ -403,40 +403,83 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 placeholder="e.g. Announce our new product update and schedule it for tomorrow morning..."
                 disabled={isGenerating}
                 className="w-full h-14 pl-5 pr-44 bg-[var(--bg-card)] border-2 border-[#2563EB]/40 focus:border-[#2563EB] rounded-2xl text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none shadow-md transition-colors"
-              />
-              <button
-                type="button"
-                onClick={() => handleRunOmniPrompt()}
-                disabled={isGenerating}
-                className="absolute right-2 top-2 bottom-2 h-10 px-6 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs md:text-sm font-extrabold shadow-md shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    <span>Generate & Approve</span>
-                  </>
-                )}
-              </button>
+          {/* OMNI-PROMPT HERO COMMAND CARD */}
+          <div className="bg-gradient-to-br from-[#2563EB]/10 via-[var(--bg-card)] to-[#0ea5e9]/10 border-2 border-[#2563EB]/25 rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden backdrop-blur-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[var(--border-color)]">
+              <div>
+                <span className="text-xs font-black uppercase tracking-widest text-[#2563EB] flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4" /> AI Omni-Prompt Dispatcher
+                </span>
+                <h2 className="text-xl md:text-2xl font-black text-[var(--text-primary)] mt-1 tracking-tight">
+                  What do you want to broadcast today?
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                  Type a raw thought or idea. AI adapts it into platform-native formats and schedules it for review.
+                </p>
+              </div>
+
+              {/* Status Pill */}
+              <div className="flex items-center gap-2 bg-[var(--bg-card)] border border-[var(--border-color)] px-3 py-1.5 rounded-xl shadow-xs self-start md:self-auto">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[11px] font-extrabold text-[var(--text-primary)]">
+                  {hoursSaved > 0 ? `${hoursSaved}h Time Saved` : 'Autonomous Ready'}
+                </span>
+              </div>
             </div>
 
-            {/* Quick Suggestion Pills */}
-            <div className="flex items-center gap-2 mt-4 overflow-x-auto custom-scrollbar whitespace-nowrap pb-1">
-              <span className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-wider shrink-0 mr-1">Quick Prompts:</span>
-              {promptSuggestions.map((sug, idx) => (
+            {/* Omni-Prompt Input Area */}
+            <div className="mt-5 space-y-3">
+              <div className="relative">
+                <textarea
+                  rows={2}
+                  value={omniPrompt}
+                  onChange={(e) => setOmniPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleRunOmniPrompt();
+                    }
+                  }}
+                  placeholder="e.g. Launched new analytics dashboard with real-time virality predictions. Highlights speed and simplicity..."
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 pr-32 text-xs md:text-sm text-[var(--text-primary)] focus:outline-none focus:border-[#2563EB] shadow-inner font-medium placeholder:text-[var(--text-secondary)]/60"
+                />
+
                 <button
-                  key={idx}
                   type="button"
-                  onClick={() => handleRunOmniPrompt(sug.replace(/^[^\s]+\s/, ''))}
-                  className="text-xs font-bold text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+                  onClick={() => handleRunOmniPrompt()}
+                  disabled={isGenerating || !omniPrompt.trim()}
+                  className="absolute right-3 bottom-4 btn btn-primary px-4 py-2 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md shadow-blue-500/20"
                 >
-                  {sug}
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Generate & Schedule</span>
+                    </>
+                  )}
                 </button>
-              ))}
+              </div>
+
+              {/* Quick Suggestions Chips */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+                <span className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider shrink-0">
+                  Quick Ideas:
+                </span>
+                {promptSuggestions.map((sug, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleRunOmniPrompt(sug.replace(/^[^\s]+\s/, ''))}
+                    className="text-xs font-bold text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 px-3.5 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+                  >
+                    {sug}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -450,7 +493,9 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 </div>
               </div>
               <p className="text-3xl font-black text-[var(--text-primary)]">{publishedPosts.length}</p>
-              <span className="text-[11px] text-emerald-500 font-bold mt-1 block">🟢 Live on Social Channels</span>
+              <span className="text-[11px] text-emerald-500 font-bold mt-1 block">
+                {publishedPosts.length > 0 ? '🟢 Live on Social Channels' : '0 Dispatches Recorded'}
+              </span>
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm">
@@ -461,7 +506,9 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 </div>
               </div>
               <p className="text-3xl font-black text-[var(--text-primary)]">{scheduledPosts.length}</p>
-              <span className="text-[11px] text-[#2563EB] font-bold mt-1 block">⏱️ Autonomous Dispatcher Ready</span>
+              <span className="text-[11px] text-[#2563EB] font-bold mt-1 block">
+                {scheduledPosts.length > 0 ? '⏱️ Scheduled Dispatches' : 'Queue Empty'}
+              </span>
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm">
@@ -471,8 +518,12 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                   <UserCheck className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-3xl font-black text-[var(--text-primary)]">{activeChannels.length} / {accounts.length || 3}</p>
-              <span className="text-[11px] text-[#0ea5e9] font-bold mt-1 block">LinkedIn, Instagram, X</span>
+              <p className="text-3xl font-black text-[var(--text-primary)]">{activeConnectedCount} / {allowedCount}</p>
+              <span className="text-[11px] text-[#0ea5e9] font-bold mt-1 block truncate">
+                {accounts.length > 0 
+                  ? `🟢 ${accounts.filter(a => a.isActive !== false).map(a => a.accountName || a.username).join(', ')}`
+                  : `Allowed: ${allowedPlatforms.join(', ')}`}
+              </span>
             </div>
 
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm">
@@ -788,154 +839,255 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
       {/* ==========================================================================
           TAB 3: ANALYTICS & HEATMAPS SECTION
          ========================================================================== */}
-      {activeTab === 'ANALYTICS' && (
-        <div className="space-y-8 animate-fadeIn">
-          {/* TOP ROW: SENTIMENT BAR + PLATFORM DONUT CHART */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* SENTIMENT & MOOD BAR */}
-            {visibleWidgets.sentiment && (
-              <div className="lg:col-span-6 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 md:p-7 shadow-sm space-y-6">
+      {activeTab === 'ANALYTICS' && (() => {
+        // Dynamic Sentiment Calculations
+        let posCount = 0;
+        let neuCount = 0;
+        let negCount = 0;
+        publishedPosts.forEach(post => {
+          if (post.tone === 'ENGAGING' || post.tone === 'STORYTELLING' || post.tone === 'HUMOROUS') posCount++;
+          else if (post.tone === 'PROFESSIONAL' || post.tone === 'CASUAL') neuCount++;
+          else posCount++;
+        });
+        negCount = posts.filter(p => p.status === 'FAILED').length;
+        const totalSentimentEvals = posCount + neuCount + negCount;
+        const posPct = totalSentimentEvals > 0 ? Math.round((posCount / totalSentimentEvals) * 100) : 0;
+        const neuPct = totalSentimentEvals > 0 ? Math.round((neuCount / totalSentimentEvals) * 100) : 0;
+        const negPct = totalSentimentEvals > 0 ? Math.round((negCount / totalSentimentEvals) * 100) : 0;
+
+        // Dynamic Platform Performance Breakdown
+        const platformDispatches: Record<string, number> = {};
+        allowedPlatforms.forEach(p => { platformDispatches[p] = 0; });
+        let totalDispatches = 0;
+        publishedPosts.forEach(post => {
+          const tps = Array.isArray(post.targetPlatforms) ? post.targetPlatforms : [];
+          tps.forEach(p => {
+            const pUpper = String(p).toUpperCase();
+            if (platformDispatches[pUpper] !== undefined) {
+              platformDispatches[pUpper] += 1;
+              totalDispatches += 1;
+            }
+          });
+        });
+
+        const platformColors: Record<string, string> = {
+          LINKEDIN: '#0a66c2',
+          INSTAGRAM: '#e1306c',
+          X: '#38bdf8',
+          FACEBOOK: '#1877f2',
+        };
+
+        // Dynamic Heatmap Calculations
+        const daysList = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const hourSlots = ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'];
+        const dynamicHeatmap: Record<string, number[]> = {
+          Mon: [0, 0, 0, 0, 0, 0, 0],
+          Tue: [0, 0, 0, 0, 0, 0, 0],
+          Wed: [0, 0, 0, 0, 0, 0, 0],
+          Thu: [0, 0, 0, 0, 0, 0, 0],
+          Fri: [0, 0, 0, 0, 0, 0, 0],
+          Sat: [0, 0, 0, 0, 0, 0, 0],
+          Sun: [0, 0, 0, 0, 0, 0, 0],
+        };
+
+        let hasHeatmapData = false;
+        publishedPosts.forEach(post => {
+          if (post.publishedAt) {
+            hasHeatmapData = true;
+            const date = new Date(post.publishedAt);
+            const dayIndex = (date.getDay() + 6) % 7;
+            const dayName = daysList[dayIndex];
+            const hour = date.getHours();
+            const slotIdx = Math.min(6, Math.max(0, Math.floor((hour - 8) / 2)));
+            if (dayName && dynamicHeatmap[dayName]) {
+              dynamicHeatmap[dayName][slotIdx] = Math.min(3, dynamicHeatmap[dayName][slotIdx] + 1);
+            }
+          }
+        });
+
+        return (
+          <div className="space-y-8 animate-fadeIn">
+            {/* TOP ROW: SENTIMENT BAR + PLATFORM DONUT CHART */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* SENTIMENT & MOOD BAR */}
+              {visibleWidgets.sentiment && (
+                <div className="lg:col-span-6 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 md:p-7 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
+                    <div>
+                      <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
+                        <Smile className="h-5 w-5 text-emerald-500" />
+                        Sentiment & Audience Mood Bar
+                      </h3>
+                      <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Sentiment analysis of interactions & post tones</p>
+                    </div>
+                    {totalSentimentEvals > 0 && (
+                      <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-extrabold">
+                        {posPct}% Positive
+                      </span>
+                    )}
+                  </div>
+
+                  {totalSentimentEvals === 0 ? (
+                    <div className="p-6 bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-2xl text-center space-y-2">
+                      <Smile className="w-8 h-8 mx-auto text-[var(--text-secondary)] opacity-50" />
+                      <p className="text-xs font-bold text-[var(--text-primary)]">No Interactions Evaluated Yet</p>
+                      <p className="text-[11px] text-[var(--text-secondary)]">Publish posts across your social channels to generate live AI sentiment analysis.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="h-6 w-full rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] overflow-hidden flex shadow-inner">
+                        {posPct > 0 && (
+                          <div style={{ width: `${posPct}%` }} className="bg-emerald-500 h-full flex items-center justify-center text-[10px] font-extrabold text-white">
+                            {posPct}%
+                          </div>
+                        )}
+                        {neuPct > 0 && (
+                          <div style={{ width: `${neuPct}%` }} className="bg-amber-400 h-full flex items-center justify-center text-[10px] font-extrabold text-slate-900">
+                            {neuPct}%
+                          </div>
+                        )}
+                        {negPct > 0 && (
+                          <div style={{ width: `${negPct}%` }} className="bg-rose-500 h-full flex items-center justify-center text-[10px] font-extrabold text-white">
+                            {negPct}%
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3 pt-1">
+                        <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between">
+                          <span className="text-xs text-emerald-500 font-extrabold">Positive</span>
+                          <span className="text-sm font-black text-[var(--text-primary)]">{posCount}</span>
+                        </div>
+                        <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between">
+                          <span className="text-xs text-amber-500 font-extrabold">Neutral</span>
+                          <span className="text-sm font-black text-[var(--text-primary)]">{neuCount}</span>
+                        </div>
+                        <div className="px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center justify-between">
+                          <span className="text-xs text-rose-500 font-extrabold">Issues/Failed</span>
+                          <span className="text-sm font-black text-[var(--text-primary)]">{negCount}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PLATFORM COMPARISON DONUT / LIST CHART */}
+              {visibleWidgets.platformDonut && (
+                <div className="lg:col-span-6 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 md:p-7 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
+                    <div>
+                      <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
+                        <PieChart className="h-5 w-5 text-[#2563EB]" />
+                        Platform Performance Distribution
+                      </h3>
+                      <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Post dispatches per enabled channel</p>
+                    </div>
+                  </div>
+
+                  {totalDispatches === 0 ? (
+                    <div className="p-6 bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-2xl text-center space-y-2">
+                      <PieChart className="w-8 h-8 mx-auto text-[var(--text-secondary)] opacity-50" />
+                      <p className="text-xs font-bold text-[var(--text-primary)]">No Dispatches Recorded Yet</p>
+                      <p className="text-[11px] text-[var(--text-secondary)]">Platform distribution breakdown will calibrate here once your first post is published.</p>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/composer')}
+                        className="btn btn-primary px-4 py-2 text-xs font-extrabold inline-flex items-center gap-1.5 mt-2 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Create First Post</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allowedPlatforms.map(plat => {
+                        const count = platformDispatches[plat] || 0;
+                        const pct = totalDispatches > 0 ? Math.round((count / totalDispatches) * 100) : 0;
+                        const color = platformColors[plat] || '#2563EB';
+                        const isConnected = accounts.some(a => a.platform?.toUpperCase() === plat && a.isActive !== false);
+
+                        return (
+                          <div key={plat} className="flex items-center justify-between p-3 bg-[var(--bg-input)]/50 rounded-xl border border-[var(--border-color)]">
+                            <div className="flex items-center gap-2.5">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                              <span className="text-xs font-bold text-[var(--text-primary)]">{plat}</span>
+                              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                                isConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-[var(--text-secondary)]'
+                              }`}>
+                                {isConnected ? 'Connected' : 'Not Linked'}
+                              </span>
+                            </div>
+                            <span className="text-xs font-black text-[var(--text-primary)]">
+                              {count} {count === 1 ? 'post' : 'posts'} ({pct}%)
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* AUDIENCE ACTIVITY HEATMAP */}
+            {visibleWidgets.activityHeatmap && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
                 <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
                   <div>
                     <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                      <Smile className="h-5 w-5 text-emerald-500" />
-                      Sentiment & Audience Mood Bar
+                      <Clock className="h-5 w-5 text-amber-500" />
+                      Audience Activity Heatmap (Best Posting Time)
                     </h3>
-                    <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Sentiment analysis of recent interactions</p>
+                    <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Post activity and golden engagement windows</p>
                   </div>
-                  <span className="text-xs text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-extrabold">
-                    82% Positive
+                  <span className="text-xs font-extrabold text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                    {hasHeatmapData ? 'Live Calculated Radar' : 'Calibrating'}
                   </span>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="h-6 w-full rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] overflow-hidden flex shadow-inner">
-                    <div style={{ width: '82%' }} className="bg-emerald-500 h-full flex items-center justify-center text-[10px] font-extrabold text-white">82%</div>
-                    <div style={{ width: '12%' }} className="bg-amber-400 h-full flex items-center justify-center text-[10px] font-extrabold text-slate-900">12%</div>
-                    <div style={{ width: '6%' }} className="bg-rose-500 h-full flex items-center justify-center text-[10px] font-extrabold text-white">6%</div>
+                {!hasHeatmapData ? (
+                  <div className="p-6 bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-2xl text-center space-y-2">
+                    <Clock className="w-8 h-8 mx-auto text-amber-500/60" />
+                    <p className="text-xs font-bold text-[var(--text-primary)]">Heatmap Calibrating</p>
+                    <p className="text-[11px] text-[var(--text-secondary)]">Your 7-day activity radar will map active peak windows as you dispatch posts across your connected channels.</p>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-3 pt-1">
-                    <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-between">
-                      <span className="text-xs text-emerald-500 font-extrabold">Positive</span>
-                      <span className="text-sm font-black text-[var(--text-primary)]">1,420</span>
+                ) : (
+                  <div className="space-y-2 overflow-x-auto">
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--text-secondary)] mb-1">
+                      <span className="w-10">Day</span>
+                      {hourSlots.map(h => (
+                        <span key={h} className="flex-1 text-center">{h}</span>
+                      ))}
                     </div>
-                    <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between">
-                      <span className="text-xs text-amber-500 font-extrabold">Neutral</span>
-                      <span className="text-sm font-black text-[var(--text-primary)]">208</span>
-                    </div>
-                    <div className="px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center justify-between">
-                      <span className="text-xs text-rose-500 font-extrabold">Negative</span>
-                      <span className="text-sm font-black text-[var(--text-primary)]">104</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* PLATFORM COMPARISON DONUT CHART */}
-            {visibleWidgets.platformDonut && (
-              <div className="lg:col-span-6 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 md:p-7 shadow-sm space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
-                  <div>
-                    <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                      <PieChart className="h-5 w-5 text-[#2563EB]" />
-                      Platform Performance Distribution
-                    </h3>
-                    <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Reach & engagement contribution per connected channel</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-                  <div className="w-36 h-36 relative shrink-0">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                      <path strokeDasharray="45, 100" stroke="#0a66c2" strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path strokeDasharray="35, 100" strokeDashoffset="-45" stroke="#e1306c" strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path strokeDasharray="20, 100" strokeDashoffset="-80" stroke="#38bdf8" strokeWidth="4" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-xs text-[var(--text-secondary)] font-bold">Top</span>
-                      <span className="text-sm font-black text-[var(--text-primary)]">LinkedIn</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 flex-1 w-full">
-                    <div className="flex items-center justify-between p-2.5 bg-[var(--bg-input)]/50 rounded-xl border border-[var(--border-color)]">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#0a66c2]" />
-                        <span className="text-xs font-bold text-[var(--text-primary)]">LinkedIn</span>
+                    {daysList.map(day => (
+                      <div key={day} className="flex items-center gap-2">
+                        <span className="w-10 text-xs font-bold text-[var(--text-secondary)]">{day}</span>
+                        {(dynamicHeatmap[day] || [0, 0, 0, 0, 0, 0, 0]).map((lvl, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex-1 h-7 rounded-lg transition-all ${
+                              lvl >= 3
+                                ? 'bg-[#2563EB] shadow-xs'
+                                : lvl === 2
+                                ? 'bg-[#2563EB]/60'
+                                : lvl === 1
+                                ? 'bg-[#2563EB]/25'
+                                : 'bg-[var(--bg-input)] border border-[var(--border-color)]'
+                            }`}
+                            title={`${day} ${hourSlots[idx]} Activity Level: ${lvl > 0 ? `${lvl} dispatches` : 'No dispatches'}`}
+                          />
+                        ))}
                       </div>
-                      <span className="text-xs font-black text-[#0a66c2]">45% (64.2K Reach)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 bg-[var(--bg-input)]/50 rounded-xl border border-[var(--border-color)]">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#e1306c]" />
-                        <span className="text-xs font-bold text-[var(--text-primary)]">Instagram</span>
-                      </div>
-                      <span className="text-xs font-black text-[#e1306c]">35% (49.9K Reach)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 bg-[var(--bg-input)]/50 rounded-xl border border-[var(--border-color)]">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#38bdf8]" />
-                        <span className="text-xs font-bold text-[var(--text-primary)]">X (Twitter)</span>
-                      </div>
-                      <span className="text-xs font-black text-[#38bdf8]">20% (28.5K Reach)</span>
-                    </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>
-
-          {/* AUDIENCE ACTIVITY HEATMAP */}
-          {visibleWidgets.activityHeatmap && (
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
-                <div>
-                  <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-amber-500" />
-                    Audience Activity Heatmap (Best Posting Time)
-                  </h3>
-                  <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">Follower activity heat map by time and day</p>
-                </div>
-                <span className="text-xs font-extrabold text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                  Peak: 10:00 AM & 5:45 PM
-                </span>
-              </div>
-
-              <div className="space-y-2 overflow-x-auto">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--text-secondary)] mb-1">
-                  <span className="w-10">Day</span>
-                  {['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].map(h => (
-                    <span key={h} className="flex-1 text-center">{h}</span>
-                  ))}
-                </div>
-
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                  <div key={day} className="flex items-center gap-2">
-                    <span className="w-10 text-xs font-bold text-[var(--text-secondary)]">{day}</span>
-                    {[1, 3, 2, 1, 3, 2, 1].map((lvl, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex-1 h-7 rounded-lg transition-all ${
-                          lvl === 3
-                            ? 'bg-[#2563EB] shadow-xs'
-                            : lvl === 2
-                            ? 'bg-[#2563EB]/40'
-                            : 'bg-[var(--bg-input)] border border-[var(--border-color)]'
-                        }`}
-                        title={`${day} activity level: ${lvl === 3 ? 'PEAK' : lvl === 2 ? 'MEDIUM' : 'NORMAL'}`}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* INSTANT APPROVAL MODAL (For Omni-Prompt) */}
       {showApprovalModal && (

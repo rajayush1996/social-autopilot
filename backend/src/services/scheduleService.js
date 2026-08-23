@@ -44,7 +44,7 @@ export class ScheduleService {
    */
   static async getUserSchedules(userId) {
     await UserService.ensureUserExists(userId);
-    return CacheService.remember(
+    const schedules = await CacheService.remember(
       CACHE_KEYS.USER_SCHEDULES(userId),
       TTL.LONG,
       () => prisma.automationSchedule.findMany({
@@ -52,15 +52,24 @@ export class ScheduleService {
         orderBy: { createdAt: 'desc' },
       })
     );
+    return schedules.map(s => ({
+      ...s,
+      targetAccountIds: s.campaignMemory?._targetAccountIds || [],
+    }));
   }
 
   /**
    * Get single schedule by ID.
    */
   static async getScheduleById(id, userId) {
-    return prisma.automationSchedule.findFirst({
+    const sched = await prisma.automationSchedule.findFirst({
       where: { id, userId },
     });
+    if (!sched) return null;
+    return {
+      ...sched,
+      targetAccountIds: sched.campaignMemory?._targetAccountIds || [],
+    };
   }
 
   /**
@@ -77,12 +86,18 @@ export class ScheduleService {
       repeatType,
       isActive,
       targetPlatforms,
+      targetAccountIds,
       tone,
       topicPrompt,
       includeImage,
       imageMode,
       customImageUrl,
     } = data;
+
+    const memory = CampaignMemoryService.getDefaultMemory(null, name || 'Automated Daily Pulse');
+    if (Array.isArray(targetAccountIds)) {
+      memory._targetAccountIds = targetAccountIds;
+    }
 
     const result = await prisma.automationSchedule.create({
       data: {
@@ -104,11 +119,14 @@ export class ScheduleService {
         includeImage: !!includeImage || imageMode === 'AI_FLUX',
         imageMode: imageMode || (includeImage ? 'AI_FLUX' : 'NONE'),
         customImageUrl: customImageUrl || null,
-        campaignMemory: CampaignMemoryService.getDefaultMemory(null, name || 'Automated Daily Pulse'),
+        campaignMemory: memory,
       },
     });
     await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
-    return result;
+    return {
+      ...result,
+      targetAccountIds: result.campaignMemory?._targetAccountIds || [],
+    };
   }
 
   /**
@@ -118,6 +136,13 @@ export class ScheduleService {
     const existing = await this.getScheduleById(id, userId);
     if (!existing) {
       throw new Error('Schedule not found or unauthorized.');
+    }
+
+    let updatedMemory = existing.campaignMemory || CampaignMemoryService.getDefaultMemory(null, data.name || existing.name);
+    if (data.targetAccountIds !== undefined) {
+      if (typeof updatedMemory === 'object' && updatedMemory !== null) {
+        updatedMemory._targetAccountIds = Array.isArray(data.targetAccountIds) ? data.targetAccountIds : [];
+      }
     }
 
     const updated = await prisma.automationSchedule.update({
@@ -136,11 +161,15 @@ export class ScheduleService {
         ...(data.includeImage !== undefined && { includeImage: !!data.includeImage }),
         ...(data.imageMode !== undefined && { imageMode: data.imageMode }),
         ...(data.customImageUrl !== undefined && { customImageUrl: data.customImageUrl }),
+        campaignMemory: updatedMemory,
       },
     });
     await CacheService.del(CACHE_KEYS.USER_SCHEDULES(userId));
     await CacheService.del(CACHE_KEYS.CAMPAIGN_MEMORY(id));
-    return updated;
+    return {
+      ...updated,
+      targetAccountIds: updated.campaignMemory?._targetAccountIds || [],
+    };
   }
 
   /**
@@ -360,6 +389,7 @@ export class ScheduleService {
         mediaUrls: postMediaUrls,
         mediaType: postMediaType,
         targetPlatforms: schedule.targetPlatforms,
+        targetAccountIds: schedule.targetAccountIds || [],
         status: POST_STATUS.SCHEDULED,
         scheduledAt: targetScheduledAt,
         aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
@@ -373,6 +403,7 @@ export class ScheduleService {
         mediaUrls: postMediaUrls,
         mediaType: postMediaType,
         targetPlatforms: schedule.targetPlatforms,
+        targetAccountIds: schedule.targetAccountIds || [],
         status: POST_STATUS.SCHEDULED,
         scheduledAt: targetScheduledAt,
         aiGenerated: true,
