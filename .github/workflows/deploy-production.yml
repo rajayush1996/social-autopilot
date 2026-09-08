@@ -1,11 +1,12 @@
 name: 🚀 Deploy to Production (Oracle Cloud VM)
+run-name: "🚀 Prod Deploy: ${{ github.event.inputs.reason || 'Manual Release' }} [${{ github.ref_name }}@${{ github.sha }}] by @${{ github.actor }}"
 
 on:
   # One-Click Manual Trigger from GitHub Actions Tab
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Reason for Deployment'
+        description: 'Deployment Reason / Release Note'
         required: false
         default: 'Production Release'
 
@@ -18,6 +19,22 @@ jobs:
     steps:
       - name: 🔍 Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 📋 Display Commit & Release Details
+        run: |
+          echo "=========================================================="
+          echo "🚀 PRODUCTION DEPLOYMENT METADATA"
+          echo "=========================================================="
+          echo "📌 Commit SHA   : ${{ github.sha }}"
+          echo "🌿 Branch       : ${{ github.ref_name }}"
+          echo "👤 Triggered By : @${{ github.actor }}"
+          echo "💬 Commit Msg   : $(git log -1 --pretty=%s)"
+          echo "👤 Author       : $(git log -1 --pretty='%an <%ae>')"
+          echo "🕒 Commit Date  : $(git log -1 --pretty=%cd)"
+          echo "🎯 Reason       : ${{ github.event.inputs.reason || 'Production Release' }}"
+          echo "=========================================================="
 
       - name: 🔑 Configure SSH Key
         uses: webfactory/ssh-agent@v0.9.0
@@ -72,9 +89,28 @@ jobs:
             fi
           EOF
 
-      - name: 🎉 Deployment Success Notification
+      - name: 🎉 Deployment Summary & Notification
+        if: always()
         run: |
           echo "=========================================================="
-          echo "🎉 Production Deployment Successful!"
+          echo "🎉 Production Deployment Finished!"
           echo "🌐 Live URL: http://${{ secrets.PROD_SSH_HOST || '140.245.202.135' }}"
           echo "=========================================================="
+          
+          # Render beautiful GitHub Markdown Summary in Actions UI
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ## 🚀 Production Deployment Summary
+
+          | Property | Value |
+          | :--- | :--- |
+          | **Status** | ${{ job.status == 'success' && '✅ **SUCCESS**' || '❌ **FAILED**' }} |
+          | **Commit SHA** | \`${{ github.sha }}\` |
+          | **Branch** | \`${{ github.ref_name }}\` |
+          | **Deployed By** | @${{ github.actor }} |
+          | **Reason** | ${{ github.event.inputs.reason || 'Manual Release' }} |
+          | **Live URL** | [http://${{ secrets.PROD_SSH_HOST || '140.245.202.135' }}](http://${{ secrets.PROD_SSH_HOST || '140.245.202.135' }}) |
+
+          ### 💬 Latest Commit
+          > **$(git log -1 --pretty=%s)**  
+          > *Authored by $(git log -1 --pretty='%an <%ae>') on $(git log -1 --pretty=%cd)*
+          EOF
