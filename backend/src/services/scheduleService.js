@@ -425,6 +425,7 @@ export class ScheduleService {
           { expiresIn: '7d' }
         );
         emailService.sendPostApprovalEmail({
+          userId: user.id,
           userEmail: user.email,
           userName: user.name,
           postId: post.id,

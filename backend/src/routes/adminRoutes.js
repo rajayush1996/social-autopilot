@@ -9,6 +9,7 @@ import {
   setPlanFeatures,
   getPlatformStatus,
   setPlatformStatus,
+  getEmailLogs,
 } from '../controllers/adminController.js';
 import { restrictToSuperAdmin } from '../middlewares/rbac.js';
 import { authenticateJwt } from '../middlewares/auth.js';
@@ -64,5 +65,10 @@ router.get('/platform-status', getPlatformStatus);
  */
 router.post('/platform-status', restrictToSuperAdmin, setPlatformStatus);
 router.put('/platform-status', restrictToSuperAdmin, setPlatformStatus);
+
+/**
+ * GET /api/admin/email-logs - Super Admin view email delivery audit logs
+ */
+router.get('/email-logs', restrictToSuperAdmin, getEmailLogs);
 
 export default router;

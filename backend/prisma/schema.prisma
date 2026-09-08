@@ -67,6 +67,7 @@ model User {
   posts          Post[]
   aiLogs         AIGenerationLog[]
   automationSchedules AutomationSchedule[]
+  emailLogs           EmailLog[]
 
   @@map("users")
 }
@@ -212,4 +213,22 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+model EmailLog {
+  id           String    @id @default(uuid())
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  recipient    String
+  subject      String
+  status       String    // 'DELIVERED', 'FAILED', 'CONSOLE_FALLBACK'
+  port         Int?
+  messageId    String?
+  errorMessage String?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("email_logs")
 }

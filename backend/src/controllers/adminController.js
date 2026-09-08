@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError.js';
 import UserService from '../services/userService.js';
 import FeatureConfigService from '../services/featureConfigService.js';
 import AutopilotService from '../services/autopilotService.js';
+import { prisma } from '../config/db.js';
 
 /**
  * Controller: Update autopilot configurations for a user (Thin Handler).
@@ -134,3 +135,43 @@ export const setPlatformStatus = catchAsync(async (req, res) => {
   const updated = await FeatureConfigService.setPlatformStatusMatrix(statusMatrix);
   return successResponse(res, HttpStatus.OK, 'Platform status matrix updated successfully.', { statusMatrix: updated });
 });
+
+/**
+ * Controller: Super Admin endpoint to view audit logs of emails sent/failed (Thin Handler).
+ */
+export const getEmailLogs = catchAsync(async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page || '1', 10));
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '50', 10)));
+  const skip = (page - 1) * limit;
+  const { status, recipient } = req.query;
+
+  const where = {};
+  if (status) where.status = String(status).toUpperCase();
+  if (recipient) where.recipient = { contains: String(recipient), mode: 'insensitive' };
+
+  const [logs, total] = await Promise.all([
+    prisma.emailLog.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    }),
+    prisma.emailLog.count({ where }),
+  ]);
+
+  return successResponse(res, HttpStatus.OK, 'Email audit logs retrieved successfully.', {
+    logs,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    }
+  });
+});
+

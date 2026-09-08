@@ -553,6 +553,8 @@ export class AuthService {
         </html>
       `,
       text: `Welcome to OmniSync! Please confirm your email address within 2 minutes: ${verificationLink}`,
+      userId: user.id,
+      metadata: { type: 'REGISTRATION_VERIFICATION' },
     }).then((res) => {
       logger.info(`[AuthService] ✉️ Verification email delivered in background to ${email}`);
     }).catch((emailErr) => {
@@ -674,6 +676,8 @@ export class AuthService {
         </html>
       `,
       text: `Welcome to OmniSync! Your fresh 2-minute verification link is: ${verificationLink}`,
+      userId: user.id,
+      metadata: { type: 'RESEND_VERIFICATION' },
     }).then(() => {
       logger.info(`[AuthService] ✉️ Fresh verification email delivered in background to ${email}`);
     }).catch((emailErr) => {

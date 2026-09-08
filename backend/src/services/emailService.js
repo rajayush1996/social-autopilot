@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
+import { prisma } from '../config/db.js';
 
 /**
  * Email Service
@@ -49,9 +50,9 @@ class EmailService {
   }
 
   /**
-   * Send Generic Transactional Email with Multi-Port Failover
+   * Send Generic Transactional Email with Multi-Port Failover & Persistent Database Audit Logging
    */
-  async sendEmail({ to, subject, html, text, from }) {
+  async sendEmail({ to, subject, html, text, from, userId, metadata }) {
     if (!this.transporter) this.initTransporter();
     const fromAddress = from || process.env.SMTP_FROM || process.env.FROM_EMAIL || 'info@omnisyncapp.com';
     const mailOptions = {
@@ -82,6 +83,20 @@ class EmailService {
 
           const info = await transport.sendMail(mailOptions);
           logger.info(`[EmailService] ✉️ Email delivered to ${to} via Port ${target.port} (Message ID: ${info.messageId})`);
+
+          // Persistent Audit Log in Database
+          await prisma.emailLog.create({
+            data: {
+              userId: userId || null,
+              recipient: to,
+              subject,
+              status: 'DELIVERED',
+              port: target.port,
+              messageId: info.messageId,
+              metadata: metadata || null,
+            }
+          }).catch(dbErr => logger.warn(`[EmailService] Failed to record success email log: ${dbErr.message}`));
+
           return { success: true, messageId: info.messageId, port: target.port };
         } catch (err) {
           lastError = err;
@@ -90,9 +105,46 @@ class EmailService {
       }
 
       logger.error(`[EmailService] ❌ All SMTP delivery ports failed for ${to}: ${lastError?.message}`);
+
+      // Persistent Failure Audit Log in Database
+      await prisma.emailLog.create({
+        data: {
+          userId: userId || null,
+          recipient: to,
+          subject,
+          status: 'FAILED',
+          errorMessage: lastError?.message || 'All SMTP delivery ports failed',
+          metadata: metadata || null,
+        }
+      }).catch(dbErr => logger.warn(`[EmailService] Failed to record failure email log: ${dbErr.message}`));
+
+      // Create In-App Notification so user sees the failure on dashboard
+      if (userId) {
+        await prisma.notification.create({
+          data: {
+            userId,
+            title: '⚠️ Email Delivery Notice',
+            message: `Email "${subject}" could not be sent to ${to}. Reason: ${lastError?.message || 'Delivery failed'}`,
+            type: 'warning',
+          }
+        }).catch(() => {});
+      }
+
       return { success: false, error: lastError?.message };
     } else {
       logger.info(`[EmailService Console Fallback] ✉️ To: ${to} | Subject: ${subject}\n${text || html}`);
+
+      await prisma.emailLog.create({
+        data: {
+          userId: userId || null,
+          recipient: to,
+          subject,
+          status: 'CONSOLE_FALLBACK',
+          errorMessage: 'SMTP credentials not configured; logged to console',
+          metadata: metadata || null,
+        }
+      }).catch(() => {});
+
       return { success: true, isConsoleFallback: true };
     }
   }
@@ -100,7 +152,7 @@ class EmailService {
   /**
    * Send Email Approval Request for Generated Post Content (Ultra-Clean Light Theme)
    */
-  async sendPostApprovalEmail({ userEmail, userName, postId, postContent, mediaUrls = [], targetPlatforms = [], scheduledAt, approvalToken, apiBaseUrl, frontendUrl }) {
+  async sendPostApprovalEmail({ userId, userEmail, userName, postId, postContent, mediaUrls = [], targetPlatforms = [], scheduledAt, approvalToken, apiBaseUrl, frontendUrl }) {
     const baseUrl = apiBaseUrl || process.env.API_BASE_URL || 'http://localhost:5000';
     const appUrl = frontendUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -261,6 +313,8 @@ class EmailService {
       html: htmlContent,
       text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${postContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
       from: fromAddress,
+      userId,
+      metadata: { postId, type: 'POST_APPROVAL', targetPlatforms },
     });
   }
 }
