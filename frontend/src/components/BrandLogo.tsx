@@ -49,11 +49,15 @@ export function BrandLogo({
 
   const logoContent = (
     <div className={`flex items-center gap-3 group select-none ${className}`}>
-      {/* Consistent Gradient Squircle Icon */}
+      {/* Consistent Official OmniSync Squircle Icon */}
       <div
-        className={`${selectedSize.box} bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-200 shrink-0`}
+        className={`${selectedSize.box} relative flex items-center justify-center shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform duration-200 shrink-0 rounded-xl overflow-hidden`}
       >
-        <Sparkles className={`${selectedSize.icon} animate-pulse`} />
+        <img
+          src="/omnisync-icon.png"
+          alt="OmniSync Logo"
+          className="w-full h-full object-contain"
+        />
       </div>
 
       {!iconOnly && (

@@ -24,8 +24,8 @@ function MinimalSaaSPageLoader({ message = 'Loading workspace...' }: { message?:
           {/* Ambient Glow */}
           <div className="absolute -inset-2 bg-gradient-to-tr from-[#2563EB]/25 to-[#0ea5e9]/20 rounded-2xl blur-lg animate-pulse" />
           
-          <div className="w-14 h-14 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl flex items-center justify-center text-[#2563EB] relative z-10">
-            <Sparkles className="w-6 h-6 animate-pulse" />
+          <div className="w-14 h-14 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl flex items-center justify-center relative z-10 overflow-hidden p-1.5">
+            <img src="/omnisync-icon.png" alt="OmniSync Logo" className="w-full h-full object-contain" />
             <div className="absolute inset-0 rounded-2xl border-2 border-[#2563EB]/30 border-t-[#2563EB] border-r-[#0ea5e9] animate-spin pointer-events-none" />
           </div>
         </div>

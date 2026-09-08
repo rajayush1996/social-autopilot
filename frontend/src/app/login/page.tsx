@@ -76,8 +76,12 @@ export default function LoginPage() {
         {/* Brand Header */}
         <div className="flex flex-col items-center gap-3 text-center">
           <Link href="/" className="group" title="Go to Home">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2563EB] to-[#0ea5e9] flex items-center justify-center text-white shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-              <Sparkles className="h-6 w-6 animate-pulse" />
+            <div className="w-14 h-14 rounded-2xl shadow-xl shadow-blue-500/25 group-hover:scale-105 transition-transform overflow-hidden relative border border-blue-500/20">
+              <img
+                src="/omnisync-icon.png"
+                alt="OmniSync Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
           </Link>
           <div>

@@ -18,8 +18,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'OmniSync Dashboard',
-  description: 'Enterprise Social Media Posting Scheduler & AI Content Generator',
+  metadataBase: new URL('https://omnisyncapp.com'),
+  title: 'OmniSync - Autonomous Social Media AI Autopilot',
+  description: 'Enterprise Multi-Channel Social Media Posting Scheduler & AI Content Generator',
+  icons: {
+    icon: [
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/omnisync-icon.png', sizes: '512x512', type: 'image/png' },
+      { url: '/favicon.ico' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  openGraph: {
+    title: 'OmniSync - Autonomous Social Media AI Autopilot',
+    description: 'Enterprise Multi-Channel Social Media Posting Scheduler & AI Content Generator',
+    url: 'https://omnisyncapp.com',
+    siteName: 'OmniSync',
+    images: [
+      {
+        url: '/omnisync-logo.jpg',
+        width: 1024,
+        height: 1024,
+        alt: 'OmniSync AI Platform',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
