@@ -11,14 +11,14 @@ export default function TermsOfService() {
             ← Back to Home
           </Link>
           <h1 className="text-3xl md:text-4xl font-black text-white">Terms of Service & Platform Usage Policy</h1>
-          <p className="text-xs text-slate-400 mt-1">Effective Date: August 4, 2026</p>
+          <p className="text-xs text-slate-400 mt-1">Effective Date: August 4, 2026 | Last Updated: September 8, 2026</p>
         </div>
 
         {/* Section 1 */}
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">1. Acceptance of Terms</h2>
           <p className="text-xs leading-relaxed text-slate-300">
-            By accessing or using <strong>OmniSync</strong> (&quot;the Platform&quot;), you agree to be bound by these Terms of Service. If you are accepting these terms on behalf of a company or legal entity, you represent that you have the authority to bind such entity.
+            By accessing or using <strong>OmniSync</strong> (&quot;the Platform&quot;), a SaaS service developed and operated by <strong>Avenar</strong> (&quot;the Company&quot;, &quot;we&quot;, &quot;us&quot;), you agree to be bound by these Terms of Service. If you are accepting these terms on behalf of a company or legal entity, you represent that you have the authority to bind such entity.
           </p>
         </section>
 
@@ -26,7 +26,7 @@ export default function TermsOfService() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">2. Service Overview & Social Platform Integration</h2>
           <p className="text-xs leading-relaxed text-slate-300">
-            OmniSync provides automated AI content generation, post scheduling, and multi-channel publishing to third-party social media networks including <strong>Instagram (Meta)</strong>, <strong>LinkedIn</strong>, and <strong>X (Twitter)</strong>. You acknowledge that your use of third-party platforms via OmniSync is also subject to their respective terms and community guidelines.
+            OmniSync provides automated AI content generation, post scheduling, and multi-channel publishing to third-party social media networks including <strong>LinkedIn</strong>, <strong>Instagram (Meta)</strong>, and <strong>X (Twitter)</strong>. You acknowledge that your use of third-party platforms via OmniSync is also subject to their respective terms and community guidelines.
           </p>
         </section>
 
@@ -34,7 +34,7 @@ export default function TermsOfService() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">3. User Responsibilities & Acceptable Content</h2>
           <div className="text-xs leading-relaxed text-slate-300 space-y-2">
-            <p>You agree NOT to use Social Autopilot to generate, schedule, or publish:</p>
+            <p>You agree NOT to use OmniSync to generate, schedule, or publish:</p>
             <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
               <li>Spam, automated abuse, or repetitive low-quality marketing blasts violating social network policies.</li>
               <li>Hate speech, harassment, defamatory, or illegal content.</li>
@@ -47,10 +47,10 @@ export default function TermsOfService() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">4. Third-Party Platform Compliance</h2>
           <div className="text-xs leading-relaxed text-slate-300 space-y-2">
-            <p>Your authorization granted to Social Autopilot adheres to third-party developer policies:</p>
+            <p>Your authorization granted to OmniSync adheres strictly to third-party developer policies:</p>
             <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
+              <li><strong>LinkedIn:</strong> Usage complies with LinkedIn API Terms, Community Guidelines, and Developer Agreement.</li>
               <li><strong>Meta (Facebook & Instagram):</strong> Usage complies with Meta Platform Terms and Instagram Graph API policies.</li>
-              <li><strong>LinkedIn:</strong> Usage complies with LinkedIn API Terms and Developer Agreement.</li>
               <li><strong>X (Twitter):</strong> Usage complies with X API Developer Agreement and Developer Policy.</li>
             </ul>
           </div>
@@ -60,7 +60,7 @@ export default function TermsOfService() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">5. Limitation of Liability & Service Availability</h2>
           <p className="text-xs leading-relaxed text-slate-300">
-            Social Autopilot strives for 99.9% queue and worker uptime. However, we are not liable for temporary service interruptions, third-party API rate limits, or account suspensions imposed directly by Instagram, LinkedIn, or X.
+            Avenar strives for 99.9% queue and worker uptime for OmniSync. However, we are not liable for temporary service interruptions, third-party API rate limits, or account suspensions imposed directly by LinkedIn, Instagram, or X.
           </p>
         </section>
 
@@ -68,13 +68,13 @@ export default function TermsOfService() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-indigo-400">6. Account Termination & Contact</h2>
           <p className="text-xs leading-relaxed text-slate-300">
-            You may disconnect your social media accounts or delete your Social Autopilot account at any time. For legal or support inquiries, contact us at <code className="text-indigo-300">legal@socialautopilot.com</code>.
+            You may disconnect your social media accounts or delete your OmniSync account at any time. For legal or support inquiries, contact us at <a href="mailto:support@omnisyncapp.com" className="text-indigo-400 hover:underline">support@omnisyncapp.com</a>.
           </p>
         </section>
 
         {/* Footer */}
         <div className="pt-6 border-t border-slate-850 flex items-center justify-between text-xs text-slate-500">
-          <span>© 2026 Social Autopilot. All rights reserved.</span>
+          <span>© 2026 Avenar. All rights reserved. OmniSync™ is an Avenar product.</span>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
