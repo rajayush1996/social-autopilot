@@ -51,20 +51,40 @@ export default function AdminPage() {
   });
   const [savingMatrix, setSavingMatrix] = useState(false);
 
+  // Platform Status Tri-State Matrix (Live, Coming Soon, Disabled)
+  const [platformStatus, setPlatformStatus] = useState<Record<string, 'ENABLED' | 'COMING_SOON' | 'DISABLED'>>({
+    INSTAGRAM: 'ENABLED',
+    LINKEDIN: 'ENABLED',
+    LINKEDIN_COMMUNITY: 'COMING_SOON',
+    FACEBOOK: 'COMING_SOON',
+    X: 'COMING_SOON',
+    YOUTUBE: 'COMING_SOON',
+    THREADS: 'COMING_SOON',
+    PINTEREST: 'COMING_SOON',
+    REDDIT: 'COMING_SOON',
+    BLUESKY: 'COMING_SOON',
+    MASTODON: 'COMING_SOON',
+  });
+  const [savingPlatformStatus, setSavingPlatformStatus] = useState(false);
+
   const toast = useToast();
 
   const fetchAdminData = async () => {
     try {
-      const [profile, list, statusRes, matrixRes] = await Promise.all([
+      const [profile, list, statusRes, matrixRes, platformStatusRes] = await Promise.all([
         ApiService.getMe(),
         ApiService.getFeatures(),
         ApiService.getDispatcherStatus(),
         ApiService.getPlanFeatures(),
+        ApiService.getAdminPlatformStatusMatrix().catch(() => ({})),
       ]);
       setFeatures(list);
       setDispatcherEnabled(statusRes.dispatcherEnabled);
       if (matrixRes) {
         setPlanMatrix(matrixRes);
+      }
+      if (platformStatusRes && Object.keys(platformStatusRes).length > 0) {
+        setPlatformStatus((prev) => ({ ...prev, ...platformStatusRes }));
       }
       const roleUpper = profile.role?.toUpperCase();
       setIsAuthorized(roleUpper === 'SUPER_ADMIN' || roleUpper === 'ADMIN');
@@ -162,6 +182,26 @@ export default function AdminPage() {
     }
   };
 
+  const handleSetPlatformStatus = (platformId: string, status: 'ENABLED' | 'COMING_SOON' | 'DISABLED') => {
+    setPlatformStatus((prev) => ({
+      ...prev,
+      [platformId]: status,
+    }));
+  };
+
+  const handleSavePlatformStatus = async () => {
+    setSavingPlatformStatus(true);
+    try {
+      await ApiService.updateAdminPlatformStatusMatrix(platformStatus);
+      toast.success('Platform status matrix updated! Live status, Coming Soon tags, and visibility updated across Landing, Accounts, and Composer pages.');
+    } catch (err: any) {
+      console.error('Failed to save platform status matrix:', err);
+      toast.error(err.response?.data?.message || 'Failed to update platform status matrix.');
+    } finally {
+      setSavingPlatformStatus(false);
+    }
+  };
+
   const handleGrantCredits = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUniqueId.trim()) {
@@ -212,7 +252,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="w-full max-w-full 2xl:max-w-[1600px] mx-auto space-y-6 sm:space-y-8 pb-12 animate-fadeIn">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
@@ -344,6 +384,117 @@ export default function AdminPage() {
                       );
                     })}
                   </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Platform Availability & Live Status Controls (Tri-State Manager) */}
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 space-y-5 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-color)]">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-600 dark:text-emerald-400">
+              <Radio className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-[var(--text-primary)] tracking-tight">Platform Availability & Live Status Controls</h2>
+              <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                Dynamically toggle platforms between Live (Enabled), Coming Soon (Temp Disabled), or Hidden (Disabled) across Landing, Accounts, and Composer.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSavePlatformStatus}
+            disabled={savingPlatformStatus}
+            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 shrink-0 flex items-center gap-2"
+          >
+            {savingPlatformStatus ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Saving Status...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Save Platform Statuses</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+          {[
+            { id: 'INSTAGRAM', name: 'Instagram (Business Graph API)', desc: 'Reels, Feed photos & Carousels' },
+            { id: 'LINKEDIN', name: 'LinkedIn (Personal Profile)', desc: 'Member profile posting (w_member_social)' },
+            { id: 'LINKEDIN_COMMUNITY', name: 'LinkedIn (Community / Company Pages)', desc: 'Organization pages (Community Management API)' },
+            { id: 'FACEBOOK', name: 'Facebook (Business Pages)', desc: 'Page posts, photos, video updates' },
+            { id: 'X', name: 'X (Twitter API v2)', desc: 'Direct tweets and concise threads' },
+            { id: 'YOUTUBE', name: 'YouTube Shorts', desc: 'Video shorts & channel uploads' },
+            { id: 'THREADS', name: 'Threads', desc: 'Meta Threads content sharing' },
+            { id: 'PINTEREST', name: 'Pinterest', desc: 'Pins, boards, and graphic links' },
+            { id: 'REDDIT', name: 'Reddit', desc: 'Community submissions & discussions' },
+            { id: 'BLUESKY', name: 'Bluesky', desc: 'AT Protocol decentralized feeds' },
+            { id: 'MASTODON', name: 'Mastodon', desc: 'ActivityPub federated social network' },
+          ].map((plt) => {
+            const currentStatus = platformStatus[plt.id] || 'COMING_SOON';
+
+            return (
+              <div key={plt.id} className="bg-[var(--bg-input)]/50 border border-[var(--border-color)] rounded-2xl p-4 space-y-3 flex flex-col justify-between shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-[var(--text-primary)]">{plt.name}</span>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                      currentStatus === 'ENABLED'
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                        : currentStatus === 'COMING_SOON'
+                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                        : 'bg-rose-500/10 text-rose-500 border-rose-500/30'
+                    }`}>
+                      {currentStatus === 'ENABLED' ? '🟢 Live' : currentStatus === 'COMING_SOON' ? '🟡 Coming Soon' : '🔴 Hidden'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-1 font-medium">{plt.desc}</p>
+                </div>
+
+                {/* 3-Way Tri-State Switch */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => handleSetPlatformStatus(plt.id, 'ENABLED')}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center ${
+                      currentStatus === 'ENABLED'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    Live
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetPlatformStatus(plt.id, 'COMING_SOON')}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center ${
+                      currentStatus === 'COMING_SOON'
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    Soon
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetPlatformStatus(plt.id, 'DISABLED')}
+                    className={`py-1.5 px-2 rounded-lg text-[10px] font-black transition-all cursor-pointer text-center ${
+                      currentStatus === 'DISABLED'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    Off
+                  </button>
                 </div>
               </div>
             );

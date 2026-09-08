@@ -111,6 +111,60 @@ export class FeatureConfigService {
 
     return updatedSetting.value;
   }
+
+  /**
+   * Get tri-state platform status matrix (ENABLED | COMING_SOON | DISABLED).
+   */
+  static async getPlatformStatusMatrix() {
+    const defaultStatusMatrix = {
+      INSTAGRAM: 'ENABLED',
+      LINKEDIN: 'ENABLED',
+      LINKEDIN_COMMUNITY: 'COMING_SOON',
+      FACEBOOK: 'COMING_SOON',
+      X: 'COMING_SOON',
+      YOUTUBE: 'COMING_SOON',
+      THREADS: 'COMING_SOON',
+      PINTEREST: 'COMING_SOON',
+      REDDIT: 'COMING_SOON',
+      BLUESKY: 'COMING_SOON',
+      MASTODON: 'COMING_SOON',
+    };
+
+    let setting = await prisma.systemSetting.findUnique({
+      where: { key: 'PLATFORM_STATUS_MATRIX' },
+    });
+
+    if (!setting) {
+      try {
+        setting = await prisma.systemSetting.create({
+          data: {
+            key: 'PLATFORM_STATUS_MATRIX',
+            value: defaultStatusMatrix,
+          },
+        });
+      } catch (e) {
+        setting = { value: defaultStatusMatrix };
+      }
+    }
+
+    return { ...defaultStatusMatrix, ...(setting?.value || {}) };
+  }
+
+  /**
+   * Super Admin method to update tri-state platform status matrix.
+   */
+  static async setPlatformStatusMatrix(matrix) {
+    const current = await this.getPlatformStatusMatrix();
+    const updated = { ...current, ...matrix };
+
+    const updatedSetting = await prisma.systemSetting.upsert({
+      where: { key: 'PLATFORM_STATUS_MATRIX' },
+      update: { value: updated },
+      create: { key: 'PLATFORM_STATUS_MATRIX', value: updated },
+    });
+
+    return updatedSetting.value;
+  }
 }
 
 export default FeatureConfigService;

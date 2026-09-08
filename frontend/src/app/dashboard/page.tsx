@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-8 pb-12 animate-fadeIn max-w-7xl mx-auto">
+      <div className="space-y-6 sm:space-y-8 pb-12 animate-fadeIn w-full max-w-full 2xl:max-w-[1600px] mx-auto">
         {/* Header Skeleton */}
         <div className="flex justify-between items-center pb-6 border-b border-[var(--border-color)]">
           <div className="space-y-2">
@@ -62,14 +62,14 @@ export default function DashboardPage() {
         </div>
 
         {/* 4 KPI Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-28 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 skeleton-shimmer" />
           ))}
         </div>
 
         {/* Analytics & Feed Skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           <div className="lg:col-span-8 space-y-6">
             <div className="h-72 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 skeleton-shimmer" />
             <div className="h-60 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 skeleton-shimmer" />
@@ -84,9 +84,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 pb-12 animate-fadeIn max-w-7xl mx-auto">
+    <div className="space-y-6 sm:space-y-8 pb-12 animate-fadeIn w-full max-w-full 2xl:max-w-[1600px] mx-auto">
       {/* Top Telemetry Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[var(--border-color)]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 pb-6 border-b border-[var(--border-color)]">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">

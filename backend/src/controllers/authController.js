@@ -4,17 +4,23 @@ import { ApiError } from '../utils/ApiError.js';
 import AuthService from '../services/authService.js';
 import UserService from '../services/userService.js';
 import SocialAccountService from '../services/socialAccountService.js';
+import FeatureConfigService from '../services/featureConfigService.js';
 import { emitAccountStatusChange } from '../services/socketService.js';
 
 /**
  * Controller: Generate OAuth authorization URLs for target social platforms (Thin Handler).
  */
 export const getOAuthUrl = catchAsync(async (req, res) => {
-  const { platform } = req.query;
+  const { platform, accountType, targetType } = req.query;
   const redirectUriInput = req.query.redirectUri;
   const userIdInput = req.user?.id || req.query.userId;
 
-  const result = await AuthService.getOAuthUrl({ platform, redirectUriInput, userIdInput });
+  const result = await AuthService.getOAuthUrl({
+    platform,
+    redirectUriInput,
+    userIdInput,
+    accountType: (accountType || targetType || 'PERSONAL').toUpperCase(),
+  });
   return successResponse(res, HttpStatus.OK, `OAuth URL generated for ${result.platform}`, result);
 });
 
@@ -398,4 +404,12 @@ export const resendVerification = catchAsync(async (req, res) => {
   });
 
   return successResponse(res, HttpStatus.OK, result.message);
+});
+
+/**
+ * Controller: Public Platform Status Matrix (Landing page & Guest visitors)
+ */
+export const getPublicPlatformStatus = catchAsync(async (req, res) => {
+  const statusMatrix = await FeatureConfigService.getPlatformStatusMatrix();
+  return successResponse(res, HttpStatus.OK, 'Public platform status retrieved.', { statusMatrix });
 });

@@ -7,6 +7,8 @@ import {
   setUserCredits,
   getPlanFeatures,
   setPlanFeatures,
+  getPlatformStatus,
+  setPlatformStatus,
 } from '../controllers/adminController.js';
 import { restrictToSuperAdmin } from '../middlewares/rbac.js';
 import { authenticateJwt } from '../middlewares/auth.js';
@@ -51,5 +53,16 @@ router.get('/plan-features', getPlanFeatures);
  * POST /api/admin/plan-features - Super Admin update plan feature matrix
  */
 router.post('/plan-features', restrictToSuperAdmin, setPlanFeatures);
+
+/**
+ * GET /api/admin/platform-status - Get tri-state platform status matrix
+ */
+router.get('/platform-status', getPlatformStatus);
+
+/**
+ * POST /api/admin/platform-status - Super Admin update platform status matrix
+ */
+router.post('/platform-status', restrictToSuperAdmin, setPlatformStatus);
+router.put('/platform-status', restrictToSuperAdmin, setPlatformStatus);
 
 export default router;

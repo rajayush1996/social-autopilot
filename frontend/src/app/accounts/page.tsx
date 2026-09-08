@@ -9,7 +9,8 @@ import {
   AlertCircle,
   Sparkles,
   Building2,
-  User
+  User,
+  Plus
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -69,6 +70,13 @@ export default function SocialAccountsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [simulateMode, setSimulateMode] = useState(false);
   const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([...DEFAULT_ALLOWED_PLATFORMS]);
+  const [platformStatus, setPlatformStatus] = useState<Record<string, 'ENABLED' | 'COMING_SOON' | 'DISABLED'>>({
+    INSTAGRAM: 'ENABLED',
+    LINKEDIN: 'ENABLED',
+    LINKEDIN_COMMUNITY: 'COMING_SOON',
+    FACEBOOK: 'COMING_SOON',
+    X: 'COMING_SOON',
+  });
   const toast = useToast();
 
   const isFetchingRef = useRef(false);
@@ -94,10 +102,15 @@ export default function SocialAccountsPage() {
     const initPageData = async () => {
       setLoading(true);
       try {
-        const [meRes, activeAccounts] = await Promise.all([
+        const [meRes, activeAccounts, platformStatusRes] = await Promise.all([
           ApiService.getMe(),
           ApiService.getConnectedAccounts(),
+          ApiService.getPlatformStatusMatrix().catch(() => ({})),
         ]);
+
+        if (platformStatusRes && Object.keys(platformStatusRes).length > 0) {
+          setPlatformStatus((prev) => ({ ...prev, ...platformStatusRes }));
+        }
 
         if (meRes && Array.isArray(meRes.allowedPlatforms)) {
           setAllowedPlatforms(meRes.allowedPlatforms.map((p: string) => p.toUpperCase()));
@@ -135,18 +148,16 @@ export default function SocialAccountsPage() {
     initPageData();
   }, []);
 
-  const handleConnect = async (platform: 'INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK') => {
-    setActionLoading(platform);
+  const handleConnect = async (platform: 'INSTAGRAM' | 'LINKEDIN' | 'X' | 'FACEBOOK', accountType: 'PERSONAL' | 'ORGANIZATION' = 'PERSONAL') => {
+    const actionKey = `${platform}_${accountType}`;
+    setActionLoading(actionKey);
 
     if (simulateMode) {
       try {
-        let accountType = 'PERSONAL';
         let username = `mock_${platform.toLowerCase()}_creator`;
 
         if (platform === 'LINKEDIN') {
-          const hasPersonal = accounts.some((acc) => acc.platform === 'LINKEDIN' && (acc.accountType === 'PERSONAL' || !acc.accountType));
-          if (hasPersonal) {
-            accountType = 'ORGANIZATION';
+          if (accountType === 'ORGANIZATION') {
             username = 'Avenar (Company Page)';
           } else {
             username = 'Ayush Raj (Personal Profile)';
@@ -171,8 +182,8 @@ export default function SocialAccountsPage() {
     }
 
     try {
-      // Get OAuth redirect link using ApiService
-      const authUrl = await ApiService.getOAuthUrl(platform);
+      // Get OAuth redirect link using ApiService with target accountType
+      const authUrl = await ApiService.getOAuthUrl(platform, accountType);
 
       if (authUrl) {
         window.location.href = authUrl;
@@ -253,9 +264,9 @@ export default function SocialAccountsPage() {
   const isSandboxEnabled = process.env.NEXT_PUBLIC_ENABLE_SANDBOX === 'true';
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 sm:space-y-8 pb-12 animate-fadeIn w-full max-w-full 2xl:max-w-[1600px] mx-auto">
+      {/* Page Header with Real-time Socket & Sandbox Indicator */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 pb-6 border-b border-[var(--border-color)]">
         <div>
           <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
             Social Platforms Connection
@@ -284,14 +295,19 @@ export default function SocialAccountsPage() {
       </div>
 
       {/* Cards list */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-4 sm:gap-5">
         {platforms
-          .filter((plt) => allowedPlatforms.includes(plt.id))
+          .filter((plt) => {
+            const status = platformStatus[plt.id];
+            if (status === 'DISABLED') return false;
+            return true;
+          })
           .map((plt) => {
           const Icon = plt.icon;
           const platformAccounts = accounts.filter(acc => acc.platform?.toUpperCase() === plt.id);
           const isLinked = platformAccounts.length > 0;
           const isLoading = actionLoading === plt.id;
+          const isPlatformComingSoon = (platformStatus[plt.id] || 'COMING_SOON') !== 'ENABLED';
 
           return (
             <div 
@@ -339,21 +355,15 @@ export default function SocialAccountsPage() {
                               {linkedAccount.avatarUrl ? (
                                 <img src={linkedAccount.avatarUrl} alt={linkedAccount.username} className="w-8 h-8 rounded-xl object-cover border border-[var(--border-color)] shrink-0" />
                               ) : (
-                                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-xs shrink-0 ${
-                                  isOrg ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-500' : 'bg-[#2563EB]/10 border-[#2563EB]/20 text-[#2563EB]'
-                                }`}>
+                                <div className="w-8 h-8 rounded-xl border border-[#2563EB]/25 bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center font-bold text-xs shrink-0">
                                   {isOrg ? <Building2 className="w-4 h-4" /> : <User className="w-4 h-4" />}
                                 </div>
                               )}
                               <div className="overflow-hidden">
                                 <p className="text-xs font-bold text-[var(--text-primary)] truncate">{linkedAccount.username}</p>
-                                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border inline-flex items-center gap-1 mt-0.5 ${
-                                  isOrg
-                                    ? 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20'
-                                    : 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20'
-                                }`}>
+                                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border inline-flex items-center gap-1 mt-0.5 bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/25">
                                   {isOrg ? <Building2 className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
-                                  {isOrg ? 'Company Page' : 'Personal'}
+                                  {isOrg ? 'Page' : 'Personal Profile'}
                                 </span>
                               </div>
                             </div>
@@ -374,25 +384,152 @@ export default function SocialAccountsPage() {
                         </div>
                       );
                     })}
+
+                    {/* LinkedIn-specific additional connection button */}
+                    {plt.id === 'LINKEDIN' ? (
+                      (() => {
+                        const isOrgComingSoon = (platformStatus['LINKEDIN_COMMUNITY'] || 'COMING_SOON') !== 'ENABLED';
+
+                        if (!platformAccounts.some((a) => a.accountType === 'ORGANIZATION')) {
+                          if (isOrgComingSoon) {
+                            return (
+                              <div className="w-full py-2.5 px-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs font-bold flex items-center justify-between text-amber-600 dark:text-amber-400 mt-2">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="w-3.5 h-3.5" />
+                                  <span>Company Pages (Community API)</span>
+                                </div>
+                                <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                                  Coming Soon
+                                </span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleConnect('LINKEDIN', 'ORGANIZATION')}
+                              disabled={Boolean(actionLoading)}
+                              className="w-full h-11 px-3 bg-[#2563EB]/10 hover:bg-[#2563EB]/20 text-[#2563EB] dark:text-[#60A5FA] border border-[#2563EB]/30 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs mt-2 disabled:opacity-50"
+                            >
+                              {actionLoading === 'LINKEDIN_ORGANIZATION' ? (
+                                <span className="w-3.5 h-3.5 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Building2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                              )}
+                              <span>+ Connect Pages</span>
+                            </button>
+                          );
+                        } else if (!platformAccounts.some((a) => a.accountType === 'PERSONAL')) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleConnect('LINKEDIN', 'PERSONAL')}
+                              disabled={Boolean(actionLoading)}
+                              className="w-full h-11 px-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/20 mt-2 disabled:opacity-50"
+                            >
+                              {actionLoading === 'LINKEDIN_PERSONAL' ? (
+                                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <User className="w-3.5 h-3.5" />
+                              )}
+                              <span>+ Connect Personal Profile</span>
+                            </button>
+                          );
+                        } else {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleConnect('LINKEDIN', 'ORGANIZATION')}
+                              disabled={Boolean(actionLoading) || isOrgComingSoon}
+                              className="w-full h-9 px-3 bg-[var(--bg-input)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 text-[var(--text-secondary)] hover:text-[#2563EB] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-1 disabled:opacity-50"
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Re-sync Pages</span>
+                            </button>
+                          );
+                        }
+                      })()
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleConnect(plt.id)}
+                        disabled={Boolean(actionLoading)}
+                        className="w-full h-9 px-3 bg-[var(--bg-input)] hover:bg-[#2563EB]/10 border border-[var(--border-color)] hover:border-[#2563EB]/30 text-[var(--text-secondary)] hover:text-[#2563EB] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer mt-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Re-sync Account</span>
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <button
-                    onClick={() => handleConnect(plt.id)}
-                    disabled={isLoading}
-                    className="btn btn-primary w-full shadow-md shadow-blue-500/10"
-                  >
-                    {isLoading ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <ExternalLink className="h-4 w-4" />
-                        Connect {plt.name}
-                      </>
-                    )}
-                  </button>
+                  plt.id === 'LINKEDIN' ? (
+                    (() => {
+                      const isOrgComingSoon = (platformStatus['LINKEDIN_COMMUNITY'] || 'COMING_SOON') !== 'ENABLED';
+
+                      return (
+                        <div className="space-y-2.5">
+                          <button
+                            type="button"
+                            onClick={() => handleConnect('LINKEDIN', 'PERSONAL')}
+                            disabled={Boolean(actionLoading)}
+                            className="w-full h-11 px-4 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50"
+                          >
+                            {actionLoading === 'LINKEDIN_PERSONAL' ? (
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <User className="w-4 h-4" />
+                            )}
+                            <span>Connect Personal Profile</span>
+                          </button>
+
+                          {isOrgComingSoon ? (
+                            <div className="w-full py-2.5 px-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs font-bold flex items-center justify-between text-amber-600 dark:text-amber-400">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5" />
+                                <span>Company Pages</span>
+                              </div>
+                              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                                Coming Soon
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleConnect('LINKEDIN', 'ORGANIZATION')}
+                              disabled={Boolean(actionLoading)}
+                              className="w-full h-11 px-4 bg-[#2563EB]/10 hover:bg-[#2563EB]/20 text-[#2563EB] dark:text-[#60A5FA] border border-[#2563EB]/30 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+                            >
+                              {actionLoading === 'LINKEDIN_ORGANIZATION' ? (
+                                <span className="w-4 h-4 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Building2 className="w-4 h-4 text-[#2563EB]" />
+                              )}
+                              <span>Connect Pages</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleConnect(plt.id)}
+                      disabled={Boolean(actionLoading)}
+                      className="w-full h-11 px-4 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50"
+                    >
+                      {actionLoading === `${plt.id}_PERSONAL` || actionLoading === plt.id ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Connecting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="h-4 w-4" />
+                          <span>Connect {plt.name}</span>
+                        </>
+                      )}
+                    </button>
+                  )
                 )}
               </div>
             </div>

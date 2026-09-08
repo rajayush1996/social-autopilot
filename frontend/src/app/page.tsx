@@ -82,9 +82,32 @@ export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [platformStatus, setPlatformStatus] = useState<Record<string, 'ENABLED' | 'COMING_SOON' | 'DISABLED'>>({
+    INSTAGRAM: 'ENABLED',
+    LINKEDIN: 'ENABLED',
+    LINKEDIN_COMMUNITY: 'COMING_SOON',
+    FACEBOOK: 'COMING_SOON',
+    X: 'COMING_SOON',
+    YOUTUBE: 'COMING_SOON',
+    THREADS: 'COMING_SOON',
+    PINTEREST: 'COMING_SOON',
+    REDDIT: 'COMING_SOON',
+    BLUESKY: 'COMING_SOON',
+    MASTODON: 'COMING_SOON',
+  });
 
   useEffect(() => {
     setIsClient(true);
+
+    // Fetch dynamic live platform availability matrix
+    ApiService.getPlatformStatusMatrix()
+      .then((statusMap) => {
+        if (statusMap && Object.keys(statusMap).length > 0) {
+          setPlatformStatus(statusMap);
+        }
+      })
+      .catch(() => {});
+
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (token) {
       // Safely verify token with getMe() without breaking the landing page
@@ -220,42 +243,56 @@ export default function Home() {
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[1.1] max-w-4xl mx-auto text-[var(--text-primary)]">
             Automate Your Social Media <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#2563EB] via-sky-500 to-emerald-500">
-              Across Instagram, LinkedIn & X
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-rose-500 to-[#2563EB]">
+              Starting with Instagram Autopilot
             </span>
           </h1>
 
           <p className="text-[var(--text-secondary)] text-sm md:text-base leading-relaxed max-w-2xl mx-auto font-medium">
-            Connect your social accounts, set your brand niche, and let OpenAI automatically generate, format, schedule, and publish high-converting organic posts on Redis queues.
+            Connect your accounts, set your brand niche, and let OpenAI automatically generate, format, schedule, and publish high-converting organic posts on Redis queues.
           </p>
 
-          {/* Multi-Channel Network Badges Strip (Drital Hub Style in Electric Blue) */}
+          {/* Multi-Channel Network Badges Strip (Dynamic Real-Time Matrix) */}
           <div className="pt-6 pb-2">
             <p className="text-xs font-extrabold uppercase tracking-widest text-[#2563EB] mb-4">
-              Seamlessly Connect & Schedule Across All Networks
+              Supported Publishing Channels & Upcoming Expansions
             </p>
             <div className="flex flex-wrap justify-center gap-3 max-w-4xl mx-auto">
               {[
-                { name: 'Facebook', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30' },
-                { name: 'Instagram', color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/30' },
-                { name: 'X (Twitter)', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-input)] border-[var(--border-color)]' },
-                { name: 'LinkedIn', color: 'text-[#0a66c2]', bg: 'bg-[#0a66c2]/10 border-[#0a66c2]/30' },
-                { name: 'YouTube', color: 'text-rose-600', bg: 'bg-rose-500/10 border-rose-500/30' },
-                { name: 'Threads', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-input)] border-[var(--border-color)]' },
-                { name: 'Pinterest', color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/30' },
-                { name: 'Reddit', color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/30' },
-                { name: 'Bluesky', color: 'text-sky-500', bg: 'bg-sky-500/10 border-sky-500/30' },
-                { name: 'Mastodon', color: 'text-indigo-500', bg: 'bg-indigo-500/10 border-indigo-500/30' },
-              ].map((channel, cIdx) => (
-                <div
-                  key={cIdx}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border ${channel.bg} transition-all duration-300 hover:scale-105 shadow-xs cursor-pointer group`}
-                >
-                  <span className={`text-xs font-black ${channel.color}`}>
-                    {channel.name}
-                  </span>
-                </div>
-              ))}
+                { key: 'INSTAGRAM', name: 'Instagram', color: 'text-pink-500', bg: 'bg-pink-500/10 border-pink-500/30' },
+                { key: 'LINKEDIN', name: 'LinkedIn', color: 'text-[#0a66c2]', bg: 'bg-[#0a66c2]/10 border-[#0a66c2]/30' },
+                { key: 'FACEBOOK', name: 'Facebook', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/30' },
+                { key: 'X', name: 'X (Twitter)', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-input)] border-[var(--border-color)]' },
+                { key: 'YOUTUBE', name: 'YouTube', color: 'text-rose-600', bg: 'bg-rose-500/10 border-rose-500/30' },
+                { key: 'THREADS', name: 'Threads', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-input)] border-[var(--border-color)]' },
+                { key: 'PINTEREST', name: 'Pinterest', color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/30' },
+                { key: 'REDDIT', name: 'Reddit', color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/30' },
+                { key: 'BLUESKY', name: 'Bluesky', color: 'text-sky-500', bg: 'bg-sky-500/10 border-sky-500/30' },
+                { key: 'MASTODON', name: 'Mastodon', color: 'text-indigo-500', bg: 'bg-indigo-500/10 border-indigo-500/30' },
+              ]
+                .filter((channel) => (platformStatus[channel.key] || 'COMING_SOON') !== 'DISABLED')
+                .map((channel, cIdx) => {
+                  const status = platformStatus[channel.key] || (channel.key === 'INSTAGRAM' ? 'ENABLED' : 'COMING_SOON');
+                  const isLive = status === 'ENABLED';
+
+                  return (
+                    <div
+                      key={cIdx}
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl border ${channel.bg} transition-all duration-300 hover:scale-105 shadow-xs cursor-pointer group`}
+                    >
+                      <span className={`text-xs font-black ${channel.color}`}>
+                        {channel.name}
+                      </span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        isLive 
+                          ? 'bg-emerald-500/20 text-emerald-500 border-emerald-500/40 shadow-xs' 
+                          : 'bg-amber-500/20 text-amber-500 border-amber-500/30'
+                      }`}>
+                        {isLive ? 'Live' : 'Coming Soon'}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           </div>
 
@@ -303,13 +340,40 @@ export default function Home() {
 
                 {/* Simulated Post adaptation */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Instagram адаптер (Live) */}
+                  <div className="bg-[var(--bg-card)] border-2 border-pink-500/40 rounded-2xl p-5 space-y-3 shadow-sm relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="bg-[#e1306c]/10 p-2 rounded-xl text-[#e1306c]">
+                          <InstagramBrandIcon className="w-4 h-4 text-[#e1306c]" />
+                        </div>
+                        <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">Instagram Feed</span>
+                      </div>
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                        Live
+                      </span>
+                    </div>
+                    <div className="h-24 bg-[var(--bg-input)] rounded-xl flex items-center justify-center border border-[var(--border-color)]">
+                      <span className="text-xs text-[var(--text-secondary)] font-bold">Visual Graphic & Auto-Captions</span>
+                    </div>
+                  </div>
+
                   {/* LinkedIn адаптер */}
                   <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-3 hover:border-slate-700/80 transition-all duration-300 shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="bg-[#0a66c2]/10 p-2 rounded-xl text-[#0a66c2]">
-                        <LinkedInBrandIcon className="w-4 h-4 text-[#0a66c2]" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="bg-[#0a66c2]/10 p-2 rounded-xl text-[#0a66c2]">
+                          <LinkedInBrandIcon className="w-4 h-4 text-[#0a66c2]" />
+                        </div>
+                        <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">LinkedIn post</span>
                       </div>
-                      <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">LinkedIn post</span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        platformStatus['LINKEDIN'] === 'ENABLED'
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                      }`}>
+                        {platformStatus['LINKEDIN'] === 'ENABLED' ? 'Live' : 'Coming Soon'}
+                      </span>
                     </div>
                     <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
                       💡 Systemizing your workflow isn&apos;t about spending more hours—it&apos;s about building leverage. Here is how our team scales organic outreach...
@@ -318,28 +382,24 @@ export default function Home() {
 
                   {/* X адаптер */}
                   <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-3 hover:border-slate-700/80 transition-all duration-300 shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="bg-[var(--bg-input)] p-2 rounded-xl text-[var(--text-primary)] border border-[var(--border-color)]">
-                        <XBrandIcon className="w-4 h-4 text-[var(--text-primary)]" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="bg-[var(--bg-input)] p-2 rounded-xl text-[var(--text-primary)] border border-[var(--border-color)]">
+                          <XBrandIcon className="w-4 h-4 text-[var(--text-primary)]" />
+                        </div>
+                        <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">X Tweet</span>
                       </div>
-                      <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">X Tweet</span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                        platformStatus['X'] === 'ENABLED'
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                      }`}>
+                        {platformStatus['X'] === 'ENABLED' ? 'Live' : 'Coming Soon'}
+                      </span>
                     </div>
                     <p className="text-xs md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
                       Stop overthinking your content strategy. Focus on consistency, leverage AI for compaction, and schedule everything ahead. Simplicity scales. 🚀
                     </p>
-                  </div>
-
-                  {/* Instagram адаптер */}
-                  <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 space-y-3 hover:border-slate-700/80 transition-all duration-300 shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="bg-[#e1306c]/10 p-2 rounded-xl text-[#e1306c]">
-                        <InstagramBrandIcon className="w-4 h-4 text-[#e1306c]" />
-                      </div>
-                      <span className="text-xs text-[var(--text-primary)] font-extrabold uppercase tracking-wider">Instagram image</span>
-                    </div>
-                    <div className="h-24 bg-[var(--bg-input)] rounded-xl flex items-center justify-center border border-[var(--border-color)]">
-                      <span className="text-xs text-[var(--text-secondary)] font-bold">Mock Up Image Preview</span>
-                    </div>
                   </div>
                 </div>
               </div>

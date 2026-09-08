@@ -66,17 +66,15 @@ export class SocketClientManager {
     if (typeof window === 'undefined') return null;
 
     if (!this.socket) {
-      let socketUrl = CONFIG.API_URL || 'http://localhost:5000';
+      let socketUrl = CONFIG.API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
       if (socketUrl.endsWith('/api')) {
         socketUrl = socketUrl.replace(/\/api$/, '');
       }
-      if (!socketUrl || socketUrl === '/' || socketUrl.includes(':3000')) {
-        socketUrl = 'http://localhost:5000';
-      }
 
-      console.log('⚡ [SocketClientManager] Connecting to Express Backend WebSocket server at:', socketUrl);
+      console.log('⚡ [SocketClientManager] Connecting to WebSocket server at:', socketUrl);
 
       this.socket = io(socketUrl, {
+        path: '/socket.io',
         transports: ['polling', 'websocket'],
         autoConnect: true,
         reconnection: true,

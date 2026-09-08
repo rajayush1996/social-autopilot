@@ -320,8 +320,8 @@ export async function processPostPublishing(postId) {
       type: notificationType,
     });
 
-    // Automatic Local File Storage Cleanup Hook
-    if (post.mediaUrls && post.mediaUrls.length > 0) {
+    // Automatic Local File Storage Cleanup Hook (Disabled by default to preserve media thumbnails in history)
+    if (process.env.CLEANUP_LOCAL_MEDIA === 'true' && post.mediaUrls && post.mediaUrls.length > 0) {
       for (const mediaUrl of post.mediaUrls) {
         if (mediaUrl.includes('/uploads/')) {
           try {

@@ -26,7 +26,7 @@ export class AuthService {
   /**
    * Generate OAuth Authorization URL for target social platform.
    */
-  static async getOAuthUrl({ platform, redirectUriInput, userIdInput }) {
+  static async getOAuthUrl({ platform, redirectUriInput, userIdInput, accountType = 'PERSONAL' }) {
     if (!platform) {
       throw ApiError.badRequest('Query parameter "platform" is required (INSTAGRAM, LINKEDIN, X, FACEBOOK).');
     }
@@ -40,15 +40,24 @@ export class AuthService {
     }
 
     let url = '';
-    const state = Buffer.from(JSON.stringify({ platform, userId, timestamp: Date.now() })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ platform, userId, accountType, timestamp: Date.now() })).toString('base64');
 
     switch (platform.toUpperCase()) {
       case 'LINKEDIN':
-        if (!config.social.linkedin.clientId) {
+        const isOrg = accountType === 'ORGANIZATION';
+        const linkedinClientId = isOrg 
+          ? (config.social.linkedin.orgClientId || config.social.linkedin.clientId)
+          : config.social.linkedin.clientId;
+        
+        if (!linkedinClientId) {
           throw ApiError.badRequest('LINKEDIN_CLIENT_ID is not configured in environment variables.');
         }
-        const linkedinScope = config.social.linkedin.scope || 'openid profile w_member_social';
-        url = `${config.social.linkedin.oauthBaseUrl}/authorization?response_type=code&client_id=${config.social.linkedin.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(linkedinScope)}`;
+
+        const linkedinScope = isOrg
+          ? (config.social.linkedin.orgScope || 'openid profile w_organization_social r_organization_social')
+          : (config.social.linkedin.scope || 'openid profile w_member_social');
+
+        url = `${config.social.linkedin.oauthBaseUrl}/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${encodeURIComponent(linkedinScope)}`;
         break;
 
       case 'X':
@@ -112,6 +121,7 @@ export class AuthService {
     let platform = 'LINKEDIN';
     let userId = null;
     let codeVerifier = 'challenge';
+    let accountType = 'PERSONAL';
 
     if (state) {
       try {
@@ -125,6 +135,7 @@ export class AuthService {
         if (decoded.platform) platform = decoded.platform.toUpperCase();
         if (decoded.userId && decoded.userId !== 'default-user-id') userId = decoded.userId;
         if (decoded.codeVerifier) codeVerifier = decoded.codeVerifier;
+        if (decoded.accountType) accountType = decoded.accountType.toUpperCase();
       } catch (e) {
         logger.warn(`[OAuth Callback GET] State parse warning: ${e.message}`);
       }
@@ -147,12 +158,20 @@ export class AuthService {
     try {
       const adapter = SocialAdapterFactory.getAdapter(platform);
 
-      if (platform === 'LINKEDIN' && config.social.linkedin.clientId) {
+      if (platform === 'LINKEDIN') {
+        const isOrg = accountType === 'ORGANIZATION';
+        const clientId = isOrg 
+          ? (config.social.linkedin.orgClientId || config.social.linkedin.clientId)
+          : config.social.linkedin.clientId;
+        const clientSecret = isOrg
+          ? (config.social.linkedin.orgClientSecret || config.social.linkedin.clientSecret)
+          : config.social.linkedin.clientSecret;
+
         const exchanged = await adapter.exchangeToken({
           code,
           redirectUri,
-          clientId: config.social.linkedin.clientId,
-          clientSecret: config.social.linkedin.clientSecret,
+          clientId,
+          clientSecret,
         });
         tokenData.accessToken = exchanged.accessToken;
         tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
@@ -196,6 +215,7 @@ export class AuthService {
         tokenData.accessToken = exchanged.accessToken;
         if (exchanged.refreshToken) tokenData.refreshToken = exchanged.refreshToken;
         tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+        if (exchanged.accounts) tokenData.accounts = exchanged.accounts;
         if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
         if (exchanged.username) tokenData.username = exchanged.username;
       }
@@ -273,8 +293,11 @@ export class AuthService {
         });
         tokenData.accessToken = exchanged.accessToken;
         tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+        if (exchanged.accounts) tokenData.accounts = exchanged.accounts;
         if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
         if (exchanged.username) tokenData.username = exchanged.username;
+        if (exchanged.accountType) tokenData.accountType = exchanged.accountType;
+        if (exchanged.avatarUrl) tokenData.avatarUrl = exchanged.avatarUrl;
       } else if (platformUpper === 'X' && config.social.x.clientId) {
         exchanged = await adapter.exchangeToken({
           code,
@@ -286,6 +309,33 @@ export class AuthService {
         tokenData.accessToken = exchanged.accessToken;
         tokenData.refreshToken = exchanged.refreshToken;
         tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+        if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
+        if (exchanged.username) tokenData.username = exchanged.username;
+        tokenData.isPremium = Boolean(exchanged.isPremium);
+      } else if (platformUpper === 'INSTAGRAM' && config.social.instagram.appId) {
+        exchanged = await adapter.exchangeToken({
+          code,
+          redirectUri,
+          appId: config.social.instagram.appId,
+          appSecret: config.social.instagram.appSecret,
+        });
+        tokenData.accessToken = exchanged.accessToken;
+        tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+        if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
+        if (exchanged.username) tokenData.username = exchanged.username;
+      } else if (platformUpper === 'FACEBOOK' && config.social.facebook.appId) {
+        exchanged = await adapter.exchangeToken({
+          code,
+          redirectUri,
+          appId: config.social.facebook.appId,
+          appSecret: config.social.facebook.appSecret,
+        });
+        tokenData.accessToken = exchanged.accessToken;
+        if (exchanged.refreshToken) tokenData.refreshToken = exchanged.refreshToken;
+        tokenData.expiresAt = exchanged.expiresIn ? new Date(Date.now() + exchanged.expiresIn * 1000) : tokenData.expiresAt;
+        if (exchanged.accounts) tokenData.accounts = exchanged.accounts;
+        if (exchanged.platformAccountId) tokenData.platformAccountId = exchanged.platformAccountId;
+        if (exchanged.username) tokenData.username = exchanged.username;
       }
     } catch (err) {
       logger.warn(`[AuthService] OAuth exchange fallback used: ${err.message}`);
@@ -293,19 +343,41 @@ export class AuthService {
 
     await UserService.ensureUserExists(userId);
 
-    const account = await SocialAccountService.upsertAccount({
-      userId,
-      platform: platformUpper,
-      platformAccountId: tokenData.platformAccountId,
-      username: tokenData.username,
-      accessToken: encrypt(tokenData.accessToken),
-      refreshToken: encrypt(tokenData.refreshToken),
-      expiresAt: tokenData.expiresAt,
-    });
+    const accountsToSave = Array.isArray(tokenData.accounts) && tokenData.accounts.length > 0
+      ? tokenData.accounts.map((acc) => ({
+          userId,
+          platform: platformUpper,
+          platformAccountId: acc.platformAccountId,
+          username: acc.username,
+          accountType: acc.accountType || 'PERSONAL',
+          avatarUrl: acc.avatarUrl || null,
+          accessToken: encrypt(tokenData.accessToken),
+          refreshToken: tokenData.refreshToken ? encrypt(tokenData.refreshToken) : null,
+          expiresAt: tokenData.expiresAt,
+          isPremium: tokenData.isPremium || false,
+        }))
+      : [{
+          userId,
+          platform: platformUpper,
+          platformAccountId: tokenData.platformAccountId,
+          username: tokenData.username,
+          accountType: tokenData.accountType || 'PERSONAL',
+          avatarUrl: tokenData.avatarUrl || null,
+          accessToken: encrypt(tokenData.accessToken),
+          refreshToken: tokenData.refreshToken ? encrypt(tokenData.refreshToken) : null,
+          expiresAt: tokenData.expiresAt,
+          isPremium: tokenData.isPremium || false,
+        }];
+
+    let savedAccount = null;
+    for (const accPayload of accountsToSave) {
+      const res = await SocialAccountService.upsertAccount(accPayload);
+      if (!savedAccount) savedAccount = res;
+    }
 
     emitAccountStatusChange({ userId, platform: platformUpper, action: 'CONNECTED' });
 
-    return account;
+    return savedAccount;
   }
 
   /**

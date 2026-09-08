@@ -46,6 +46,7 @@ import SchedulingDispatcher from '@/components/SchedulingDispatcher';
 import LiquidUploadButton from '@/components/LiquidUploadButton';
 import PlatformIcon from '@/components/PlatformIcon';
 import ChannelTargetChips from '@/components/ChannelTargetChips';
+import CarouselSlideDeck from '@/components/CarouselSlideDeck';
 import { SocialAccount } from '@/lib/api';
 import { RichPromptEditor } from '@/components/RichPromptEditor';
 import {
@@ -436,9 +437,20 @@ export default function ComposerPage() {
           .filter((p: PlatformKey) => userAllowed.includes(p));
         setConnectedPlatforms(activePlatforms);
 
-        // Auto-select single-account destinations or keep active targets
+        // Auto-select single-account destinations only. Platforms with multiple accounts start with 0 selected
         const activeIds = activeAccounts.map((a: any) => a.id);
-        setSelectedAccountIds((prev) => (prev.length > 0 ? prev.filter((id) => activeIds.includes(id)) : activeIds));
+        const singleAccountIds = activeAccounts
+          .filter((acc: any) => {
+            const platAccounts = activeAccounts.filter(
+              (a: any) => a.platform?.toUpperCase() === acc.platform?.toUpperCase()
+            );
+            return platAccounts.length === 1;
+          })
+          .map((a: any) => a.id);
+
+        setSelectedAccountIds((prev) =>
+          prev.length > 0 ? prev.filter((id) => activeIds.includes(id)) : singleAccountIds
+        );
 
         if (activePlatforms.length > 0) {
           const currentSelected = reduxComposer.selectedPlatforms || [];
@@ -704,7 +716,7 @@ export default function ComposerPage() {
     }
 
     if (hasZeroSelectedActivePlatform) {
-      toast.error('Please select at least one account or company page in the channel dropdown.');
+      toast.error('Please select at least one account or page in the channel dropdown.');
       return;
     }
 
@@ -803,7 +815,7 @@ export default function ComposerPage() {
   }
 
   return (
-    <div className="space-y-8 pb-12 animate-fadeIn max-w-[1400px] mx-auto">
+    <div className="space-y-6 sm:space-y-8 pb-12 animate-fadeIn w-full max-w-full 2xl:max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--border-color)]">
         <div>
@@ -1517,13 +1529,13 @@ export default function ComposerPage() {
                     <div className="absolute right-0 bottom-full mb-2 w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 p-1.5 overflow-hidden animate-fadeIn">
                       <button
                         onClick={() => { setPublishMode('NOW'); setShowPublishDropdown(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'NOW' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'NOW' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
                       >
                         <Zap className="w-4 h-4" /> Publish Now
                       </button>
                       <button
                         onClick={() => { setPublishMode('SCHEDULE'); setShowPublishDropdown(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'SCHEDULE' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'SCHEDULE' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
                       >
                         <Calendar className="w-4 h-4" /> Schedule Later
                       </button>

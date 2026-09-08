@@ -304,8 +304,8 @@ export function CampaignCreativeStudio({
                     key={d}
                     type="button"
                     onClick={() => { setSelectedDays(d); if (onDurationChange) onDurationChange(d); }}
-                    className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all border cursor-pointer ${
-                      selectedDays === d ? 'bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] border-blue-300' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all border cursor-pointer ${
+                      selectedDays === d ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[#2563EB]/40'
                     }`}
                   >
                     {d} Days
@@ -583,6 +583,17 @@ export function SchedulingDispatcher() {
     }
   };
 
+  const hasZeroSelectedActivePlatform = formPlatforms.some((p) => {
+    const accountsForP = connectedAccounts.filter(
+      (acc) => acc.platform?.toUpperCase() === p.toUpperCase()
+    );
+    if (accountsForP.length > 1) {
+      const selectedCount = accountsForP.filter((acc) => formAccountIds.includes(acc.id)).length;
+      return selectedCount === 0;
+    }
+    return false;
+  });
+
   const handleOpenAddModal = () => {
     setEditingSchedule(null);
     setFormName('Daily Growth Engine');
@@ -592,7 +603,15 @@ export function SchedulingDispatcher() {
     setFormDays(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']);
     setFormRepeat('WEEKLY');
     setFormPlatforms(['LINKEDIN']);
-    setFormAccountIds(connectedAccounts.map((a) => a.id));
+    const singleAccountIds = connectedAccounts
+      .filter((acc) => {
+        const platAccounts = connectedAccounts.filter(
+          (a) => a.platform?.toUpperCase() === acc.platform?.toUpperCase()
+        );
+        return platAccounts.length === 1;
+      })
+      .map((a) => a.id);
+    setFormAccountIds(singleAccountIds);
     setFormTone('ENGAGING');
     setFormFormatStyle('SINGLE');
     setFormEmojiDensity('MEDIUM');
@@ -780,7 +799,7 @@ export function SchedulingDispatcher() {
               >
                 <div className="flex items-center gap-4 min-w-[280px] flex-1">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                    sched.isActive ? 'bg-blue-50 text-[#2563EB] border-blue-200' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
+                    sched.isActive ? 'bg-[#2563EB]/15 text-[#2563EB] border-[#2563EB]/30' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
                   }`}>
                     <Layers className="h-5 w-5" />
                   </div>
@@ -905,8 +924,17 @@ export function SchedulingDispatcher() {
                 <button
                   type="button"
                   onClick={handleSaveSchedule}
-                  disabled={saving}
-                  className="px-6 py-2.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center gap-2 cursor-pointer"
+                  disabled={saving || hasZeroSelectedActivePlatform}
+                  className={`px-6 py-2.5 rounded-xl font-extrabold text-sm transition-all shadow-md active:scale-95 flex items-center gap-2 ${
+                    hasZeroSelectedActivePlatform || saving
+                      ? 'bg-gray-400 dark:bg-gray-700 text-gray-200 dark:text-gray-400 cursor-not-allowed opacity-60'
+                      : 'bg-[#2563EB] hover:bg-blue-600 text-white cursor-pointer'
+                  }`}
+                  title={
+                    hasZeroSelectedActivePlatform
+                      ? 'Please select at least one account/page in the channel dropdown'
+                      : undefined
+                  }
                 >
                   {saving ? (
                     <>
@@ -1067,8 +1095,10 @@ export function SchedulingDispatcher() {
                           type="button"
                           key={d.key}
                           onClick={() => handleToggleDay(d.key)}
-                          className={`py-2 rounded-xl font-bold text-xs cursor-pointer ${
-                            isSelected ? 'bg-blue-50 text-[#2563EB] border border-blue-300 shadow-xs' : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)]'
+                          className={`py-2 rounded-xl font-bold text-xs cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md shadow-blue-500/20'
+                              : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)] hover:border-[#2563EB]/40'
                           }`}
                         >
                           {d.label}

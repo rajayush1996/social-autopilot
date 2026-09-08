@@ -310,34 +310,47 @@ export class LinkedinAdapter extends SocialAdapter {
         });
 
         const elements = aclsRes.data?.elements || [];
-        const adminRoles = ['ADMINISTRATOR', 'CONTENT_ADMINISTRATOR', 'ADMIN', 'OWNER'];
+        const validRoles = [
+          'ADMINISTRATOR',
+          'CONTENT_ADMINISTRATOR',
+          'ADMIN',
+          'OWNER',
+          'DIRECT_SPONSORED_CONTENT_POSTER',
+          'ORGANIC_CONTENT_POSTER',
+          'CURATOR',
+          'COMMUNITY_MANAGER',
+          'LEAD_GEN_FORMS_MANAGER',
+        ];
 
         for (const elem of elements) {
-          const role = elem.role || elem.roleType;
-          if (adminRoles.includes(role) && elem.organizationalTarget) {
-            const orgUrn = elem.organizationalTarget;
-            const orgId = orgUrn.replace('urn:li:organization:', '');
+          const role = (elem.role || elem.roleType || '').toUpperCase();
+          const isValidRole = validRoles.includes(role) || !role || elem.state === 'APPROVED';
 
-            let orgName = `Company Page (${orgId})`;
+          if (isValidRole && elem.organizationalTarget) {
+            const orgUrn = elem.organizationalTarget;
+            const orgId = orgUrn.replace('urn:li:organization:', '').replace('urn:li:organizationBrand:', '');
+
+            let orgName = `Page (${orgId})`;
             let orgLogo = null;
 
             try {
-              const orgDetailsRes = await axios.get(`${config.social.linkedin.apiBaseUrl}/organizations/${orgId}`, {
+              const endpoint = orgUrn.includes('organizationBrand') ? `/organizationBrands/${orgId}` : `/organizations/${orgId}`;
+              const orgDetailsRes = await axios.get(`${config.social.linkedin.apiBaseUrl}${endpoint}`, {
                 headers: {
                   Authorization: `Bearer ${accessToken}`,
                   'LinkedIn-Version': '202607',
                 },
               });
-              orgName = orgDetailsRes.data?.localizedName || orgDetailsRes.data?.name || orgName;
+              orgName = orgDetailsRes.data?.localizedName || orgDetailsRes.data?.name || orgDetailsRes.data?.vanityName || orgName;
               orgLogo = orgDetailsRes.data?.logoV2?.['cropped~']?.elements?.[0]?.identifiers?.[0]?.identifier || null;
             } catch (orgDetailErr) {
-              logger.warn(`[LinkedinAdapter] Details fetch failed for org ${orgId}: ${orgDetailErr.message}`);
+              logger.warn(`[LinkedinAdapter] Details fetch fallback for org ${orgId}: ${orgDetailErr.message}`);
             }
 
             accountsList.push({
               platformAccountId: orgUrn,
               username: orgName,
-              accountName: `${orgName} (Company Page)`,
+              accountName: `${orgName} (Page)`,
               accountType: 'ORGANIZATION',
               avatarUrl: orgLogo,
             });

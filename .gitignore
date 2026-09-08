@@ -32,7 +32,10 @@ desktop.ini
 # Scratch & test scripts
 scratch/
 test_*.js
+SESSION_CONTEXT.md
+backups/
+backend/backups/
 
-# Architecture & Setup Documentation (Ignored as requested)
+# Architecture & Setup Documentation
 ARCHITECTURE_FLOW.md
 SETUP_GUIDE.md

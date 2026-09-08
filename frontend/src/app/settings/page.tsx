@@ -116,7 +116,7 @@ export default function AutopilotSettingsPage() {
   const isPremium = user?.plan === 'PREMIUM';
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="w-full max-w-full 2xl:max-w-[1600px] mx-auto space-y-6 sm:space-y-8 pb-12 animate-fadeIn">
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
@@ -128,7 +128,7 @@ export default function AutopilotSettingsPage() {
       </div>
 
       {/* Autopilot Configuration Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         
         {/* Main Autopilot Brand & Engine Form */}
         <div className="lg:col-span-7 space-y-6">

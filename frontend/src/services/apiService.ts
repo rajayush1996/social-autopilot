@@ -166,8 +166,8 @@ export class ApiService {
   /**
    * Generate platform OAuth authorization redirect URL
    */
-  static async getOAuthUrl(platform: PlatformId): Promise<string> {
-    const response = await apiClient.get(`${API_ENDPOINTS.OAUTH_REDIRECT_URL}?platform=${platform}`);
+  static async getOAuthUrl(platform: PlatformId, accountType: 'PERSONAL' | 'ORGANIZATION' = 'PERSONAL'): Promise<string> {
+    const response = await apiClient.get(`${API_ENDPOINTS.OAUTH_REDIRECT_URL}?platform=${platform}&accountType=${accountType}`);
     return response.data?.data?.authUrl;
   }
 
@@ -662,6 +662,58 @@ export class ApiService {
       brandName,
     });
     return response.data?.data;
+  }
+
+  /**
+   * 🌐 Fetch public platform status matrix (Landing page & Client)
+   */
+  static async getPlatformStatusMatrix(): Promise<Record<string, 'ENABLED' | 'COMING_SOON' | 'DISABLED'>> {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.PLATFORM_STATUS);
+      return response.data?.data?.statusMatrix || {
+        INSTAGRAM: 'ENABLED',
+        LINKEDIN: 'ENABLED',
+        LINKEDIN_COMMUNITY: 'COMING_SOON',
+        FACEBOOK: 'COMING_SOON',
+        X: 'COMING_SOON',
+        YOUTUBE: 'COMING_SOON',
+        THREADS: 'COMING_SOON',
+        PINTEREST: 'COMING_SOON',
+        REDDIT: 'COMING_SOON',
+        BLUESKY: 'COMING_SOON',
+        MASTODON: 'COMING_SOON',
+      };
+    } catch {
+      return {
+        INSTAGRAM: 'ENABLED',
+        LINKEDIN: 'ENABLED',
+        LINKEDIN_COMMUNITY: 'COMING_SOON',
+        FACEBOOK: 'COMING_SOON',
+        X: 'COMING_SOON',
+        YOUTUBE: 'COMING_SOON',
+        THREADS: 'COMING_SOON',
+        PINTEREST: 'COMING_SOON',
+        REDDIT: 'COMING_SOON',
+        BLUESKY: 'COMING_SOON',
+        MASTODON: 'COMING_SOON',
+      };
+    }
+  }
+
+  /**
+   * 👑 Super Admin: Fetch admin platform status matrix
+   */
+  static async getAdminPlatformStatusMatrix(): Promise<Record<string, 'ENABLED' | 'COMING_SOON' | 'DISABLED'>> {
+    const response = await apiClient.get(API_ENDPOINTS.ADMIN_PLATFORM_STATUS);
+    return response.data?.data?.statusMatrix || {};
+  }
+
+  /**
+   * 👑 Super Admin: Update platform status matrix
+   */
+  static async updateAdminPlatformStatusMatrix(statusMatrix: Record<string, string>): Promise<Record<string, string>> {
+    const response = await apiClient.put(API_ENDPOINTS.ADMIN_PLATFORM_STATUS, { statusMatrix });
+    return response.data?.data?.statusMatrix;
   }
 }
 

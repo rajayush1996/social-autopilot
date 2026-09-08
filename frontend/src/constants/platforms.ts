@@ -15,6 +15,7 @@ export const ALL_PLATFORMS: PlatformKey[] = [
 ];
 
 export const DEFAULT_ALLOWED_PLATFORMS: PlatformKey[] = [
+  SOCIAL_PLATFORMS.INSTAGRAM,
   SOCIAL_PLATFORMS.LINKEDIN,
 ];
 

@@ -18,8 +18,9 @@ export const ALL_SUPPORTED_PLATFORMS = Object.freeze([
   SOCIAL_PLATFORM.FACEBOOK,
 ]);
 
-// Currently active & live platforms for standard users (Single-platform LinkedIn focus)
+// Currently active & live platforms for standard users
 export const ACTIVE_LIVE_PLATFORMS = Object.freeze([
+  SOCIAL_PLATFORM.INSTAGRAM,
   SOCIAL_PLATFORM.LINKEDIN,
 ]);
 

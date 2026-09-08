@@ -28,6 +28,10 @@ export const API_ENDPOINTS = {
   LOGIN: `/api/auth/login`,
   ME: `/api/auth/me`,
 
+  // Platform Status & Admin Matrix
+  PLATFORM_STATUS: `/api/auth/platform-status`,
+  ADMIN_PLATFORM_STATUS: `/api/admin/platform-status`,
+
   // Scheduling Dispatcher endpoints
   DISPATCHER_STATUS: `/api/schedules/status`,
   SCHEDULES: `/api/schedules`,

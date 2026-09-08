@@ -1,0 +1,80 @@
+name: 🚀 Deploy to Production (Oracle Cloud VM)
+
+on:
+  # One-Click Manual Trigger from GitHub Actions Tab
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for Deployment'
+        required: false
+        default: 'Production Release'
+
+jobs:
+  deploy:
+    name: 🌐 1-Click Production Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 🔍 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: 🚀 Execute Remote Deployment on Oracle VM
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ${{ secrets.PROD_SSH_USER || 'ubuntu' }}@${{ secrets.PROD_SSH_HOST || '140.245.202.135' }} << 'EOF'
+            set -e
+            echo "🚀 [Deploy] Starting Production Deployment..."
+            
+            # 1. Pull latest code from master branch
+            cd ~/social-autopilot
+            git fetch origin master
+            git reset --hard origin/master
+
+            # 2. Restore secure symlinks if missing
+            ln -sf /var/secrets/social-autopilot/backend.env ~/social-autopilot/backend/.env
+            ln -sf /var/secrets/social-autopilot/frontend.env ~/social-autopilot/frontend/.env.production
+            ln -sf /var/secrets/social-autopilot/frontend.env ~/social-autopilot/frontend/.env.local
+
+            # 3. Update Backend, Prisma Schema, and Client
+            echo "📦 [Deploy] Updating Backend dependencies and Prisma..."
+            cd ~/social-autopilot/backend
+            npm install --production=false
+            npx prisma db push
+            npx prisma generate
+
+            # 4. Build Optimized Production Frontend
+            echo "🏗️ [Deploy] Building Next.js Frontend..."
+            cd ~/social-autopilot/frontend
+            npm install
+            npm run build
+
+            # 5. Reload Application via PM2 (Zero-Downtime)
+            echo "♻️ [Deploy] Reloading PM2 processes..."
+            pm2 reload all --update-env
+            pm2 save
+
+            # 6. Verify Production Health Check
+            echo "🏥 [Deploy] Verifying System Health..."
+            sleep 3
+            HEALTH=$(curl -s http://127.0.0.1:5000/health)
+            echo "Health check result: $HEALTH"
+            
+            if [[ $HEALTH == *"\"status\":\"UP\""* ]]; then
+              echo "✅ [Deploy] Production is HEALTHY and LIVE!"
+            else
+              echo "⚠️ [Deploy] Health check reported degraded status!"
+              exit 1
+            fi
+          EOF
+
+      - name: 🎉 Deployment Success Notification
+        run: |
+          echo "=========================================================="
+          echo "🎉 Production Deployment Successful!"
+          echo "🌐 Live URL: http://${{ secrets.PROD_SSH_HOST || '140.245.202.135' }}"
+          echo "=========================================================="

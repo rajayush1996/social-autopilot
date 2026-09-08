@@ -2,11 +2,19 @@ import axios from 'axios';
 import type { PlatformId } from '@/config/platforms';
 import { toast } from '@/components/Toast';
 
-// Get API base URL from env or default to localhost
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-const API_URL = rawApiUrl.startsWith('http://') || rawApiUrl.startsWith('https://') 
-  ? rawApiUrl 
-  : `https://${rawApiUrl}`;
+// Dynamic API URL: In browser, default to current origin (eliminates CORS completely)
+const getApiUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '') {
+    const raw = process.env.NEXT_PUBLIC_API_URL.trim();
+    return raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'http://140.245.202.135';
+};
+
+export const API_URL = getApiUrl();
 
 export const apiClient = axios.create({
   baseURL: API_URL,

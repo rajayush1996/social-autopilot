@@ -155,7 +155,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="absolute top-0 right-1/4 w-96 h-96 bg-[var(--brand-accent)]/[0.04] rounded-full blur-3xl pointer-events-none" />
               <div className="absolute bottom-10 left-1/4 w-96 h-96 bg-[var(--brand-cyan)]/[0.03] rounded-full blur-3xl pointer-events-none" />
               
-              <div className="min-h-full py-8 px-8 md:px-10 max-w-7xl mx-auto space-y-8 relative z-10" suppressHydrationWarning>
+              <div className="min-h-full py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-10 max-w-7xl 2xl:max-w-[1600px] mx-auto space-y-6 sm:space-y-8 relative z-10" suppressHydrationWarning>
                 {children}
               </div>
             </main>

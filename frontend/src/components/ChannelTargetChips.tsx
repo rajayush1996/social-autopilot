@@ -10,7 +10,8 @@ import {
   Info,
   CheckCircle2
 } from 'lucide-react';
-import { PlatformIcon, type PlatformDefinition } from '@/config/platforms';
+import PlatformIcon from '@/components/PlatformIcon';
+import type { PlatformDefinition } from '@/config/platforms';
 import type { PlatformKey } from '@/constants/platforms';
 import { SocialAccount } from '@/lib/api';
 
@@ -105,9 +106,7 @@ export default function ChannelTargetChips({
                   }
                 }}
                 className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer select-none ${
-                  hasZeroSelection
-                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-600 dark:text-amber-400 shadow-sm'
-                    : isActive
+                  isActive
                     ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-md shadow-blue-500/20'
                     : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-primary)] hover:border-[#2563EB]/50 hover:bg-[var(--bg-card)]'
                 }`}
@@ -119,11 +118,9 @@ export default function ChannelTargetChips({
               >
                 {/* Solid Status Indicator (Green = Active/Connected, Red = Offline) */}
                 <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
+                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                     isConnected
-                      ? isActive
-                        ? 'bg-emerald-300 animate-pulse'
-                        : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
                       : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
                   }`}
                 />
@@ -143,14 +140,14 @@ export default function ChannelTargetChips({
 
                 {/* Status Badge: Active / Offline / X Selected */}
                 <span
-                  className={`text-[10px] px-1 rounded font-extrabold uppercase tracking-widest ${
-                    hasZeroSelection
-                      ? 'text-amber-500'
-                      : isActive
-                      ? 'text-blue-100'
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider ${
+                    isActive
+                      ? hasZeroSelection
+                        ? 'bg-amber-400/20 text-amber-200 border border-amber-300/30'
+                        : 'bg-white/20 text-white'
                       : isConnected
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-rose-600 dark:text-rose-400'
+                      ? 'text-emerald-500 bg-emerald-500/10'
+                      : 'text-rose-500 bg-rose-500/10'
                   }`}
                 >
                   {hasZeroSelection
@@ -158,7 +155,7 @@ export default function ChannelTargetChips({
                     : hasMultiple && isActive
                     ? `${selectedCount} Selected`
                     : isConnected
-                    ? 'Active'
+                    ? 'Connected'
                     : 'Offline'}
                 </span>
               </button>
@@ -210,7 +207,7 @@ export default function ChannelTargetChips({
                                 {isOrg ? (
                                   <>
                                     <Building2 className="w-3 h-3 text-indigo-500 shrink-0" />
-                                    <span>Company Page</span>
+                                    <span>Page</span>
                                   </>
                                 ) : (
                                   <>
@@ -233,7 +230,7 @@ export default function ChannelTargetChips({
                     })}
                   </div>
 
-                  {/* Quick Select All Button */}
+                  {/* Quick Select All/Clear Buttons */}
                   <div className="pt-1 flex items-center justify-between text-[11px] px-1 text-[var(--text-secondary)]">
                     <button
                       type="button"
@@ -241,29 +238,29 @@ export default function ChannelTargetChips({
                         const allIds = accountsForPlatform.map((a) => a.id);
                         const allSelected = allIds.every((id) => selectedAccountIds.includes(id));
                         allIds.forEach((id) => {
-                          if (allSelected) {
-                            if (selectedAccountIds.includes(id)) {
-                              onToggleAccount(id, platformUpper);
-                            }
-                          } else {
-                            if (!selectedAccountIds.includes(id)) {
-                              onToggleAccount(id, platformUpper);
-                            }
+                          if (allSelected && selectedAccountIds.includes(id)) {
+                            onToggleAccount(id, platformUpper);
+                          } else if (!allSelected && !selectedAccountIds.includes(id)) {
+                            onToggleAccount(id, platformUpper);
                           }
                         });
                       }}
-                      className="text-[#2563EB] dark:text-[#60A5FA] font-bold hover:underline cursor-pointer"
+                      className="font-bold text-[#2563EB] dark:text-[#60A5FA] hover:underline cursor-pointer"
                     >
-                      {accountsForPlatform.every((a) => selectedAccountIds.includes(a.id))
-                        ? 'Deselect All'
-                        : 'Select All'}
+                      Select All
                     </button>
                     <button
                       type="button"
-                      onClick={() => setOpenDropdownPlatform(null)}
-                      className="font-bold text-[var(--text-primary)] hover:text-[#2563EB] cursor-pointer"
+                      onClick={() => {
+                        accountsForPlatform.forEach((a) => {
+                          if (selectedAccountIds.includes(a.id)) {
+                            onToggleAccount(a.id, platformUpper);
+                          }
+                        });
+                      }}
+                      className="hover:text-[var(--text-primary)] cursor-pointer"
                     >
-                      Done ✓
+                      Clear
                     </button>
                   </div>
                 </div>
@@ -278,7 +275,7 @@ export default function ChannelTargetChips({
         <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-2 animate-fadeIn">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
           <span>
-            <strong>Destination Notice:</strong> Please click the channel dropdown ▾ above and select at least one account or company page to publish.
+            <strong>Destination Notice:</strong> Please click the channel dropdown ▾ above and select at least one account or page to publish.
           </span>
         </div>
       )}

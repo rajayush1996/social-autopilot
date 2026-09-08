@@ -16,6 +16,7 @@ import {
   updateUserProfile,
   verifyEmail,
   resendVerification,
+  getPublicPlatformStatus,
 } from '../controllers/authController.js';
 import { validate } from '../middlewares/validate.js';
 import { connectAccountSchema } from '../validations/authValidation.js';
@@ -23,6 +24,11 @@ import { authenticateJwt } from '../middlewares/auth.js';
 import { authLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
+
+/**
+ * GET /api/auth/platform-status - Public platform status matrix
+ */
+router.get('/platform-status', getPublicPlatformStatus);
 
 /**
  * GET /api/auth/url - Get OAuth Authorization Link

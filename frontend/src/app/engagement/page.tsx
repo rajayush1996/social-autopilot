@@ -156,7 +156,7 @@ export default function EngagementStudioPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8 animate-in fade-in duration-300">
+    <div className="w-full max-w-full 2xl:max-w-[1600px] mx-auto space-y-6 sm:space-y-8 pb-12 animate-fadeIn">
       {/* Header Banner */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 shadow-xs relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#2563EB]/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>

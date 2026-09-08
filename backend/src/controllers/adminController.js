@@ -112,3 +112,25 @@ export const setPlanFeatures = catchAsync(async (req, res) => {
   const updatedMatrix = await FeatureConfigService.setPlanFeaturesMatrix(matrix);
   return successResponse(res, HttpStatus.OK, 'Plan feature matrix updated successfully.', { matrix: updatedMatrix });
 });
+
+/**
+ * Controller: Get tri-state platform status matrix (Thin Handler).
+ */
+export const getPlatformStatus = catchAsync(async (req, res) => {
+  const statusMatrix = await FeatureConfigService.getPlatformStatusMatrix();
+  return successResponse(res, HttpStatus.OK, 'Platform status matrix retrieved.', { statusMatrix });
+});
+
+/**
+ * Controller: Super Admin endpoint to update Platform Status Matrix (Thin Handler).
+ */
+export const setPlatformStatus = catchAsync(async (req, res) => {
+  const { statusMatrix } = req.body;
+
+  if (!statusMatrix || typeof statusMatrix !== 'object') {
+    throw ApiError.badRequest('Field "statusMatrix" is required and must be an object.');
+  }
+
+  const updated = await FeatureConfigService.setPlatformStatusMatrix(statusMatrix);
+  return successResponse(res, HttpStatus.OK, 'Platform status matrix updated successfully.', { statusMatrix: updated });
+});

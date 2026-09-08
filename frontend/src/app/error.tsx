@@ -25,12 +25,20 @@ export default function Error({
         <p className="text-sm text-slate-400">
           {error?.message || 'An unexpected error occurred while loading this page.'}
         </p>
-        <button
-          onClick={() => reset()}
-          className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors shadow-lg shadow-indigo-600/20"
-        >
-          Try again
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          <button
+            onClick={() => reset()}
+            className="w-full py-2.5 px-4 bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            Try Again 🔄
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full py-2.5 px-4 bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-primary)] border border-[var(--border-color)] text-xs font-bold rounded-xl transition-all active:scale-95 cursor-pointer"
+          >
+            Reload Page
+          </button>
+        </div>
       </div>
     </div>
   );

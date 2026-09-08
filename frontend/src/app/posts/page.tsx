@@ -386,7 +386,7 @@ export default function PostsPage() {
   }
 
   return (
-    <div className="space-y-8 relative">
+    <div className="space-y-6 sm:space-y-8 pb-12 animate-fadeIn w-full max-w-full 2xl:max-w-[1600px] mx-auto relative">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">

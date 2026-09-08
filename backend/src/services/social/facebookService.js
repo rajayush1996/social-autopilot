@@ -116,36 +116,33 @@ export class FacebookAdapter extends SocialAdapter {
       logger.info(`[FacebookAdapter] Total resolved pages: ${pages.length}`);
 
       // 6. If a Page is found, use primary Page; otherwise fallback to personal profile
-      let targetAccountId = null;
-      let targetAccountName = null;
-      let targetAccessToken = userAccessToken;
+      let targetAccountId = pages.length > 0 ? pages[0].id : null;
+      let targetAccountName = pages.length > 0 ? (pages[0].name || pages[0].id) : null;
+      let targetAccessToken = pages.length > 0 ? (pages[0].access_token || userAccessToken) : userAccessToken;
 
-      if (pages.length > 0) {
-        const primaryPage = pages[0];
-        targetAccountId = primaryPage.id;
-        targetAccountName = primaryPage.name || primaryPage.id;
-        targetAccessToken = primaryPage.access_token || userAccessToken;
-      } else {
-        // Ultimate Fallback: Connect authenticated Facebook Profile directly
-        try {
-          const profileRes = await axios.get(`${config.social.facebook.graphBaseUrl}/me`, {
-            params: {
-              access_token: userAccessToken,
-              fields: 'id,name',
-            },
-          });
-          targetAccountId = profileRes.data?.id || `fb_user_${Date.now()}`;
-          targetAccountName = profileRes.data?.name || 'postPilot';
-        } catch (profileErr) {
-          targetAccountId = `fb_account_${Date.now()}`;
-          targetAccountName = 'postPilot';
-        }
-      }
+      const accountsList = pages.length > 0
+        ? pages.map((p) => ({
+            platformAccountId: p.id,
+            username: p.name || p.id,
+            accountName: `${p.name || p.id} (Page)`,
+            accountType: 'ORGANIZATION',
+            avatarUrl: null,
+            accessToken: p.access_token || userAccessToken,
+          }))
+        : [{
+            platformAccountId: targetAccountId,
+            username: targetAccountName,
+            accountName: targetAccountName,
+            accountType: 'PERSONAL',
+            avatarUrl: null,
+            accessToken: targetAccessToken,
+          }];
 
       return {
         accessToken: targetAccessToken,
         refreshToken: userAccessToken,
         expiresIn: 60 * 24 * 60 * 60, // ~60 days
+        accounts: accountsList,
         platformAccountId: targetAccountId,
         username: targetAccountName,
       };

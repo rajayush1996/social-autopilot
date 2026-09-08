@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -96,9 +97,13 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
   const [trendingTags, setTrendingTags] = useState<any[]>([]);
   const [selectedPostToDiagnose, setSelectedPostToDiagnose] = useState<string>('');
 
-  // WIDGET GRID TOGGLE & CUSTOMIZATION STATE
   const [activeTab, setActiveTab] = useState<'CORE' | 'VIRALITY_LAB' | 'ANALYTICS'>('CORE');
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [portalMounted, setPortalMounted] = useState(false);
+
+  useEffect(() => {
+    setPortalMounted(true);
+  }, []);
   const [visibleWidgets, setVisibleWidgets] = useState({
     sentiment: true,
     platformDonut: true,
@@ -238,10 +243,14 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
   };
 
   // Derived real data
-  const publishedPosts = posts.filter(p => p.status === 'PUBLISHED');
-  const scheduledPosts = posts.filter(p => p.status === 'SCHEDULED');
-  const activeChannels = accounts.filter(a => a.isActive);
-  const hoursSaved = Math.max(Math.round((publishedPosts.length * 45) / 60 * 10) / 10, 1.5);
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const publishedPosts = safePosts.filter(p => p?.status === 'PUBLISHED');
+  const scheduledPosts = safePosts.filter(p => p?.status === 'SCHEDULED');
+  const activeConnectedCount = safeAccounts.filter(a => a?.isActive !== false).length;
+  const allowedPlatforms: string[] = (user as any)?.allowedPlatforms || ['LINKEDIN', 'X', 'INSTAGRAM', 'FACEBOOK'];
+  const allowedCount = allowedPlatforms.length;
+  const hoursSaved = publishedPosts.length > 0 ? Math.round((publishedPosts.length * 45) / 60 * 10) / 10 : 0;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -303,29 +312,38 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
       </div>
 
       {/* CUSTOMIZE WIDGETS MODAL */}
-      {showCustomizeModal && (
-        <div className="fixed inset-0 w-screen h-screen min-h-screen z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn top-0 left-0 right-0 bottom-0">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl max-w-lg w-full p-6 md:p-8 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
+      {showCustomizeModal && portalMounted && createPortal(
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomizeModal(false); }}
+          className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl max-w-lg w-full p-5 sm:p-7 space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col my-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)] shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#2563EB]/10 text-[#2563EB] rounded-xl">
                   <Grid className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-extrabold text-[var(--text-primary)]">Widget Library & Grid Control</h3>
+                  <h3 className="text-base sm:text-lg font-extrabold text-[var(--text-primary)]">Widget Library & Grid Control</h3>
                   <p className="text-xs text-[var(--text-secondary)] font-medium">Toggle graphs and monitoring widgets on your custom view</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCustomizeModal(false)}
-                className="h-8 w-8 rounded-xl bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-primary)] hover:text-rose-500 transition-all flex items-center justify-center cursor-pointer"
+                className="h-8 w-8 rounded-xl bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-primary)] hover:text-rose-500 transition-all flex items-center justify-center cursor-pointer shrink-0"
+                title="Close modal"
               >
                 <CloseIcon className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Scrollable Body */}
+            <div className="space-y-2.5 overflow-y-auto flex-1 pr-1 custom-scrollbar">
               {[
                 { key: 'sentiment', title: 'Sentiment & Mood Bar', desc: 'Classifies DMs & comments into Positive/Neutral/Negative' },
                 { key: 'platformDonut', title: 'Platform Comparison Chart', desc: 'Compares reach & clicks across LinkedIn, IG, and X' },
@@ -339,17 +357,17 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                   <div
                     key={w.key}
                     onClick={() => toggleWidget(k)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
                       isChecked 
                         ? 'bg-[#2563EB]/10 border-[#2563EB]/40 shadow-xs' 
                         : 'bg-[var(--bg-input)]/50 border-[var(--border-color)] opacity-70'
                     }`}
                   >
                     <div>
-                      <h4 className="text-sm font-extrabold text-[var(--text-primary)]">{w.title}</h4>
-                      <p className="text-xs text-[var(--text-secondary)] font-medium mt-0.5">{w.desc}</p>
+                      <h4 className="text-xs sm:text-sm font-extrabold text-[var(--text-primary)]">{w.title}</h4>
+                      <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-0.5">{w.desc}</p>
                     </div>
-                    <span className={`h-6 w-11 rounded-full p-1 transition-colors ${isChecked ? 'bg-[#2563EB]' : 'bg-[var(--border-color)]'}`}>
+                    <span className={`h-6 w-11 rounded-full p-1 transition-colors shrink-0 ml-3 ${isChecked ? 'bg-[#2563EB]' : 'bg-[var(--border-color)]'}`}>
                       <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${isChecked ? 'translate-x-5' : 'translate-x-0'}`} />
                     </span>
                   </div>
@@ -357,7 +375,8 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
               })}
             </div>
 
-            <div className="pt-4 border-t border-[var(--border-color)] text-right">
+            {/* Fixed Footer */}
+            <div className="pt-3 border-t border-[var(--border-color)] text-right shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -365,13 +384,14 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                   setActiveTab('ANALYTICS');
                   toast.success('Widget layout preferences saved!');
                 }}
-                className="btn btn-primary px-6 py-2.5 text-xs font-extrabold"
+                className="btn btn-primary px-6 py-2.5 text-xs font-extrabold cursor-pointer w-full sm:w-auto"
               >
                 Apply Custom Grid Layout
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ==========================================================================
@@ -379,30 +399,6 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
          ========================================================================== */}
       {activeTab === 'CORE' && (
         <div className="space-y-8 animate-fadeIn">
-          {/* QUICK POST CREATOR COMMAND BAR */}
-          <div className="bg-[var(--bg-card)] border-2 border-[#2563EB]/30 rounded-3xl p-6 md:p-8 shadow-lg relative overflow-hidden backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 bg-[#2563EB] text-white rounded-xl shadow-md shadow-blue-500/20">
-                  <Sparkles className="h-5 w-5 animate-pulse" />
-                </span>
-                <div>
-                  <h2 className="text-lg font-extrabold text-[var(--text-primary)]">Quick Post Creator</h2>
-                  <p className="text-xs text-[var(--text-secondary)] font-medium">Write what you want to post, and AI will generate and format it for all your channels</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Command Search Input Bar */}
-            <div className="relative mt-4">
-              <input
-                type="text"
-                value={omniPrompt}
-                onChange={(e) => setOmniPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleRunOmniPrompt()}
-                placeholder="e.g. Announce our new product update and schedule it for tomorrow morning..."
-                disabled={isGenerating}
-                className="w-full h-14 pl-5 pr-44 bg-[var(--bg-card)] border-2 border-[#2563EB]/40 focus:border-[#2563EB] rounded-2xl text-sm md:text-base text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none shadow-md transition-colors"
           {/* OMNI-PROMPT HERO COMMAND CARD */}
           <div className="bg-gradient-to-br from-[#2563EB]/10 via-[var(--bg-card)] to-[#0ea5e9]/10 border-2 border-[#2563EB]/25 rounded-3xl p-6 md:p-8 shadow-md relative overflow-hidden backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[var(--border-color)]">
@@ -520,8 +516,8 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
               </div>
               <p className="text-3xl font-black text-[var(--text-primary)]">{activeConnectedCount} / {allowedCount}</p>
               <span className="text-[11px] text-[#0ea5e9] font-bold mt-1 block truncate">
-                {accounts.length > 0 
-                  ? `🟢 ${accounts.filter(a => a.isActive !== false).map(a => a.accountName || a.username).join(', ')}`
+                {safeAccounts.length > 0 
+                  ? `🟢 ${safeAccounts.filter(a => a?.isActive !== false).map(a => a?.accountName || a?.username).join(', ')}`
                   : `Allowed: ${allowedPlatforms.join(', ')}`}
               </span>
             </div>
@@ -626,7 +622,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
 
                 <div className="p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
                   <span className="text-xs font-bold text-[#2563EB] uppercase">Active Channels Health</span>
-                  <p className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{activeChannels.length} Social Profiles Active</p>
+                  <p className="text-xl font-extrabold text-[var(--text-primary)] mt-1">{activeConnectedCount} Social Profiles Active</p>
                   <span className="text-[11px] text-[var(--text-secondary)]">Token validity verified</span>
                 </div>
 
@@ -694,7 +690,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 />
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 overflow-x-auto max-w-sm">
-                    {posts.slice(0, 3).map((p, idx) => (
+                    {safePosts.slice(0, 3).map((p, idx) => (
                       <button
                         key={p.id}
                         type="button"
@@ -849,7 +845,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
           else if (post.tone === 'PROFESSIONAL' || post.tone === 'CASUAL') neuCount++;
           else posCount++;
         });
-        negCount = posts.filter(p => p.status === 'FAILED').length;
+        negCount = safePosts.filter(p => p?.status === 'FAILED').length;
         const totalSentimentEvals = posCount + neuCount + negCount;
         const posPct = totalSentimentEvals > 0 ? Math.round((posCount / totalSentimentEvals) * 100) : 0;
         const neuPct = totalSentimentEvals > 0 ? Math.round((neuCount / totalSentimentEvals) * 100) : 0;
@@ -1005,7 +1001,7 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                         const count = platformDispatches[plat] || 0;
                         const pct = totalDispatches > 0 ? Math.round((count / totalDispatches) * 100) : 0;
                         const color = platformColors[plat] || '#2563EB';
-                        const isConnected = accounts.some(a => a.platform?.toUpperCase() === plat && a.isActive !== false);
+                        const isConnected = safeAccounts.some(a => a?.platform?.toUpperCase() === plat && a?.isActive !== false);
 
                         return (
                           <div key={plat} className="flex items-center justify-between p-3 bg-[var(--bg-input)]/50 rounded-xl border border-[var(--border-color)]">
@@ -1090,39 +1086,48 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
       })()}
 
       {/* INSTANT APPROVAL MODAL (For Omni-Prompt) */}
-      {showApprovalModal && (
-        <div className="fixed inset-0 w-screen h-screen min-h-screen z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn top-0 left-0 right-0 bottom-0">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl max-w-2xl w-full p-6 md:p-8 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
+      {showApprovalModal && portalMounted && createPortal(
+        <div 
+          onClick={(e) => { if (e.target === e.currentTarget) setShowApprovalModal(false); }}
+          className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl max-w-2xl w-full p-5 sm:p-7 space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col my-auto"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)] shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#2563EB]/10 text-[#2563EB] rounded-xl">
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-extrabold text-[var(--text-primary)]">AI Content Approval Deck</h3>
+                  <h3 className="text-base sm:text-lg font-extrabold text-[var(--text-primary)]">AI Content Approval Deck</h3>
                   <p className="text-xs text-[var(--text-secondary)] font-medium">Review and 1-click approve generated drafts for automatic queuing</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowApprovalModal(false)}
-                className="h-8 w-8 rounded-xl bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-primary)] hover:text-rose-500 transition-all flex items-center justify-center cursor-pointer"
+                className="h-8 w-8 rounded-xl bg-[var(--bg-input)] hover:bg-rose-500/10 border border-[var(--border-color)] hover:border-rose-500/30 text-[var(--text-primary)] hover:text-rose-500 transition-all flex items-center justify-center cursor-pointer shrink-0"
+                title="Close modal"
               >
                 <CloseIcon className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+            {/* Scrollable Body */}
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
               {generatedDrafts.map((draft, idx) => {
                 const isApproved = approvedIndices.includes(idx);
                 return (
                   <div
                     key={idx}
                     onClick={() => handleToggleApproveDraft(idx)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
                       isApproved 
                         ? 'bg-emerald-500/10 border-emerald-500/40 shadow-xs' 
-                        : 'bg-[var(--bg-input)] border-[var(--border-color)] hover:border-[#2563EB]/40'
+                        : 'bg-[var(--bg-input)]/60 border-[var(--border-color)] hover:border-[#2563EB]/40'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -1135,17 +1140,18 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                         {isApproved ? '🟢 Approved' : '🟡 Click to Approve'}
                       </span>
                     </div>
-                    <p className="text-sm text-[var(--text-primary)] font-medium leading-relaxed">{draft}</p>
+                    <p className="text-xs sm:text-sm text-[var(--text-primary)] font-medium leading-relaxed">{draft}</p>
                   </div>
                 );
               })}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+            {/* Fixed Footer */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[var(--border-color)] shrink-0">
               <button
                 type="button"
                 onClick={() => setShowApprovalModal(false)}
-                className="btn btn-secondary px-5 py-2.5 text-xs font-bold"
+                className="btn btn-secondary px-5 py-2.5 text-xs font-bold cursor-pointer"
               >
                 Discard
               </button>
@@ -1153,14 +1159,15 @@ export default function DashboardWidgets({ user, posts, accounts, onRefreshData 
                 type="button"
                 onClick={handleApproveAllAndSchedule}
                 disabled={isSchedulingDrafts}
-                className="btn btn-primary px-6 py-2.5 text-xs font-extrabold flex items-center gap-2 disabled:opacity-50"
+                className="btn btn-primary px-6 py-2.5 text-xs font-extrabold flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {isSchedulingDrafts ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 <span>{isSchedulingDrafts ? 'Queuing Posts...' : 'Approve & Schedule in Database'}</span>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

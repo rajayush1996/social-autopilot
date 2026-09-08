@@ -186,6 +186,7 @@ model AutomationSchedule {
   updatedAt       DateTime         @updatedAt
 
   @@index([userId, isActive])
+  @@index([isActive])
   @@map("automation_schedules")
 }
 
