@@ -43,7 +43,7 @@ const DEFAULT_SETTINGS: EngagementSettings = {
     autoLike: true,
     autoComment: true,
     commentDelaySeconds: 4,
-    firstCommentTemplate: '🔗 Try Social Autopilot today: https://socialautopilot.app \n\n#DevTools #AI #Automation',
+    firstCommentTemplate: '🔗 Try OmniSync today: https://omnisyncapp.com \n\n#DevTools #AI #Automation',
     commentStrategy: 'AI_SMART',
   },
   X: {
@@ -351,7 +351,7 @@ export default function EngagementStudioPage() {
                       rows={3}
                       value={currentRule.firstCommentTemplate}
                       onChange={(e) => updateCurrentRule('firstCommentTemplate', e.target.value)}
-                      placeholder="Enter your custom comment (e.g. 🔗 Check out our platform: https://socialautopilot.app ✨ #AI #Tools)"
+                      placeholder="Enter your custom comment (e.g. 🔗 Check out our platform: https://omnisyncapp.com ✨ #AI #Tools)"
                       className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-[var(--text-secondary)] rounded-2xl p-4 text-xs leading-relaxed focus:outline-none focus:border-[#2563EB] transition-all font-sans"
                     />
                   </div>
@@ -474,7 +474,7 @@ export default function EngagementStudioPage() {
                   <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">Completed</span>
                 </div>
                 <p className="text-[11px] text-[var(--text-secondary)] truncate font-mono">
-                  "✨ Try Social Autopilot today: https://socialautopilot.app"
+                  "✨ Try OmniSync today: https://omnisyncapp.com"
                 </p>
                 <span className="text-[10px] text-[var(--text-secondary)] block pt-0.5">Triggered 4s post-publication</span>
               </div>

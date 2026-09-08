@@ -21,7 +21,7 @@ const MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2 MB
 const MAX_EXTRACTED_CHARS = 8000;
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const CACHE_MAX_ENTRIES = 50;
-const USER_AGENT = 'SocialAutopilotBot/1.0 (+article-repurposing)';
+const USER_AGENT = 'OmniSyncBot/2.0 (+article-repurposing; https://omnisyncapp.com)';
 
 const BLOCKED_IPV4_CIDRS = Object.freeze([
   '0.0.0.0/8', // "this network"
