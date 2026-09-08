@@ -255,29 +255,13 @@ class EmailService {
 
     const fromAddress = process.env.SMTP_FROM || process.env.FROM_EMAIL || 'info@omnisyncapp.com';
 
-    const mailOptions = {
-      from: `"OmniSync Autopilot" <${fromAddress}>`,
+    return this.sendEmail({
       to: userEmail,
       subject: `[Action Required] Review & Approve: Post for ${targetPlatforms.join(', ') || 'Social Media'}`,
       html: htmlContent,
       text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${postContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
-    };
-
-    if (!this.transporter) this.initTransporter();
-
-    if (this.transporter) {
-      try {
-        const info = await this.transporter.sendMail(mailOptions);
-        logger.info(`[EmailService] ✉️ Approval email sent to ${userEmail} (Message ID: ${info.messageId})`);
-        return { success: true, messageId: info.messageId };
-      } catch (err) {
-        logger.error(`[EmailService] ❌ Failed to send email: ${err.message}`);
-        return { success: false, error: err.message };
-      }
-    } else {
-      logger.info(`[EmailService Console Fallback] ✉️ EMAIL APPROVAL REQUEST FOR: ${userEmail}\nApprove Link: ${approveLink}\nContent:\n${postContent}`);
-      return { success: true, isConsoleFallback: true, approveLink };
-    }
+      from: fromAddress,
+    });
   }
 }
 
