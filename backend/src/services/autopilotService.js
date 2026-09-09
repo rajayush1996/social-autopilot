@@ -126,7 +126,7 @@ export class AutopilotService {
         const calculatedScheduledAt = computeTargetScheduledDate(targetTimeOfDay, targetTz);
 
         // 6. Create database post record
-        const post = await PostService.createPost({
+        const postResult = await PostService.createPost({
           userId: user.id,
           content: aiResult.content,
           mediaUrls: [],
@@ -137,9 +137,12 @@ export class AutopilotService {
           aiGenerated: true,
           aiPrompt: `Autopilot daily run context: ${context}`,
         });
+        const post = postResult.post || postResult;
 
         // 6. Enqueue inside BullMQ
-        await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });
+        if (post?.id && post?.scheduledAt) {
+          await enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt });
+        }
 
         // 7. Send Email Approval Notification strictly for Autopilot runs
         if (user.email) {
@@ -150,12 +153,13 @@ export class AutopilotService {
               { expiresIn: '7d' }
             );
             await emailService.sendPostApprovalEmail({
+              userId: user.id,
               userEmail: user.email,
               userName: user.name,
               postId: post.id,
-              postContent: post.content,
-              targetPlatforms: post.targetPlatforms,
-              scheduledAt: post.scheduledAt,
+              postContent: post.content || aiResult.content,
+              targetPlatforms: post.targetPlatforms || targetPlatforms,
+              scheduledAt: post.scheduledAt || calculatedScheduledAt,
               approvalToken,
             });
           } catch (emailErr) {

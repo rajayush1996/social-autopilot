@@ -156,8 +156,37 @@ class EmailService {
     const baseUrl = apiBaseUrl || process.env.API_BASE_URL || 'http://localhost:5000';
     const appUrl = frontendUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
 
-    const approveLink = `${baseUrl}/api/posts/approve-email?token=${approvalToken}`;
-    const editLink = `${appUrl}/composer?postId=${postId}`;
+    const approveLink = approvalToken ? `${baseUrl}/api/posts/approve-email?token=${approvalToken}` : `${appUrl}/composer`;
+    const editLink = postId ? `${appUrl}/composer?postId=${postId}` : `${appUrl}/composer`;
+
+    // Bulletproof defensive resolution of post content
+    let displayContent = (typeof postContent === 'string' && postContent.trim() !== '' && postContent.trim() !== 'undefined')
+      ? postContent.trim()
+      : null;
+
+    if (!displayContent && typeof postContent === 'object' && postContent?.content) {
+      displayContent = String(postContent.content).trim();
+    }
+
+    // Fail-safe 1: If content is missing, query database directly via postId
+    if (!displayContent && postId) {
+      try {
+        const dbPost = await prisma.post.findUnique({ where: { id: postId }, select: { content: true } });
+        if (dbPost?.content && dbPost.content.trim() !== '' && dbPost.content.trim() !== 'undefined') {
+          displayContent = dbPost.content.trim();
+        }
+      } catch (dbErr) {
+        logger.warn(`[EmailService] Fail-safe post query warning: ${dbErr.message}`);
+      }
+    }
+
+    // Fail-safe 2: Clean professional fallback if all else fails
+    if (!displayContent || displayContent === 'undefined') {
+      displayContent = 'Your scheduled AI AutoPilot post has been generated and is ready for review.';
+    }
+
+    let finalMediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
+    let finalPlatforms = Array.isArray(targetPlatforms) && targetPlatforms.length > 0 ? targetPlatforms : ['LINKEDIN'];
 
     const formattedDate = scheduledAt ? new Date(scheduledAt).toLocaleString('en-US', {
       weekday: 'long',
@@ -177,7 +206,7 @@ class EmailService {
       INSTAGRAM: { bg: '#e1306c', text: '#ffffff', label: 'Instagram' },
     };
 
-    const platformsHtml = (targetPlatforms && targetPlatforms.length > 0 ? targetPlatforms : ['LINKEDIN'])
+    const platformsHtml = finalPlatforms
       .map((p) => {
         const plat = platformColors[p] || { bg: '#2563eb', text: '#ffffff', label: p };
         return `<span style="display:inline-block; background-color:${plat.bg}; color:${plat.text}; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-right:6px; margin-bottom:6px;">${plat.label}</span>`;
@@ -185,9 +214,9 @@ class EmailService {
       .join('');
 
     // Optional Attached Media Preview
-    const mediaHtml = (mediaUrls && mediaUrls.length > 0 && mediaUrls[0]) ? `
+    const mediaHtml = (finalMediaUrls.length > 0 && finalMediaUrls[0]) ? `
       <div style="margin-top:16px; margin-bottom:16px; text-align:center;">
-        <img src="${mediaUrls[0]}" alt="Attached Post Visual" style="max-width:100%; max-height:360px; border-radius:10px; border:1px solid #e2e8f0; object-fit:cover; display:block; margin:0 auto;" />
+        <img src="${finalMediaUrls[0]}" alt="Attached Post Visual" style="max-width:100%; max-height:360px; border-radius:10px; border:1px solid #e2e8f0; object-fit:cover; display:block; margin:0 auto;" />
       </div>
     ` : '';
 
@@ -243,7 +272,7 @@ class EmailService {
 
                   <!-- Post Preview Card (Clean Light High-Contrast) -->
                   <div style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:22px; margin-bottom:20px;">
-                    <div style="font-size:14px; line-height:1.65; color:#1e293b; white-space:pre-wrap; word-break:break-word; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${postContent}</div>
+                    <div style="font-size:14px; line-height:1.65; color:#1e293b; white-space:pre-wrap; word-break:break-word; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${displayContent}</div>
                     ${mediaHtml}
                   </div>
 
@@ -311,7 +340,7 @@ class EmailService {
       to: userEmail,
       subject: `[Action Required] Review & Approve: Post for ${targetPlatforms.join(', ') || 'Social Media'}`,
       html: htmlContent,
-      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${postContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
+      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${displayContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
       from: fromAddress,
       userId,
       metadata: { postId, type: 'POST_APPROVAL', targetPlatforms },

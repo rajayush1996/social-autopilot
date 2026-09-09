@@ -397,7 +397,7 @@ export class ScheduleService {
       logger.info(`[ScheduleService] Cleanly updated existing pending queued post (${post.id}) with new AI draft & media!`);
     } else {
       // Create post record scheduled for target time with media
-      post = await PostService.createPost({
+      const postResult = await PostService.createPost({
         userId: user.id,
         content: aiResult.content,
         mediaUrls: postMediaUrls,
@@ -409,12 +409,15 @@ export class ScheduleService {
         aiGenerated: true,
         aiPrompt: `Scheduled Dispatcher: ${schedule.name} - ${context}`,
       });
+      post = postResult.post || postResult;
     }
 
     // Queue in BullMQ until exact target scheduledAt time (non-blocking)
-    enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt }).catch(err => {
-      logger.warn(`[ScheduleService] BullMQ enqueue warning: ${err.message}`);
-    });
+    if (post?.id && post?.scheduledAt) {
+      enqueuePostJob({ postId: post.id, scheduledAt: post.scheduledAt }).catch(err => {
+        logger.warn(`[ScheduleService] BullMQ enqueue warning: ${err.message}`);
+      });
+    }
 
     // Send Email Approval Notification to User in background (non-blocking)
     if (user.email) {
@@ -429,10 +432,10 @@ export class ScheduleService {
           userEmail: user.email,
           userName: user.name,
           postId: post.id,
-          postContent: post.content,
-          mediaUrls: post.mediaUrls || [],
-          targetPlatforms: post.targetPlatforms,
-          scheduledAt: post.scheduledAt,
+          postContent: post.content || aiResult.content,
+          mediaUrls: post.mediaUrls || postMediaUrls || [],
+          targetPlatforms: post.targetPlatforms || schedule.targetPlatforms,
+          scheduledAt: post.scheduledAt || targetScheduledAt,
           approvalToken,
         }).catch(emailErr => {
           logger.warn(`[ScheduleService] Email notification background warning: ${emailErr.message}`);
