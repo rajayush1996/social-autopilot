@@ -88,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Automated Jugaad: Silent Background Heartbeat to keep Render awake & auto-sync queue
   useEffect(() => {
-    if (!mounted || !hasToken) return;
+    if (!mounted || !hasToken || isPublic) return;
 
     // Immediate ping on mount to wake up backend and sweep due posts
     ApiService.triggerSchedulerSync().catch(() => {});

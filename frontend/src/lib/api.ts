@@ -2,10 +2,13 @@ import axios from 'axios';
 import type { PlatformId } from '@/config/platforms';
 import { toast } from '@/components/Toast';
 
-// Dynamic API URL: In browser, default to window.location.origin (eliminates CORS & DNS errors)
+// Dynamic API URL: In localhost development, route to backend port 5000; in production use origin
 const getApiUrl = (): string => {
   if (typeof window !== 'undefined') {
-    return window.location.origin || '';
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    }
+    return process.env.NEXT_PUBLIC_API_URL || window.location.origin || '';
   }
   if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '') {
     const raw = process.env.NEXT_PUBLIC_API_URL.replace(/['",]/g, '').trim();
@@ -56,8 +59,8 @@ const processQueue = (error: any, token: string | null = null) => {
 
 export const isPublicPath = (pathname?: string | null): boolean => {
   if (!pathname) return true;
-  const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
-  const publicRoutes = ['/', '/login', '/signup', '/privacy', '/terms', '/docs'];
+  const clean = (pathname.split('?')[0].replace(/\/+$/, '') || '/').toLowerCase();
+  const publicRoutes = ['/', '/login', '/signup', '/privacy', '/terms', '/data-deletion', '/docs'];
   return publicRoutes.includes(clean);
 };
 

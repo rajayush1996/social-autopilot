@@ -2,10 +2,13 @@
  * Centralized configuration variables for the frontend.
  * Zero hardcoded configurations inside components.
  */
-// Dynamic API URL: In browser, default to window.location.origin
+// Dynamic API URL: In localhost development, route to backend port 5000; in production use origin
 const getApiUrl = (): string => {
   if (typeof window !== 'undefined') {
-    return window.location.origin || '';
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    }
+    return process.env.NEXT_PUBLIC_API_URL || window.location.origin || '';
   }
   if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '') {
     const raw = process.env.NEXT_PUBLIC_API_URL.replace(/['",]/g, '').trim();
