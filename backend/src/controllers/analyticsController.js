@@ -15,7 +15,8 @@ export async function diagnosePost(req, res, next) {
 export async function getAudiencePeakTimes(req, res, next) {
   try {
     const userId = req.user?.id;
-    const result = await AnalyticsService.getAudiencePeakTimes(userId);
+    const platform = req.query.platform ? String(req.query.platform).toUpperCase() : undefined;
+    const result = await AnalyticsService.getAudiencePeakTimes(userId, platform);
     return res.status(200).json(result);
   } catch (error) {
     logger.error(`[AnalyticsController] getAudiencePeakTimes Error: ${error.message}`);

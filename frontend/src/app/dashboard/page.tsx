@@ -6,6 +6,7 @@ import { RefreshCw, Sparkles, Plus, Calendar, Layers, ShieldCheck } from 'lucide
 import ApiService from '@/services/apiService';
 import { Post, SocialAccount, User } from '@/lib/api';
 import DashboardWidgets from '@/components/DashboardWidgets';
+import DashboardCopilot from '@/components/DashboardCopilot';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -129,6 +130,13 @@ export default function DashboardPage() {
         posts={posts} 
         accounts={accounts} 
         onRefreshData={fetchDashboardData} 
+      />
+
+      {/* Sticky AI Copilot: Exclusively on Dashboard */}
+      <DashboardCopilot
+        user={user}
+        posts={posts}
+        accounts={accounts}
       />
     </div>
   );

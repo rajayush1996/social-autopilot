@@ -23,26 +23,14 @@ export class DashboardController {
 
   /**
    * 🕒 GET /api/dashboard/heatmap
-   * Returns audience activity heatmap (7 days x 7 time slots).
+   * Returns audience activity heatmap (7 days x 7 time slots) calculated from real DB posts or platform benchmarks.
    */
   static async getHeatmap(req, res, next) {
     try {
-      const heatmapData = [
-        { day: 'Mon', slots: [1, 3, 2, 1, 3, 2, 1] },
-        { day: 'Tue', slots: [2, 3, 3, 1, 2, 3, 1] },
-        { day: 'Wed', slots: [1, 2, 3, 2, 3, 2, 1] },
-        { day: 'Thu', slots: [2, 3, 2, 1, 3, 3, 2] },
-        { day: 'Fri', slots: [3, 3, 2, 2, 2, 1, 1] },
-        { day: 'Sat', slots: [1, 2, 1, 3, 2, 2, 2] },
-        { day: 'Sun', slots: [1, 1, 2, 3, 3, 2, 1] },
-      ];
-
-      return res.status(200).json({
-        success: true,
-        hours: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'],
-        peakWindows: ['10:00 AM', '5:45 PM'],
-        heatmap: heatmapData,
-      });
+      const userId = req.user?.id;
+      const platform = req.query?.platform ? String(req.query.platform).toUpperCase() : undefined;
+      const result = await AnalyticsService.getAudienceHeatmap(userId, platform);
+      return res.status(200).json(result);
     } catch (error) {
       logger.error(`[DashboardController] getHeatmap error: ${error.message}`);
       return next(error);
@@ -55,14 +43,71 @@ export class DashboardController {
    */
   static async getFormatPerformance(req, res, next) {
     try {
+      const userId = req.user?.id;
+      let reelsCount = 0;
+      let carouselCount = 0;
+      let singleImageCount = 0;
+      let textCount = 0;
+
+      if (userId) {
+        const posts = await prisma.post.findMany({
+          where: { userId },
+          select: { mediaUrls: true, mediaType: true },
+          take: 100,
+        });
+
+        posts.forEach(p => {
+          const mediaCount = Array.isArray(p.mediaUrls) ? p.mediaUrls.length : 0;
+          if (p.mediaType === 'video') reelsCount++;
+          else if (mediaCount > 1) carouselCount++;
+          else if (mediaCount === 1) singleImageCount++;
+          else textCount++;
+        });
+      }
+
+      const totalPosts = reelsCount + carouselCount + singleImageCount + textCount;
+      const hasRealPosts = totalPosts > 0;
+
+      const formats = [
+        {
+          type: 'REELS',
+          label: '🎥 Video Reels',
+          avgEngagement: '7.4%',
+          reachShare: hasRealPosts ? Math.round((reelsCount / totalPosts) * 100) : 45,
+          count: reelsCount,
+          multiplier: '3.2x Saves'
+        },
+        {
+          type: 'CAROUSEL',
+          label: '📸 Photo Carousels',
+          avgEngagement: '5.8%',
+          reachShare: hasRealPosts ? Math.round((carouselCount / totalPosts) * 100) : 35,
+          count: carouselCount,
+          multiplier: '2.4x Clicks'
+        },
+        {
+          type: 'SINGLE_IMAGE',
+          label: '🖼️ Single Images',
+          avgEngagement: '3.2%',
+          reachShare: hasRealPosts ? Math.round((singleImageCount / totalPosts) * 100) : 15,
+          count: singleImageCount,
+          multiplier: '1.2x Reach'
+        },
+        {
+          type: 'TEXT',
+          label: '✍️ Text Threads',
+          avgEngagement: '2.9%',
+          reachShare: hasRealPosts ? Math.round((textCount / totalPosts) * 100) : 5,
+          count: textCount,
+          multiplier: '1.8x Comments'
+        },
+      ];
+
       return res.status(200).json({
         success: true,
-        formats: [
-          { type: 'REELS', label: '🎥 Video Reels', avgEngagement: '7.4%', reachShare: 45, multiplier: '3.2x Saves' },
-          { type: 'CAROUSEL', label: '📸 Photo Carousels', avgEngagement: '5.8%', reachShare: 35, multiplier: '2.4x Clicks' },
-          { type: 'SINGLE_IMAGE', label: '🖼️ Single Images', avgEngagement: '3.2%', reachShare: 15, multiplier: '1.2x Reach' },
-          { type: 'TEXT', label: '✍️ Text Threads', avgEngagement: '2.9%', reachShare: 5, multiplier: '1.8x Comments' },
-        ],
+        isRealData: hasRealPosts,
+        totalAnalyzed: totalPosts,
+        formats,
       });
     } catch (error) {
       logger.error(`[DashboardController] getFormatPerformance error: ${error.message}`);
