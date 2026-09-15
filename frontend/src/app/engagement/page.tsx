@@ -102,22 +102,15 @@ export default function EngagementStudioPage() {
           setConnectedAccounts(activeAccs);
         }
 
-        const role = (meRes?.role || 'USER').toUpperCase();
-        const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
-
-        if (isSuperAdmin) {
-          // SuperAdmin sees all platforms
-          setVisiblePlatforms(['LINKEDIN', 'X', 'INSTAGRAM', 'FACEBOOK']);
-        } else if (meRes && Array.isArray(meRes.allowedPlatforms)) {
-          // Regular User sees platforms enabled by SuperAdmin in DB Feature Matrix
+        if (meRes && Array.isArray(meRes.allowedPlatforms)) {
           const allowed = meRes.allowedPlatforms.map((p: string) => p.toUpperCase() as AllowedPlatform);
-          setVisiblePlatforms(allowed.length > 0 ? allowed : ['LINKEDIN']);
+          setVisiblePlatforms(allowed);
         } else {
-          setVisiblePlatforms(['LINKEDIN']);
+          setVisiblePlatforms([]);
         }
       } catch (err) {
         console.warn('Failed to load accounts/permissions in Engagement Studio:', err);
-        setVisiblePlatforms(['LINKEDIN']);
+        setVisiblePlatforms([]);
       } finally {
         setLoading(false);
       }

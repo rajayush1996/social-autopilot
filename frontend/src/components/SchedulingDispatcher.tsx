@@ -488,7 +488,7 @@ export function SchedulingDispatcher() {
       .catch(() => {});
   }, []);
 
-  const displayPlatforms = (allowedPlatforms.length > 0 ? allowedPlatforms : [...DEFAULT_ALLOWED_PLATFORMS]).map((platformKey) => ({
+  const displayPlatforms = allowedPlatforms.map((platformKey) => ({
     id: platformKey as any,
     label: PLATFORM_REGISTRY[platformKey as PlatformKey]?.name || platformKey,
   }));

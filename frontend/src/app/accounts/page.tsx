@@ -464,7 +464,33 @@ export default function SocialAccountsPage() {
                 ) : (
                   plt.id === 'LINKEDIN' ? (
                     (() => {
+                      const isLinkedInComingSoon = (platformStatus['LINKEDIN'] || 'COMING_SOON') !== 'ENABLED';
                       const isOrgComingSoon = (platformStatus['LINKEDIN_COMMUNITY'] || 'COMING_SOON') !== 'ENABLED';
+                      const isLinkedInPlanAllowed = allowedPlatforms.includes('LINKEDIN');
+
+                      if (isLinkedInComingSoon) {
+                        return (
+                          <button
+                            type="button"
+                            disabled={true}
+                            className="w-full h-11 px-4 bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)] rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+                          >
+                            <Sparkles className="h-4 w-4 text-amber-500" />
+                            <span>LinkedIn (Coming Soon)</span>
+                          </button>
+                        );
+                      }
+
+                      if (!isLinkedInPlanAllowed) {
+                        return (
+                          <a
+                            href="/profile"
+                            className="w-full h-11 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/25 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          >
+                            <span>Upgrade Plan to Connect</span>
+                          </a>
+                        );
+                      }
 
                       return (
                         <div className="space-y-2.5">
@@ -511,24 +537,42 @@ export default function SocialAccountsPage() {
                       );
                     })()
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleConnect(plt.id)}
-                      disabled={Boolean(actionLoading)}
-                      className="w-full h-11 px-4 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50"
-                    >
-                      {actionLoading === `${plt.id}_PERSONAL` || actionLoading === plt.id ? (
-                        <>
-                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Connecting...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ExternalLink className="h-4 w-4" />
-                          <span>Connect {plt.name}</span>
-                        </>
-                      )}
-                    </button>
+                    isPlatformComingSoon ? (
+                      <button
+                        type="button"
+                        disabled={true}
+                        className="w-full h-11 px-4 bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)] rounded-xl text-xs font-semibold flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+                      >
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                        <span>{plt.name} (Coming Soon)</span>
+                      </button>
+                    ) : !allowedPlatforms.includes(plt.id) ? (
+                      <a
+                        href="/profile"
+                        className="w-full h-11 px-4 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/25 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <span>Upgrade Plan to Connect</span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleConnect(plt.id)}
+                        disabled={Boolean(actionLoading)}
+                        className="w-full h-11 px-4 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50"
+                      >
+                        {actionLoading === `${plt.id}_PERSONAL` || actionLoading === plt.id ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Connecting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="h-4 w-4" />
+                            <span>Connect {plt.name}</span>
+                          </>
+                        )}
+                      </button>
+                    )
                   )
                 )}
               </div>

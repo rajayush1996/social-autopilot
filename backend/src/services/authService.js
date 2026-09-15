@@ -12,6 +12,7 @@ import SocialAdapterFactory from './social/socialAdapterFactory.js';
 import { emitAccountStatusChange } from './socketService.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 import emailService from './emailService.js';
+import FeatureConfigService from './featureConfigService.js';
 import { ACTIVE_LIVE_PLATFORMS, SUPER_ADMIN_PLATFORMS } from '../config/constants.js';
 
 const JWT_SECRET = config.jwt.secret;
@@ -37,6 +38,38 @@ export class AuthService {
     if (!userId || userId === 'default-user-id') {
       const latestUser = await UserService.getLatestUser();
       userId = latestUser ? latestUser.id : 'default-user-id';
+    }
+
+    // Validate platform availability against live platform status matrix
+    const targetPlatform = platform.toUpperCase();
+    let statusMatrix = {};
+    try {
+      statusMatrix = await FeatureConfigService.getPlatformStatusMatrix();
+    } catch (e) {}
+
+    const platformStatus = statusMatrix[targetPlatform];
+    const requestingUser = userId ? await UserService.findUserById(userId) : null;
+    const isSuperAdmin = requestingUser?.role?.toUpperCase() === 'SUPER_ADMIN';
+
+    if (platformStatus === 'DISABLED') {
+      throw ApiError.badRequest(`Platform ${targetPlatform} has been disabled by the administrator.`);
+    }
+
+    if (platformStatus === 'COMING_SOON' && !isSuperAdmin) {
+      throw ApiError.badRequest(`Platform ${targetPlatform} is marked as Coming Soon and is not yet open for connection.`);
+    }
+
+    if (!isSuperAdmin && requestingUser) {
+      try {
+        const planMatrix = await FeatureConfigService.getPlanFeaturesMatrix();
+        const userPlan = (requestingUser.plan || 'FREE').toUpperCase();
+        const planAllowed = planMatrix[userPlan]?.allowedPlatforms || ['LINKEDIN'];
+        if (!planAllowed.includes(targetPlatform)) {
+          throw ApiError.forbidden(`Platform ${targetPlatform} is disabled for your ${userPlan} subscription plan.`);
+        }
+      } catch (err) {
+        if (err instanceof ApiError) throw err;
+      }
     }
 
     let url = '';
@@ -792,6 +825,14 @@ export class AuthService {
     const isSuperAdmin = user.role?.toUpperCase() === 'SUPER_ADMIN';
     let allowedPlatforms = isSuperAdmin ? [...SUPER_ADMIN_PLATFORMS] : [...ACTIVE_LIVE_PLATFORMS];
 
+    // Live Tri-State Platform Status Matrix (ENABLED / COMING_SOON / DISABLED)
+    let platformStatusMatrix = {};
+    try {
+      platformStatusMatrix = await FeatureConfigService.getPlatformStatusMatrix();
+    } catch (e) {
+      logger.warn(`[AuthService.getMe] Failed to query platform status matrix: ${e.message}`);
+    }
+
     if (!isSuperAdmin) {
       try {
         const setting = await prisma.systemSetting.findUnique({
@@ -813,6 +854,18 @@ export class AuthService {
       } catch (e) {
         allowedPlatforms = [...ACTIVE_LIVE_PLATFORMS];
       }
+
+      // Regular users: Only allow platforms explicitly ENABLED in the status matrix
+      allowedPlatforms = allowedPlatforms.filter((plat) => {
+        const status = platformStatusMatrix[plat.toUpperCase()];
+        return status === 'ENABLED';
+      });
+    } else {
+      // Super Admin: Has access to all platforms EXCEPT those explicitly marked DISABLED
+      allowedPlatforms = allowedPlatforms.filter((plat) => {
+        const status = platformStatusMatrix[plat.toUpperCase()];
+        return status !== 'DISABLED';
+      });
     }
 
     return {

@@ -424,7 +424,7 @@ export default function ComposerPage() {
         ApiService.getMe(),
       ]);
 
-      const userAllowed = (Array.isArray(user?.allowedPlatforms) && user.allowedPlatforms.length > 0)
+      const userAllowed = Array.isArray(user?.allowedPlatforms)
         ? user.allowedPlatforms.map((platform: string) => platform.toUpperCase() as PlatformKey)
         : [...DEFAULT_ALLOWED_PLATFORMS];
       setAllowedPlatforms(userAllowed);

@@ -13,6 +13,7 @@ import { updateUserMemory } from '../services/ai/memoryService.js';
 import CacheService from '../services/cacheService.js';
 import { CACHE_KEYS } from '../config/cacheKeys.js';
 import { generateSmartFirstComment } from '../services/aiService.js';
+import FeatureConfigService from '../services/featureConfigService.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -111,6 +112,25 @@ export async function processPostPublishing(postId) {
   try {
     for (const account of accountsToPublish) {
       const platform = account.platform;
+
+      // Check if platform has been globally disabled by Super Admin
+      let platformStatusMatrix = {};
+      try {
+        platformStatusMatrix = await FeatureConfigService.getPlatformStatusMatrix();
+      } catch (e) {}
+
+      if (platformStatusMatrix[platform] === 'DISABLED') {
+        logger.warn(`[BullMQ Worker] Skipping ${platform}: platform is DISABLED by administrator.`);
+        executionLogs.push({
+          platform,
+          accountType: account.accountType || 'PERSONAL',
+          username: account.username,
+          status: 'SKIPPED',
+          reason: `Platform ${platform} has been disabled by the administrator.`,
+          timestamp: new Date().toISOString(),
+        });
+        continue;
+      }
 
       try {
         // Resolve platform-specific caption if post.content is a platform draft JSON map

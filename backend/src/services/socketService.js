@@ -260,6 +260,16 @@ export class SocketServerManager {
       this.io.emit(SOCKET_EVENTS.SYSTEM_NOTIFICATION, payload);
     }
   }
+
+  /**
+   * Gracefully close Socket.io server instance (useful for test tear-downs).
+   */
+  close() {
+    if (this.io) {
+      this.io.close();
+      this.io = null;
+    }
+  }
 }
 
 // Singleton Instance

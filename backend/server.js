@@ -12,6 +12,7 @@ import adminRoutes from './src/routes/adminRoutes.js';
 import scheduleRoutes from './src/routes/scheduleRoutes.js';
 import { initPostWorker } from './src/workers/postWorker.js';
 import { startCronSchedulerLoop, syncScheduledPostsToQueue } from './src/jobs/postScheduler.js';
+import { seedSuperAdmin } from './src/config/seedAdmin.js';
 import logger from './src/utils/logger.js';
 
 import helmet from 'helmet';
@@ -160,8 +161,9 @@ initSocket(server);
 server.listen(PORT, async () => {
   logger.info(`🚀 Social Autopilot Server & Socket.io listening on http://localhost:${PORT}`);
   
-  // Database and Redis connection checks
+  // Database and Redis connection checks & Super Admin auto-seed
   await checkDatabaseConnection();
+  await seedSuperAdmin();
   if (process.env.QUEUE_DRIVER === 'redis' || (!process.env.QUEUE_DRIVER && process.env.REDIS_URL)) {
     await checkRedisConnection();
   }

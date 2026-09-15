@@ -28,6 +28,7 @@ test('SocketServerManager - Client connection & account_status_changed event emi
 
       clientSocket.close();
       server.close();
+      socketManager.close();
       done();
     });
   });
@@ -55,6 +56,7 @@ test('SocketServerManager - check_platform_connection roundtrip verification', (
 
       clientSocket.close();
       server.close();
+      socketManager.close();
       done();
     });
   });

@@ -28,15 +28,26 @@ import { ACTIVE_LIVE_PLATFORMS, SUPER_ADMIN_PLATFORMS } from '../config/constant
  * Helper: Retrieve allowed platforms for a user based on role and plan matrix.
  */
 async function getUserAllowedPlatforms(user) {
-  if (user.role?.toUpperCase() === 'SUPER_ADMIN') {
-    return [...SUPER_ADMIN_PLATFORMS];
-  }
+  const isSuperAdmin = user.role?.toUpperCase() === 'SUPER_ADMIN';
+  let allowed = isSuperAdmin ? [...SUPER_ADMIN_PLATFORMS] : [...ACTIVE_LIVE_PLATFORMS];
+
+  let platformStatusMatrix = {};
   try {
-    const matrix = await FeatureConfigService.getPlanFeaturesMatrix();
-    const userPlan = (user.plan || 'FREE').toUpperCase();
-    return matrix[userPlan]?.allowedPlatforms || [...ACTIVE_LIVE_PLATFORMS];
-  } catch (e) {
-    return [...ACTIVE_LIVE_PLATFORMS];
+    platformStatusMatrix = await FeatureConfigService.getPlatformStatusMatrix();
+  } catch (e) {}
+
+  if (!isSuperAdmin) {
+    try {
+      const matrix = await FeatureConfigService.getPlanFeaturesMatrix();
+      const userPlan = (user.plan || 'FREE').toUpperCase();
+      allowed = matrix[userPlan]?.allowedPlatforms || [...ACTIVE_LIVE_PLATFORMS];
+    } catch (e) {
+      allowed = [...ACTIVE_LIVE_PLATFORMS];
+    }
+
+    return allowed.filter((plat) => platformStatusMatrix[plat.toUpperCase()] === 'ENABLED');
+  } else {
+    return allowed.filter((plat) => platformStatusMatrix[plat.toUpperCase()] !== 'DISABLED');
   }
 }
 
