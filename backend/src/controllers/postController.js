@@ -44,11 +44,9 @@ async function getUserAllowedPlatforms(user) {
     } catch (e) {
       allowed = [...ACTIVE_LIVE_PLATFORMS];
     }
-
-    return allowed.filter((plat) => platformStatusMatrix[plat.toUpperCase()] === 'ENABLED');
-  } else {
-    return allowed.filter((plat) => platformStatusMatrix[plat.toUpperCase()] !== 'DISABLED');
   }
+
+  return allowed.filter((plat) => platformStatusMatrix[plat.toUpperCase()] === 'ENABLED');
 }
 
 /**
@@ -126,6 +124,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
       contentLength,
       articleUrl,
       articleContext,
+      userId,
     });
   } else {
     aiResult = await generatePostContent({
@@ -140,6 +139,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
       contentLength,
       articleUrl,
       articleContext,
+      userId,
     });
   }
 
@@ -195,6 +195,7 @@ export const createPost = catchAsync(async (req, res) => {
     aiGenerated = false,
     aiPrompt,
     firstComment,
+    autoLike,
   } = req.body;
   const userId = req.user.id;
 
@@ -239,9 +240,14 @@ export const createPost = catchAsync(async (req, res) => {
     initialStatus = POST_STATUS.SCHEDULED;
   }
 
-  const finalAiPrompt = firstComment?.trim()
-    ? `${aiPrompt || ''} FirstComment:${firstComment.trim()}`
-    : aiPrompt;
+  let metaPrompt = aiPrompt || '';
+  if (firstComment?.trim()) {
+    metaPrompt += ` FirstComment:${firstComment.trim()}`;
+  }
+  if (autoLike !== undefined) {
+    metaPrompt += ` AutoLike:${autoLike ? 'true' : 'false'}`;
+  }
+  const finalAiPrompt = metaPrompt || undefined;
 
   // Delegate post creation, BullMQ enqueue, and cache eviction to PostService
   const { post, queueResult } = await PostService.createPost({

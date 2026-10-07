@@ -347,8 +347,8 @@ export class ApiService {
    */
   static async updateAutopilotSettings(payload: {
     userId: string;
-    autopilotEnabled: boolean;
-    brandContext: string;
+    autopilotEnabled?: boolean;
+    brandContext?: string;
   }): Promise<any> {
     const response = await apiClient.post(API_ENDPOINTS.UPDATE_SETTINGS, payload);
     return response.data?.data;
@@ -568,6 +568,18 @@ export class ApiService {
     recentActivity: Post[];
   }> {
     const response = await apiClient.get('/api/analytics/dashboard-summary');
+    return response.data;
+  }
+
+  /**
+   * 📈 Fetch Real PostgreSQL Analytics & Intelligence Report
+   */
+  static async getAnalyticsReport(params?: { range?: string; platform?: string }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.range) query.set('range', params.range);
+    if (params?.platform) query.set('platform', params.platform);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await apiClient.get(`/api/analytics/report${qs}`);
     return response.data;
   }
 

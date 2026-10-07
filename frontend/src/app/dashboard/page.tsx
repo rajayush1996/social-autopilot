@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, Sparkles, Plus, Calendar, Layers, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Sparkles, Plus, Calendar, Layers, ShieldCheck, Compass } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import { Post, SocialAccount, User } from '@/lib/api';
 import DashboardWidgets from '@/components/DashboardWidgets';
 import DashboardCopilot from '@/components/DashboardCopilot';
+import OnboardingModal from '@/components/OnboardingModal';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -30,6 +32,11 @@ export default function DashboardPage() {
       setUser(profile);
       setAccounts(linkedAccounts);
       setPosts(postsList);
+
+      // Auto-trigger Onboarding modal for new users without brand context
+      if (profile && !profile.brandContext && !localStorage.getItem('onboarding_completed') && !localStorage.getItem('onboarding_dismissed')) {
+        setShowOnboarding(true);
+      }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
@@ -102,8 +109,18 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Actions Bar (Sync Queue & Create Post) */}
-        <div className="flex items-center gap-3">
+        {/* Actions Bar (Persona & Niche, Sync Queue & Create Post) */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowOnboarding(true)}
+            className="h-10 px-3.5 rounded-xl bg-gradient-to-r from-blue-600/10 to-purple-600/10 hover:from-blue-600/20 hover:to-purple-600/20 text-[#2563EB] dark:text-[#60A5FA] border border-[#2563EB]/25 text-xs font-extrabold transition-all active:scale-95 cursor-pointer shadow-xs flex items-center gap-1.5"
+            title="Configure your Brand Voice, Field, and Niche"
+          >
+            <Compass className="h-4 w-4 text-[#2563EB]" />
+            <span>Brand Voice & Niche</span>
+          </button>
+
           <button
             type="button"
             onClick={handleSyncScheduler}
@@ -137,6 +154,21 @@ export default function DashboardPage() {
         user={user}
         posts={posts}
         accounts={accounts}
+      />
+
+      {/* Interactive AI Persona & Niche Onboarding Modal */}
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => {
+          setShowOnboarding(false);
+          localStorage.setItem('onboarding_dismissed', 'true');
+        }}
+        onSaved={(newCtx, newName) => {
+          setUser((prev) => (prev ? { ...prev, brandContext: newCtx, name: newName || prev.name } : null));
+          fetchDashboardData();
+        }}
+        initialBrandContext={user?.brandContext || ''}
+        initialName={user?.name || ''}
       />
     </div>
   );

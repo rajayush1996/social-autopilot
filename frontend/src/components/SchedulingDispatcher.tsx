@@ -488,6 +488,7 @@ export function SchedulingDispatcher() {
       .catch(() => {});
   }, []);
 
+  // Allowed channels on the user's plan are always visible for scheduling rules
   const displayPlatforms = allowedPlatforms.map((platformKey) => ({
     id: platformKey as any,
     label: PLATFORM_REGISTRY[platformKey as PlatformKey]?.name || platformKey,
@@ -1238,9 +1239,12 @@ export function SchedulingDispatcher() {
                   <div className="space-y-1">
                     <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Format Style</label>
                     <select value={formFormatStyle} onChange={(e) => setFormFormatStyle(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-[var(--text-primary)] text-[11px] font-medium">
-                      <option value="SINGLE">Standard Post</option>
-                      <option value="THREAD">Numbered Thread</option>
-                      <option value="CAROUSEL">Carousel Outline</option>
+                      <option value="DYNAMIC_AUTO">✨ Dynamic Rotation (Fresh Each Time)</option>
+                      <option value="PARAGRAPHS">📄 Standard Paragraphs (Pure Prose)</option>
+                      <option value="BULLETS">📌 Bullet Points List</option>
+                      <option value="ONE_LINERS">⚡ Punchy One-Liners</option>
+                      <option value="CAROUSEL">🎠 Carousel Slide Deck</option>
+                      <option value="THREAD">🧵 Numbered Thread</option>
                     </select>
                   </div>
 

@@ -102,11 +102,16 @@ export default function EngagementStudioPage() {
           setConnectedAccounts(activeAccs);
         }
 
-        if (meRes && Array.isArray(meRes.allowedPlatforms)) {
-          const allowed = meRes.allowedPlatforms.map((p: string) => p.toUpperCase() as AllowedPlatform);
-          setVisiblePlatforms(allowed);
-        } else {
-          setVisiblePlatforms([]);
+        const planAllowed = meRes && Array.isArray(meRes.allowedPlatforms) && meRes.allowedPlatforms.length > 0
+          ? meRes.allowedPlatforms.map((p: string) => p.toUpperCase() as AllowedPlatform)
+          : (['LINKEDIN'] as AllowedPlatform[]);
+
+        // Allowed platforms on the user's plan are always visible & configurable.
+        // Even if not connected yet, the user can set automation rules which activate once connected.
+        setVisiblePlatforms(planAllowed);
+
+        if (planAllowed.length > 0) {
+          setActivePlatform((prev) => (planAllowed.includes(prev) ? prev : planAllowed[0]));
         }
       } catch (err) {
         console.warn('Failed to load accounts/permissions in Engagement Studio:', err);
@@ -242,9 +247,29 @@ export default function EngagementStudioPage() {
       </div>
 
       {/* Main Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Automation Toggles & Rules (2 Cols) */}
-        <div className="lg:col-span-2 space-y-6">
+      {visiblePlatforms.length === 0 ? (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-10 text-center space-y-4 shadow-sm animate-fadeIn">
+          <div className="w-14 h-14 rounded-2xl bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center mx-auto">
+            <Zap className="w-7 h-7" />
+          </div>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-lg font-black text-[var(--text-primary)]">No Active Channels Connected</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Connect your social channels (LinkedIn, Instagram, X, or Facebook) in Connected Channels to configure automated first comments, anti-bot auto-likes, and reach protection.
+            </p>
+          </div>
+          <Link
+            href="/accounts"
+            className="h-10 px-5 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-extrabold transition-all shadow-md shadow-blue-500/20 inline-flex items-center gap-2 cursor-pointer"
+          >
+            <Link2 className="w-4 h-4" />
+            <span>Connect Channels in Accounts →</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column: Automation Toggles & Rules (2 Cols) */}
+          <div className="lg:col-span-2 space-y-6">
           {/* Card 1: Auto-Like & Algorithm Signal */}
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
@@ -253,11 +278,16 @@ export default function EngagementStudioPage() {
                   <ThumbsUp className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-[var(--text-primary)]">
-                    Auto-Like Post-Publication
-                  </h3>
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    Automatically likes your post 2 seconds after release to trigger initial feed reach.
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-extrabold text-[var(--text-primary)]">
+                      Auto-Like Post-Publication
+                    </h3>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      🛡️ Tri-Shield Anti-Bot (35s-65s Jitter)
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    When enabled, automatically likes your post 35s–65s after publication using human jitter delay to trigger initial feed reach safely without bot detection.
                   </p>
                 </div>
               </div>
@@ -273,6 +303,15 @@ export default function EngagementStudioPage() {
                 <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2563EB]"></div>
               </label>
             </div>
+
+            {activePlatform !== 'LINKEDIN' && (
+              <div className="p-3 bg-[var(--bg-input)] rounded-xl border border-[var(--border-color)] text-[11px] text-[var(--text-secondary)] flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>
+                  <strong>Platform Compliance Notice:</strong> Meta (Instagram/Facebook) and X restrict automated liking to prevent spam. Auto-Like is exclusively active on LinkedIn with human jitter.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Card 2: Auto-Post First Comment Rules */}
@@ -483,6 +522,7 @@ export default function EngagementStudioPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

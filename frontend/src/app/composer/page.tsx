@@ -37,7 +37,8 @@ import {
   ChevronUp,
   Wand2,
   Image as ImageIcon,
-  RefreshCw
+  RefreshCw,
+  Compass
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -47,7 +48,8 @@ import LiquidUploadButton from '@/components/LiquidUploadButton';
 import PlatformIcon from '@/components/PlatformIcon';
 import ChannelTargetChips from '@/components/ChannelTargetChips';
 import CarouselSlideDeck from '@/components/CarouselSlideDeck';
-import { SocialAccount } from '@/lib/api';
+import { SocialAccount, User } from '@/lib/api';
+import OnboardingModal from '@/components/OnboardingModal';
 import { RichPromptEditor } from '@/components/RichPromptEditor';
 import {
   getPlatformDefinition,
@@ -150,12 +152,17 @@ export default function ComposerPage() {
   const [previewDisplayMode, setPreviewDisplayMode] = useState<Record<string, 'CAROUSEL' | 'TEXT'>>({});
 
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
+  const [selectedPreviewPlatform, setSelectedPreviewPlatform] = useState<PlatformKey>('LINKEDIN');
   const [portalMounted, setPortalMounted] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Publish Split Button States
   const [publishMode, setPublishMode] = useState<'NOW' | 'SCHEDULE'>('NOW');
   const [showPublishDropdown, setShowPublishDropdown] = useState(false);
+
+  // User Profile & Universal AI Persona States
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showPersonaModal, setShowPersonaModal] = useState(false);
 
   type UserPlaceholder = { id: string; name: string; value: string };
   const [savedPlaceholders, setSavedPlaceholders] = useState<UserPlaceholder[]>([
@@ -423,6 +430,10 @@ export default function ComposerPage() {
         ApiService.getConnectedAccounts(),
         ApiService.getMe(),
       ]);
+
+      if (user) {
+        setCurrentUser(user);
+      }
 
       const userAllowed = Array.isArray(user?.allowedPlatforms)
         ? user.allowedPlatforms.map((platform: string) => platform.toUpperCase() as PlatformKey)
@@ -743,6 +754,17 @@ export default function ComposerPage() {
 
     setSubmitting(true);
     try {
+      let autoLikePref = true;
+      try {
+        const savedEng = localStorage.getItem('engagement_studio_settings');
+        if (savedEng) {
+          const parsed = JSON.parse(savedEng);
+          if (parsed.LINKEDIN && parsed.LINKEDIN.autoLike !== undefined) {
+            autoLikePref = Boolean(parsed.LINKEDIN.autoLike);
+          }
+        }
+      } catch (e) {}
+
       const payload = {
         content: JSON.stringify(platformDraftMap),
         mediaUrls: mediaFileUrl ? [mediaFileUrl] : [],
@@ -752,6 +774,7 @@ export default function ComposerPage() {
         scheduledAt: publishMode === 'SCHEDULE' ? new Date(scheduledDate).toISOString() : null,
         publishNow: publishMode === 'NOW',
         firstComment: firstComment.trim() || undefined,
+        autoLike: autoLikePref,
       };
 
       await ApiService.createPost(payload);
@@ -797,6 +820,8 @@ export default function ComposerPage() {
     dispatch(setDraftForPlatformAction({ platform: plt, content: val }));
   };
 
+  // Allowed platforms on the plan are always available to compose for.
+  // ChannelTargetChips displays offline status and prompts account connection when appropriate.
   const selectablePlatforms = getPlatformDefinitions(allowedPlatforms);
   const mediaRequiredPlatforms = platforms.filter(p => getPlatformDefinition(p).requiresMedia);
 
@@ -851,6 +876,34 @@ export default function ComposerPage() {
                   <h2 className="text-xs font-bold uppercase tracking-wider text-[#2563EB] flex items-center gap-2">
                     <Sparkles className="h-4 w-4" /> 1. Enter Topic or Prompt
                   </h2>
+                </div>
+
+                {/* Active Brand Voice & Niche Banner (Applies directly to this Single Post) */}
+                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 rounded-xl flex-wrap gap-2.5">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Compass className="w-4 h-4 text-[#2563EB] shrink-0" />
+                    <span className="text-xs font-bold text-[var(--text-primary)] shrink-0">
+                      Active Brand Voice:
+                    </span>
+                    {currentUser?.brandContext ? (
+                      <span className="text-[11px] font-bold text-[#2563EB] dark:text-[#60A5FA] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-lg border border-[#2563EB]/25 truncate max-w-[260px] sm:max-w-md inline-block" title={currentUser.brandContext}>
+                        {currentUser.brandContext}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/25">
+                        Default Brand Voice (No custom niche set)
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPersonaModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-extrabold transition-all cursor-pointer shadow-xs shrink-0"
+                    title="Customize or switch your brand voice and niche"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Edit Brand Voice</span>
+                  </button>
                 </div>
 
                 {/* Input Mode Switcher (Custom Prompt vs Summarize Article URL) */}
@@ -1220,10 +1273,10 @@ export default function ComposerPage() {
                                 onChange={(e) => setFormatStyle(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="PARAGRAPHS">📄 Standard Paragraphs</option>
-                                <option value="BULLETS">📌 Bullet Points List</option>
-                                <option value="ONE_LINERS">💡 Punchy One-Liners</option>
-                                <option value="CAROUSEL">🎠 Carousel Slide Deck (Slide-by-Slide)</option>
+                                <option value="PARAGRAPHS">📄 Standard Paragraphs (Rotates Fresh Prose Layouts Every Time)</option>
+                                <option value="BULLETS">📌 Bullet Points (Rotates Fresh Bullet Layouts Every Time)</option>
+                                <option value="ONE_LINERS">⚡ Punchy One-Liners (Rotates Fresh White-Space Layouts)</option>
+                                <option value="CAROUSEL">🎠 Carousel Slide Deck (Rotates Fresh Slide Structures)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1599,158 +1652,199 @@ export default function ComposerPage() {
                     <p className="text-[var(--text-primary)] text-sm font-bold">No Preview Available</p>
                     <p className="text-[var(--text-secondary)] text-xs">Select target channels and generate drafts to see how they look.</p>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-6">
-                    {platforms.map((platform) => (
-                      <div key={platform} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm transition-all hover:shadow-md">
+                ) : (() => {
+                  const activePlatform: PlatformKey = platforms.includes(selectedPreviewPlatform)
+                    ? selectedPreviewPlatform
+                    : (platforms[0] || 'LINKEDIN');
+                  const activePlatformDef = getPlatformDefinition(activePlatform);
+                  const isCarouselFormat = (formatStyle && formatStyle.toUpperCase().startsWith('CAROUSEL')) || (generatedDrafts[activePlatform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[activePlatform]));
+                  const currentMode = previewDisplayMode[activePlatform] || (isCarouselFormat ? 'CAROUSEL' : 'TEXT');
 
-                        {/* Mock Header with Full View Button & Carousel View Switcher */}
-                        {(() => {
-                          const isCarouselFormat = formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform]));
-                          const currentMode = previewDisplayMode[platform] || (isCarouselFormat ? 'CAROUSEL' : 'TEXT');
+                  const brandDisplayName = currentUser?.name || (currentUser?.brandContext ? currentUser.brandContext.split(/[,.\n]/)[0].slice(0, 24).trim() : 'Your Brand');
+                  const brandHandle = `@${brandDisplayName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'brand'}`;
 
-                          return (
-                            <>
-                              <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)]/50">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-[2px]">
-                                    <img src="https://ui-avatars.com/api/?name=Brand&background=1e1e1e&color=fff" alt="Avatar" className="w-full h-full rounded-full border-2 border-[var(--bg-card)] object-cover" />
-                                  </div>
-                                  <div className="leading-tight">
-                                    <p className="text-[13px] font-extrabold text-[var(--text-primary)] flex items-center gap-1">Avenar Engineering <CheckCircle2 className="w-3 h-3 text-blue-500" /></p>
-                                    <p className="text-[11px] text-[var(--text-secondary)] font-medium">@avenar_dev • Just now</p>
-                                  </div>
-                                </div>
+                  const charLimit = activePlatform === SOCIAL_PLATFORMS.X ? 280 : activePlatform === SOCIAL_PLATFORMS.LINKEDIN ? 3000 : activePlatform === SOCIAL_PLATFORMS.INSTAGRAM ? 2200 : 5000;
+                  const charCount = (generatedDrafts[activePlatform] || '').length;
+                  const isOverLimit = charCount > charLimit;
 
-                                <div className="flex items-center gap-2">
-                                  {/* Carousel View Mode Toggle */}
-                                  {isCarouselFormat && (
-                                    <div className="flex items-center bg-[var(--bg-input)] p-0.5 rounded-lg border border-[var(--border-color)] text-[10px] font-extrabold mr-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [platform]: 'CAROUSEL' }))}
-                                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                                          currentMode === 'CAROUSEL'
-                                            ? 'bg-[#2563EB] text-white shadow-xs'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                      >
-                                        🎠 Slides
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [platform]: 'TEXT' }))}
-                                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                                          currentMode === 'TEXT'
-                                            ? 'bg-[#2563EB] text-white shadow-xs'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                      >
-                                        📝 Text
-                                      </button>
-                                    </div>
-                                  )}
+                  return (
+                    <div className="space-y-3 animate-fadeIn">
+                      {/* Platform Switcher Tab Bar */}
+                      <div className="flex items-center justify-between gap-2 p-1.5 bg-[var(--bg-input)]/80 border border-[var(--border-color)] rounded-2xl">
+                        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
+                          {platforms.map((platformKey) => {
+                            const def = getPlatformDefinition(platformKey);
+                            const isSelected = activePlatform === platformKey;
+                            const hasDraft = Boolean(generatedDrafts[platformKey] && generatedDrafts[platformKey].trim().length > 0);
 
-                                  {/* Full View Button */}
-                                  <button
-                                    onClick={() => setIsFullscreenPreview(true)}
-                                    className="p-1.5 bg-[var(--bg-input)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-lg transition-all text-slate-500 hover:text-blue-500 cursor-pointer"
-                                    title="Open Full Screen Editor"
-                                  >
-                                    <Maximize2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <PlatformIcon platform={platform} className={`w-5 h-5 opacity-50 ${getPlatformDefinition(platform).accentClass}`} />
-                                  <MoreHorizontal className="w-4 h-4 text-[var(--text-secondary)] cursor-pointer" />
-                                </div>
-                              </div>
+                            return (
+                              <button
+                                key={platformKey}
+                                type="button"
+                                onClick={() => setSelectedPreviewPlatform(platformKey)}
+                                className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                                  isSelected
+                                    ? 'bg-[#2563EB] text-white shadow-xs'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+                                }`}
+                              >
+                                <PlatformIcon platform={platformKey} className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : def.accentClass}`} />
+                                <span>{def.label}</span>
+                                {hasDraft && (
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} title="Draft Ready" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                              {/* Post Body: Platform-tailored layout */}
-                              {currentMode === 'CAROUSEL' ? (
-                                /* Dedicated Carousel Mode (Pure Slide Deck Display) */
-                                <div className="p-3 bg-[var(--bg-card)]">
-                                  <CarouselSlideDeck
-                                    text={generatedDrafts[platform] || ''}
-                                    onTextChange={(newText) => handleTextChange(platform, newText)}
-                                    platformLabel={getPlatformDefinition(platform).label}
-                                  />
-                                </div>
+                        {/* Expand All Channels Grid Button */}
+                        {platforms.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsFullscreenPreview(true)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-card)] hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-[var(--border-color)] hover:border-[#2563EB] text-[11px] font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] transition-all cursor-pointer shadow-2xs shrink-0"
+                            title="Compare and edit all channels side-by-side"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                            <span className="hidden sm:inline">Compare All</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Active Social Media Card Preview */}
+                      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm transition-all hover:shadow-md">
+                        {/* Mock Header with Channel Icon & Carousel Switcher */}
+                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)]/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-purple-500 p-[2px]">
+                              {currentUser?.avatarUrl ? (
+                                <img src={currentUser.avatarUrl} alt="Avatar" className="w-full h-full rounded-full border-2 border-[var(--bg-card)] object-cover" />
                               ) : (
-                                /* Standard Raw Text / Caption Mode */
-                                <>
-                                  <div className="px-4 py-3 bg-[var(--bg-card)]">
-                                    <textarea
-                                      value={generatedDrafts[platform] || ''}
-                                      onChange={(e) => handleTextChange(platform, e.target.value)}
-                                      placeholder={`Write your ${getPlatformDefinition(platform).label} post content...`}
-                                      className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-slate-500 border-none outline-none resize-none leading-relaxed min-h-[90px]"
-                                      rows={generatedDrafts[platform] ? Math.min(10, generatedDrafts[platform].split('\n').length + 1) : 4}
-                                    />
-                                  </div>
-
-                                  {mediaFileUrl && (
-                                    <div className="w-full bg-[var(--bg-input)] border-t border-[var(--border-color)]/50 flex items-center justify-center p-2 min-h-[240px] max-h-[420px]">
-                                      {mediaType === 'VIDEO' ? (
-                                        <video src={mediaFileUrl} controls className="w-full max-h-[400px] object-contain rounded-xl" />
-                                      ) : (
-                                        <img src={mediaFileUrl} alt="Attached Media" className="w-full max-h-[400px] object-contain rounded-xl" />
-                                      )}
-                                    </div>
-                                  )}
-                                </>
+                                <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] bg-[var(--bg-input)] flex items-center justify-center font-extrabold text-xs text-[#2563EB]">
+                                  {brandDisplayName.charAt(0).toUpperCase()}
+                                </div>
                               )}
+                            </div>
+                            <div className="leading-tight">
+                              <p className="text-[13px] font-extrabold text-[var(--text-primary)] flex items-center gap-1">
+                                {brandDisplayName} <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
+                              </p>
+                              <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                                {brandHandle} • Active {activePlatformDef.label} Preview
+                              </p>
+                            </div>
+                          </div>
 
-                              {/* Social Action Bar */}
-                              <div className="flex items-center justify-between px-5 py-2.5 text-[var(--text-secondary)] border-t border-[var(--border-color)]/30">
-                                <div className="flex items-center gap-6">
-                                  <Heart className="w-[18px] h-[18px] cursor-pointer hover:text-rose-500 transition-colors" />
-                                  <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-blue-500 transition-colors" />
-                                  <Repeat className="w-[18px] h-[18px] cursor-pointer hover:text-green-500 transition-colors" />
-                                </div>
-                                <div className="flex items-center gap-4">
-                                  <Bookmark className="w-[18px] h-[18px] cursor-pointer hover:text-amber-500 transition-colors" />
-                                  <Share2 className="w-[18px] h-[18px] cursor-pointer hover:text-indigo-500 transition-colors" />
-                                </div>
-                              </div>
-                            </>
-                          );
-                        })()}
-
-                        {/* Character Limit & Virality Diagnostics Action Bar */}
-                        {(() => {
-                          const charLimit = platform === SOCIAL_PLATFORMS.X ? 280 : platform === SOCIAL_PLATFORMS.LINKEDIN ? 3000 : platform === SOCIAL_PLATFORMS.INSTAGRAM ? 2200 : 5000;
-                          const charCount = (generatedDrafts[platform] || '').length;
-                          const isOverLimit = charCount > charLimit;
-                          return (
-                            <div className="px-4 py-2 bg-[var(--bg-input)]/50 border-t border-[var(--border-color)]/30 flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            {/* Carousel View Mode Toggle */}
+                            {isCarouselFormat && (
+                              <div className="flex items-center bg-[var(--bg-input)] p-0.5 rounded-lg border border-[var(--border-color)] text-[10px] font-extrabold mr-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleDiagnoseVirality(platform)}
-                                  disabled={diagnosingVirality}
-                                  className="text-[11px] font-bold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                                  onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [activePlatform]: 'CAROUSEL' }))}
+                                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                    currentMode === 'CAROUSEL'
+                                      ? 'bg-[#2563EB] text-white shadow-xs'
+                                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                  }`}
                                 >
-                                  <Sparkles className="w-3 h-3 text-[#2563EB]" />
-                                  {diagnosingVirality ? 'Analyzing...' : '⚡ Check Post Score'}
+                                  🎠 Slides
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [activePlatform]: 'TEXT' }))}
+                                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                    currentMode === 'TEXT'
+                                      ? 'bg-[#2563EB] text-white shadow-xs'
+                                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                  }`}
+                                >
+                                  📝 Text
                                 </button>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[11px] font-bold ${isOverLimit ? 'text-rose-500' : 'text-[var(--text-secondary)]'}`}>
-                                  {charCount} / {charLimit}
-                                </span>
-                                <div className="w-16 h-1.5 bg-[var(--border-color)] rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full transition-all ${isOverLimit ? 'bg-rose-500' : charCount > charLimit * 0.9 ? 'bg-amber-500' : 'bg-[#2563EB]'}`}
-                                    style={{ width: `${Math.min(100, (charCount / charLimit) * 100)}%` }}
-                                  />
-                                </div>
-                              </div>
+                            )}
+
+                            <PlatformIcon platform={activePlatform} className={`w-5 h-5 opacity-70 ${activePlatformDef.accentClass}`} />
+                            <MoreHorizontal className="w-4 h-4 text-[var(--text-secondary)] cursor-pointer" />
+                          </div>
+                        </div>
+
+                        {/* Post Body: Platform-tailored layout */}
+                        {currentMode === 'CAROUSEL' ? (
+                          <div className="p-3 bg-[var(--bg-card)]">
+                            <CarouselSlideDeck
+                              text={generatedDrafts[activePlatform] || ''}
+                              onTextChange={(newText) => handleTextChange(activePlatform, newText)}
+                              platformLabel={activePlatformDef.label}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div className="px-4 py-3 bg-[var(--bg-card)]">
+                              <textarea
+                                value={generatedDrafts[activePlatform] || ''}
+                                onChange={(e) => handleTextChange(activePlatform, e.target.value)}
+                                placeholder={`Write or customize your ${activePlatformDef.label} post content here...`}
+                                className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-slate-500 border-none outline-none resize-none leading-relaxed min-h-[140px] focus:ring-0"
+                                rows={generatedDrafts[activePlatform] ? Math.min(14, generatedDrafts[activePlatform].split('\n').length + 2) : 6}
+                              />
                             </div>
-                          );
-                        })()}
+
+                            {mediaFileUrl && (
+                              <div className="w-full bg-[var(--bg-input)] border-t border-[var(--border-color)]/50 flex items-center justify-center p-2 min-h-[220px] max-h-[380px]">
+                                {mediaType === 'VIDEO' ? (
+                                  <video src={mediaFileUrl} controls className="w-full max-h-[360px] object-contain rounded-xl" />
+                                ) : (
+                                  <img src={mediaFileUrl} alt="Attached Media" className="w-full max-h-[360px] object-contain rounded-xl" />
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Social Action Bar */}
+                        <div className="flex items-center justify-between px-5 py-2.5 text-[var(--text-secondary)] border-t border-[var(--border-color)]/30">
+                          <div className="flex items-center gap-6">
+                            <Heart className="w-[18px] h-[18px] cursor-pointer hover:text-rose-500 transition-colors" />
+                            <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-blue-500 transition-colors" />
+                            <Repeat className="w-[18px] h-[18px] cursor-pointer hover:text-green-500 transition-colors" />
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <Bookmark className="w-[18px] h-[18px] cursor-pointer hover:text-amber-500 transition-colors" />
+                            <Share2 className="w-[18px] h-[18px] cursor-pointer hover:text-indigo-500 transition-colors" />
+                          </div>
+                        </div>
+
+                        {/* Character Limit & Virality Diagnostics Action Bar */}
+                        <div className="px-4 py-2.5 bg-[var(--bg-input)]/50 border-t border-[var(--border-color)]/30 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDiagnoseVirality(activePlatform)}
+                              disabled={diagnosingVirality}
+                              className="text-[11px] font-extrabold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+                              <span>{diagnosingVirality ? 'Analyzing...' : '⚡ Check Post Score'}</span>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[11px] font-bold ${isOverLimit ? 'text-rose-500' : 'text-[var(--text-secondary)]'}`}>
+                              {charCount} / {charLimit}
+                            </span>
+                            <div className="w-16 h-1.5 bg-[var(--border-color)] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all ${isOverLimit ? 'bg-rose-500' : charCount > charLimit * 0.9 ? 'bg-amber-500' : 'bg-[#2563EB]'}`}
+                                style={{ width: `${Math.min(100, (charCount / charLimit) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1771,10 +1865,10 @@ export default function ComposerPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2.5">
-                    Live Feed Device Preview
-                    <span className="text-xs bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20 px-3 py-0.5 rounded-full uppercase tracking-wider font-extrabold">Full Screen</span>
+                    Multi-Channel Studio Grid
+                    <span className="text-xs bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20 px-3 py-0.5 rounded-full uppercase tracking-wider font-extrabold">All Channels</span>
                   </h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Interactive full-resolution post editor & feed preview across all selected channels</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Compare, refine, and customize dispatches across all your active channels side-by-side</p>
                 </div>
               </div>
 
@@ -1821,7 +1915,7 @@ export default function ComposerPage() {
                           <div className="space-y-2.5 flex-1 flex flex-col">
                             <label className="text-xs text-[#2563EB] font-extrabold uppercase tracking-wider block shrink-0">Caption & Slide Editor</label>
 
-                            {formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform])) ? (
+                            {(formatStyle && formatStyle.toUpperCase().startsWith('CAROUSEL')) || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform])) ? (
                               <div className="flex-1">
                                 <CarouselSlideDeck
                                   text={generatedDrafts[platform] || ''}
@@ -1903,6 +1997,18 @@ export default function ComposerPage() {
           <SchedulingDispatcher />
         </div>
       )}
+
+      {/* 🧭 Universal AI Persona & Niche Setup Wizard */}
+      <OnboardingModal
+        isOpen={showPersonaModal}
+        onClose={() => setShowPersonaModal(false)}
+        onSaved={(newCtx, newName) => {
+          setCurrentUser((prev) => (prev ? { ...prev, brandContext: newCtx, name: newName || prev.name } : null));
+          toast.success('✨ Brand Voice & Niche updated! Single Post Composer is now tuned to this voice.');
+        }}
+        initialBrandContext={currentUser?.brandContext || ''}
+        initialName={currentUser?.name || ''}
+      />
     </div>
   );
 }

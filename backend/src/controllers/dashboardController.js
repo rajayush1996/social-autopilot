@@ -166,6 +166,7 @@ export class DashboardController {
         topic: prompt,
         platforms: [platform],
         tone: 'ENGAGING',
+        userId,
       });
 
       const mainText = mainResult.content || `🚀 ${prompt}\n\nAutomate your social growth seamlessly. #AIAutomation #Productivity`;

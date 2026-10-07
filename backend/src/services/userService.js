@@ -100,12 +100,13 @@ export class UserService {
    * @returns {Promise<Object>} Updated user record
    */
   static async updateAutopilotSettings(userId, { autopilotEnabled, brandContext }) {
+    const data = {};
+    if (autopilotEnabled !== undefined) data.autopilotEnabled = autopilotEnabled;
+    if (brandContext !== undefined) data.brandContext = brandContext;
+
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: {
-        autopilotEnabled,
-        brandContext,
-      },
+      data,
     });
     await CacheService.del(CACHE_KEYS.USER_PROFILE(userId));
     return updated;
