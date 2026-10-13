@@ -46,6 +46,8 @@ desktop.ini
 .tmp/
 tmp/
 temp/
+public/uploads/
+
 
 # Coverage directory used by tools like istanbul
 coverage/

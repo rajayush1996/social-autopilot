@@ -2,6 +2,7 @@ import { apiClient, User, SocialAccount, Post, AIGeneratePayload, AIGeneratedRes
 import CONFIG from '@/config';
 import { API_ENDPOINTS } from '@/config/constants';
 import type { PlatformId } from '@/config/platforms';
+import { IMAGE_ASPECT_RATIOS, type ImageAspectRatio } from '@/constants/platforms';
 
 export interface FeatureConfig {
   id: string;
@@ -668,10 +669,21 @@ export class ApiService {
   /**
    * ⚡ Generate a live sample Flux visual graphic from a prompt
    */
-  static async generateSampleVisual(topic: string, brandName?: string): Promise<{ imageUrl: string; provider: string }> {
+  static async generateSampleVisual(
+    topic: string,
+    brandName?: string,
+    content?: string,
+    tone?: string,
+    renderTypography: boolean = true,
+    aspectRatio: ImageAspectRatio = IMAGE_ASPECT_RATIOS.SQUARE
+  ): Promise<{ imageUrl: string; provider: string }> {
     const response = await apiClient.post('/api/posts/sample-visual', {
       topic,
       brandName,
+      content,
+      tone,
+      renderTypography,
+      aspectRatio,
     });
     return response.data?.data;
   }

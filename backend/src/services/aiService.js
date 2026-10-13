@@ -22,6 +22,7 @@ import {
   selectHookArchetype,
   fetchRecentUserPosts,
 } from './ai/vectorMemoryService.js';
+import { extractBrandAndVisualIntentWithAI } from '../utils/brandExtractor.js';
 
 /**
  * Resolve an article URL into prompt context. Never throws: a failed fetch returns
@@ -569,10 +570,26 @@ export async function optimizePostForPlatforms({
     results[platform.toUpperCase()] = result.content;
   }
 
+  // Synthesize unified visual directive & hero hook blueprint from primary post
+  const primaryPlatform = platforms[0]?.toUpperCase() || 'LINKEDIN';
+  const sampleContent = results[primaryPlatform] || Object.values(results)[0] || content;
+
+  let visualMeta = null;
+  try {
+    visualMeta = await extractBrandAndVisualIntentWithAI({
+      content: sampleContent,
+      topic: content,
+      tone,
+    });
+  } catch (err) {
+    logger.warn(`[AIService] Visual metadata synthesis warning: ${err.message}`);
+  }
+
   return {
     success: true,
     originalContent: content,
     adaptedPosts: results,
+    visualMeta,
   };
 }
 

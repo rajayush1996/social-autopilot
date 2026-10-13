@@ -19,9 +19,10 @@
 10. [Engine 9: 30-Day Anti-Repetition & Historical DB Memory Engine](#-10-engine-9-30-day-anti-repetition--historical-db-memory-engine)
 11. [Engine 10: PostgreSQL Real Analytics & Telemetry Suite](#-11-engine-10-postgresql-real-analytics--telemetry-suite)
 12. [Engine 11: Self-Healing Cron Scheduler & BullMQ Dispatcher](#-12-engine-11-self-healing-cron-scheduler--bullmq-dispatcher)
-13. [Cross-Niche Comparative Synthesis Table](#-13-cross-niche-comparative-synthesis-table)
-14. [End-to-End Sequence Flow & Lifecycle](#-14-end-to-end-sequence-flow--lifecycle)
-15. [Key Architectural Invariants](#-15-key-architectural-invariants)
+13. [Engine 12: Social Connection Health, Token Expiration & Alert Matrix](#-13-engine-12-social-connection-health-token-expiration--alert-matrix)
+14. [Cross-Niche Comparative Synthesis Table](#-14-cross-niche-comparative-synthesis-table)
+15. [End-to-End Sequence Flow & Lifecycle](#-15-end-to-end-sequence-flow--lifecycle)
+16. [Key Architectural Invariants](#-16-key-architectural-invariants)
 
 ---
 
@@ -269,11 +270,25 @@ When `includeImage = true`, OpenAI generates both post copy and a structured vis
 }
 ```
 
-### Supported Visual Themes:
-1. **`3D_SAAS`:** Floating translucent glassmorphism UI cards, soft ambient studio lighting.
-2. **`MINIMALIST`:** High-contrast matte typography, clean negative space, studio product rendering.
-3. **`CYBERPUNK`:** Neon cyan/magenta lighting, dark futuristic interfaces, holographic overlays.
-4. **`SPIRITUAL_SERENE`:** Golden hour divine radiance, sacred geometry, misty peaks.
+### 3-Tier Architecture & Diffusion Foundations
+1. **Tier 1 (Fal.ai Flux.1 Schnell):** Fast 0.15s ultra-HD inference ($0.0035/image), used as primary diffusion engine.
+2. **Tier 2 (OpenAI DALL-E 3):** Prompt fidelity champion, invoked with 12s race timeout fallback.
+3. **Tier 3 (Local Sharp SVG Card Engine):** Zero-cost local 1080x1080 vector graphic cards (`BRANDED_SVG_CARD`).
+
+### Hybrid Sharp Typography Compositing Pipeline ("The Secret Sauce")
+To prevent diffusion AI models from generating distorted or misspelled text:
+1. Diffusion model creates a pristine background image with subject placed on the right side and clean dark negative space on the left side.
+2. Node.js `sharp` library downloads the background buffer, applies a dark progressive gradient scrim, and composites high-contrast SVG vector typography:
+   - **Category Tag Pill:** `TECH TEARDOWN`, `GROWTH PLAYBOOK`, or `SACRED INSIGHT`
+   - **Hero Hook Headline:** Clean, multi-line auto-wrapped headline (`heroHook`)
+   - **Brand Watermark:** Monogram logo badge and brand name
+3. Gives users 100% legibility and zero spelling errors.
+
+### Multi-Channel Aspect Ratio Engine
+Supports 3 channel-optimized aspect ratios:
+- **`1:1` Square (1080×1080):** Optimized for LinkedIn & Instagram Feeds (`square_hd`).
+- **`16:9` Landscape (1200×675):** Optimized for X (Twitter), Reddit, and Facebook (`landscape_16_9`).
+- **`4:5` Portrait (1080×1350):** Optimized for mobile feed vertical scrolling (`portrait_4_3`).
 
 ---
 
@@ -345,7 +360,37 @@ Located in [`scheduleService.js`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/s
 
 ---
 
-## 📊 13. Cross-Niche Comparative Synthesis Table
+## 🔌 13. Engine 12: Social Connection Health, Token Expiration & Alert Matrix
+
+Located in [`tokenManager.js`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/social-autopilot/backend/src/services/auth/tokenManager.js), [`tokenRefreshJob.js`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/social-autopilot/backend/src/jobs/tokenRefreshJob.js), [`socketService.js`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/social-autopilot/backend/src/services/socketService.js), and [`emailService.js`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/social-autopilot/backend/src/services/emailService.js):
+
+### Platform Expiration & Token Lifecycle Matrix
+| Platform | Access Token Lifespan | Refresh Mechanism | Fallback / Expired State |
+|---|---|---|---|
+| **LinkedIn** | **60 Days** (`expires_in = 5184000`) | Proactive refresh via OAuth adapter | Re-authorization popup required if expired |
+| **Instagram** | **60 Days** (Long-Lived Meta Graph User Token) | Graph API `refresh_access_token` endpoint | Re-authentication required if 60 days lapse |
+| **Facebook** | **60 Days** (Long-Lived Page Access Token) | Refreshed with Meta User Token | Invalidated on password reset or permission revocation |
+| **X (Twitter)** | **2 Hours** (`expires_in = 7200`) | OAuth 2.0 PKCE `refreshToken` rotation | Refreshed continuously in background |
+| **User JWT** | **15 Minutes** (Access) / **30 Days** (Refresh) | `/api/auth/refresh-token` endpoint | Re-login required after 30 days inactivity |
+
+### Multi-Tier Detection Engine
+1. **Pre-Publish Runtime Validation:** Prior to publishing, `postWorker.js` calls `tokenManager.getValidAccessToken`. If token is within 5 minutes of expiration, it attempts immediate refresh.
+2. **Proactive 7-Day Background Cron:** `tokenRefreshJob.js` scans daily for accounts with `expiresAt <= now + 7 days` to proactively renew tokens before they ever expire.
+3. **Real-Time Client Verification:** `socketService.js` detects expired sessions upon `check_platform` socket queries from UI.
+
+### Automated Disconnect & Alert Dispatch Pipeline
+When a token cannot be refreshed (revoked access, changed password, or expired OAuth session):
+1. **PostgreSQL Inactivation:** Sets `SocialAccount.isActive = false`.
+2. **Redis Invalidation:** Purges cache key `USER_SOCIAL_ACCOUNTS(userId)`.
+3. **WebSockets (Real-time Push):**
+   - Emits `account_status_changed` (`action: 'DISCONNECTED'`) so channel chips in all open tabs instantly transition to offline status.
+   - Emits `notification:new` triggering an immediate floating alert toast on the active dashboard.
+4. **Urgent Transactional Email Alert:**
+   - Dispatches `sendAccountDisconnectedEmail` with direct action button: `🔗 Reconnect {Platform} Now` pointing to `/accounts`.
+
+---
+
+## 📊 14. Cross-Niche Comparative Synthesis Table
 
 Demonstrating how the **Persona & Niche Engine** adapts the **exact same prompt** (`"5 morning habits"`):
 
@@ -358,7 +403,7 @@ Demonstrating how the **Persona & Niche Engine** adapts the **exact same prompt*
 
 ---
 
-## 🔄 14. End-to-End Sequence Flow & Lifecycle
+## 🔄 15. End-to-End Sequence Flow & Lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -402,7 +447,7 @@ sequenceDiagram
 
 ---
 
-## 🏆 15. Key Architectural Invariants
+## 🏆 16. Key Architectural Invariants
 
 1. **Topic Fidelity First:** What the user types is preserved. The engine never overrides personal, spiritual, or artistic topics with tech business jargon.
 2. **Persona-Aware Synthesis:** Content naturally inherits the user's chosen field (Spiritual, Fitness, Tech, Business) while respecting individual prompt nuances.

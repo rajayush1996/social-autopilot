@@ -69,3 +69,25 @@ export const PLATFORM_REGISTRY: Record<PlatformKey, PlatformMetadata> = {
     desc: 'Publish posts, photos, and video updates directly to your managed Facebook Pages.',
   },
 };
+
+export const IMAGE_ASPECT_RATIOS = {
+  SQUARE: '1:1',
+  LANDSCAPE: '16:9',
+  PORTRAIT: '4:5',
+} as const;
+
+export type ImageAspectRatio = (typeof IMAGE_ASPECT_RATIOS)[keyof typeof IMAGE_ASPECT_RATIOS];
+
+export interface AspectRatioOption {
+  ratio: ImageAspectRatio;
+  label: string;
+  channel: string;
+  resolution: string;
+}
+
+export const ASPECT_RATIO_PRESETS: AspectRatioOption[] = [
+  { ratio: IMAGE_ASPECT_RATIOS.SQUARE, label: '1:1 Square', channel: 'LinkedIn / IG', resolution: '1080×1080 (Feed)' },
+  { ratio: IMAGE_ASPECT_RATIOS.LANDSCAPE, label: '16:9 Wide', channel: 'X / Reddit / FB', resolution: '1200×675 (Wide)' },
+  { ratio: IMAGE_ASPECT_RATIOS.PORTRAIT, label: '4:5 Portrait', channel: 'Mobile Feed', resolution: '1080×1350 (Vertical)' },
+];
+

@@ -38,7 +38,10 @@ import {
   Wand2,
   Image as ImageIcon,
   RefreshCw,
-  Compass
+  Compass,
+  Square,
+  Monitor,
+  Smartphone
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -58,7 +61,7 @@ import {
   type PlatformId,
   type PlatformDefinition,
 } from '@/config/platforms';
-import { SOCIAL_PLATFORMS, DEFAULT_ALLOWED_PLATFORMS, ALL_PLATFORMS, type PlatformKey } from '@/constants/platforms';
+import { SOCIAL_PLATFORMS, DEFAULT_ALLOWED_PLATFORMS, ALL_PLATFORMS, type PlatformKey, IMAGE_ASPECT_RATIOS, type ImageAspectRatio, ASPECT_RATIO_PRESETS } from '@/constants/platforms';
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -78,6 +81,12 @@ import {
   setComposerModeAction,
   resetDraftsAndInputsAction,
 } from '@/store/composerSlice';
+
+const ASPECT_RATIO_ICONS: Record<ImageAspectRatio, React.ComponentType<{ className?: string }>> = {
+  [IMAGE_ASPECT_RATIOS.SQUARE]: Square,
+  [IMAGE_ASPECT_RATIOS.LANDSCAPE]: Monitor,
+  [IMAGE_ASPECT_RATIOS.PORTRAIT]: Smartphone,
+};
 
 const PRESET_PROMPTS = [
   { label: '🚀 Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
@@ -142,6 +151,9 @@ export default function ComposerPage() {
   const [mediaMode, setMediaMode] = useState<'AI_IMAGE' | 'UPLOAD' | 'NONE'>('AI_IMAGE');
   const [generatingAiImage, setGeneratingAiImage] = useState<boolean>(false);
   const [aiImagePrompt, setAiImagePrompt] = useState<string>('');
+  const [extractedVisualMeta, setExtractedVisualMeta] = useState<any>(null);
+  const [renderTypography, setRenderTypography] = useState<boolean>(true);
+  const [imageAspectRatio, setImageAspectRatio] = useState<ImageAspectRatio>(IMAGE_ASPECT_RATIOS.SQUARE);
   const [firstComment, setFirstComment] = useState<string>('');
 
   const [generating, setGenerating] = useState(false);
@@ -159,6 +171,10 @@ export default function ComposerPage() {
   // Publish Split Button States
   const [publishMode, setPublishMode] = useState<'NOW' | 'SCHEDULE'>('NOW');
   const [showPublishDropdown, setShowPublishDropdown] = useState(false);
+
+  // Post Card 3-Dot Actions Menu
+  const [showCardMenu, setShowCardMenu] = useState(false);
+  const cardMenuRef = useRef<HTMLDivElement>(null);
 
   // User Profile & Universal AI Persona States
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -386,6 +402,19 @@ export default function ComposerPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPublishDropdown]);
 
+  // Click outside to close post card 3-dot menu
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showCardMenu && cardMenuRef.current && !cardMenuRef.current.contains(e.target as Node)) {
+        setShowCardMenu(false);
+      }
+    };
+    if (showCardMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCardMenu]);
+
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformKey[]>([]);
   const [allowedPlatforms, setAllowedPlatforms] = useState<PlatformKey[]>([...DEFAULT_ALLOWED_PLATFORMS]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
@@ -595,19 +624,25 @@ export default function ComposerPage() {
     }
   };
 
-  const handleGenerateAiImage = async () => {
+  const handleGenerateAiImage = async (overrideRatio?: ImageAspectRatio) => {
     const promptToUse = aiImagePrompt.trim() || topic.trim();
     if (!promptToUse) {
       toast.error('Please enter a topic in Step 1 or write an image prompt.');
       return;
     }
+    const ratioToUse = overrideRatio || imageAspectRatio;
+    if (overrideRatio && overrideRatio !== imageAspectRatio) {
+      setImageAspectRatio(overrideRatio);
+    }
     setGeneratingAiImage(true);
     try {
-      const res = await ApiService.generateSampleVisual(promptToUse);
+      const activeDraft = generatedDrafts[selectedPreviewPlatform] || Object.values(generatedDrafts).find(t => t && t.trim().length > 0) || '';
+      const brandName = currentUser?.name || (currentUser?.brandContext ? currentUser.brandContext.split(/[,.\n]/)[0].slice(0, 30).trim() : '');
+      const res = await ApiService.generateSampleVisual(promptToUse, brandName, activeDraft, tone, renderTypography, ratioToUse);
       if (res && res.imageUrl) {
         setMediaFileUrl(res.imageUrl);
         setMediaType('IMAGE');
-        toast.success('✨ AI image generated and attached to your post!');
+        toast.success(`✨ AI image (${ratioToUse}) generated and attached to your post!`);
       } else {
         toast.error('Failed to generate AI image.');
       }
@@ -696,6 +731,14 @@ export default function ComposerPage() {
             return drafts;
           }, {})
         );
+
+        if (generated.visualMeta) {
+          setExtractedVisualMeta(generated.visualMeta);
+          if (generated.visualMeta.visualPrompt && !aiImagePrompt.trim()) {
+            setAiImagePrompt(generated.visualMeta.visualPrompt);
+          }
+        }
+
         toast.success('AI content generated for selected platforms!');
       }
     } catch (err: any) {
@@ -1408,7 +1451,39 @@ export default function ComposerPage() {
                         <div className="relative h-48 w-full bg-slate-900 rounded-xl overflow-hidden group border border-[var(--border-color)] flex items-center justify-center">
                           <img src={mediaFileUrl} alt="AI Generated Graphic" className="h-full w-full object-contain" />
                           <div className="absolute top-2 right-2 bg-black/70 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">
-                            <Sparkles className="w-3 h-3 text-amber-400" /> AI Generated
+                            <Sparkles className="w-3 h-3 text-amber-400" /> AI Generated ({imageAspectRatio})
+                          </div>
+                        </div>
+
+                        {/* Phase 3: Quick Aspect Ratio Switcher on generated card */}
+                        <div className="flex items-center justify-between p-2 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-xl text-[11px]">
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Format:</span>
+                          <div className="flex items-center gap-1">
+                            {ASPECT_RATIO_PRESETS.map(({ ratio, label }) => {
+                              const active = imageAspectRatio === ratio;
+                              const IconComp = ASPECT_RATIO_ICONS[ratio];
+                              return (
+                                <button
+                                  key={ratio}
+                                  type="button"
+                                  disabled={generatingAiImage}
+                                  onClick={() => {
+                                    if (ratio !== imageAspectRatio) {
+                                      handleGenerateAiImage(ratio);
+                                    }
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50 ${
+                                    active
+                                      ? 'bg-[#2563EB] text-white shadow-xs'
+                                      : 'bg-[var(--bg-card)] hover:bg-[#2563EB]/10 text-[var(--text-secondary)] hover:text-[#2563EB] border border-[var(--border-color)]'
+                                  }`}
+                                  title={`Switch format to ${label} and regenerate`}
+                                >
+                                  <IconComp className="w-2.5 h-2.5" />
+                                  <span>{ratio}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -1419,7 +1494,7 @@ export default function ComposerPage() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={handleGenerateAiImage}
+                              onClick={() => handleGenerateAiImage()}
                               disabled={generatingAiImage}
                               className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white transition-all cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
                             >
@@ -1441,22 +1516,125 @@ export default function ComposerPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
-                            Image Style or Custom Prompt (Optional)
-                          </label>
-                          <input
-                            type="text"
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
+                              Image Style or Custom Visual Prompt (Optional)
+                            </label>
+                            {aiImagePrompt && (
+                              <button
+                                type="button"
+                                onClick={() => setAiImagePrompt('')}
+                                className="text-[10px] text-slate-400 hover:text-rose-500 font-bold transition-colors cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            rows={3}
                             value={aiImagePrompt}
                             onChange={(e) => setAiImagePrompt(e.target.value)}
-                            placeholder={topic ? `Using topic: "${topic.slice(0, 45)}..."` : 'e.g. Modern minimal tech graphic, clean dark mode SaaS dashboard'}
-                            className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3.5 py-2.5 outline-none focus:border-[#2563EB] font-medium"
+                            placeholder={topic ? `Using topic: "${topic.slice(0, 45)}..." (or describe specific visual style, colors, lighting, subjects)` : 'e.g. Modern minimal 3D isometric tech illustration, dark glassmorphic dashboard, glowing cyan accents, clean studio lighting'}
+                            className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium leading-relaxed resize-y min-h-[76px] custom-scrollbar"
                           />
+                          {/* Quick visual style presets */}
+                          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-0.5">
+                            {[
+                              { label: '✨ 3D Isometric', cue: '3D isometric render, translucent glassmorphism, soft studio lighting' },
+                              { label: '📸 Editorial Photo', cue: 'Realistic editorial photography, 35mm lens, natural daylight, candid' },
+                              { label: '🎨 Vector Minimal', cue: 'Clean flat vector illustration, bold geometric shapes, high contrast' },
+                              { label: '🌌 Cyber Dark', cue: 'Dark mode aesthetic, neon cyan and deep indigo glow, cinematic rim light' },
+                            ].map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => {
+                                  setAiImagePrompt((prev) => {
+                                    const trimmed = prev.trim();
+                                    if (!trimmed) return preset.cue;
+                                    if (trimmed.includes(preset.cue)) return trimmed;
+                                    return `${trimmed}, ${preset.cue}`;
+                                  });
+                                }}
+                                className="px-2 py-1 bg-[var(--bg-input)] hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-[#2563EB] border border-[var(--border-color)] rounded-lg text-[10px] font-bold text-[var(--text-secondary)] whitespace-nowrap transition-all cursor-pointer shrink-0"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {extractedVisualMeta && (
+                            <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#2563EB]/5 border border-[#2563EB]/20 rounded-xl text-[11px] animate-fadeIn">
+                              <span className="font-extrabold text-[#2563EB] flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+                                <span>{extractedVisualMeta.categoryPill || 'VISUAL BLUEPRINT'}</span>
+                              </span>
+                              <span className="text-[10px] text-[var(--text-secondary)] font-medium truncate max-w-[200px]" title={extractedVisualMeta.heroHook}>
+                                Hook: "{extractedVisualMeta.heroHook?.slice(0, 32)}..."
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Phase 2: Typography Overlay Toggle */}
+                          <div className="flex items-center justify-between p-2 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-xl">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-bold text-[var(--text-primary)]">Vector Typography Overlay</span>
+                              <span className="text-[10px] text-[var(--text-secondary)] font-medium hidden sm:inline">(Hero Hook & Brand Logo)</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setRenderTypography(!renderTypography)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                                renderTypography
+                                  ? 'bg-[#2563EB] text-white shadow-xs'
+                                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)]'
+                              }`}
+                            >
+                              {renderTypography ? '✨ Overlay ON' : '🖼️ Raw Art Only'}
+                            </button>
+                          </div>
+
+                          {/* Phase 3: Multi-Channel Aspect Ratio Selector */}
+                          <div className="space-y-1.5 p-2.5 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-xl">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-[var(--text-primary)]">Canvas Format & Ratio</span>
+                              <span className="text-[10px] text-[#2563EB] font-extrabold">
+                                {ASPECT_RATIO_PRESETS.find((p) => p.ratio === imageAspectRatio)?.resolution || '1080×1080 (Feed)'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                              {ASPECT_RATIO_PRESETS.map(({ ratio, label, channel }) => {
+                                const active = imageAspectRatio === ratio;
+                                const IconComp = ASPECT_RATIO_ICONS[ratio];
+                                return (
+                                  <button
+                                    key={ratio}
+                                    type="button"
+                                    onClick={() => setImageAspectRatio(ratio)}
+                                    className={`py-2 px-1.5 rounded-xl text-center transition-all cursor-pointer border flex flex-col items-center justify-center gap-0.5 ${
+                                      active
+                                        ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1 text-[11px] font-extrabold">
+                                      <IconComp className="w-3 h-3" />
+                                      <span>{label}</span>
+                                    </div>
+                                    <span className={`text-[9px] font-medium leading-none ${active ? 'text-blue-100' : 'text-[var(--text-secondary)]'}`}>
+                                      {channel}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
 
                         <button
                           type="button"
-                          onClick={handleGenerateAiImage}
+                          onClick={() => handleGenerateAiImage()}
                           disabled={generatingAiImage || (!topic.trim() && !aiImagePrompt.trim())}
                           className="w-full py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
@@ -1602,8 +1780,17 @@ export default function ComposerPage() {
             {/* Right Column: Realistic Social Media Preview Feed */}
             <div className="lg:col-span-5 space-y-6 xl:col-span-5">
               <div className="sticky top-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3.5">
                   <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Social Feed Preview</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreenPreview(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-[var(--border-color)] hover:border-[#2563EB] text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] transition-all cursor-pointer shadow-2xs shrink-0"
+                    title="Open Full View live device modal preview"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                    <span>Full View</span>
+                  </button>
                 </div>
 
                 {/* Engagement Diagnostics Card (When analyzed) */}
@@ -1766,7 +1953,76 @@ export default function ComposerPage() {
                             )}
 
                             <PlatformIcon platform={activePlatform} className={`w-5 h-5 opacity-70 ${activePlatformDef.accentClass}`} />
-                            <MoreHorizontal className="w-4 h-4 text-[var(--text-secondary)] cursor-pointer" />
+                            
+                            <div className="relative" ref={cardMenuRef}>
+                              <button
+                                type="button"
+                                onClick={() => setShowCardMenu(!showCardMenu)}
+                                className="p-1 rounded-lg hover:bg-[var(--bg-input)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+                                title="Post options & Full View"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+
+                              {showCardMenu && (
+                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 p-1.5 space-y-1 animate-fadeIn backdrop-blur-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowCardMenu(false);
+                                      setIsFullscreenPreview(true);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-extrabold text-[var(--text-primary)] hover:bg-[#2563EB]/10 hover:text-[#2563EB] transition-all text-left cursor-pointer"
+                                  >
+                                    <Maximize2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                                    <span>Full View Preview</span>
+                                  </button>
+
+                                  {mediaFileUrl && (
+                                    <a
+                                      href={mediaFileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setShowCardMenu(false)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[#2563EB]/10 hover:text-[#2563EB] transition-all text-left cursor-pointer"
+                                    >
+                                      <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                                      <span>View Image Full Size</span>
+                                    </a>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowCardMenu(false);
+                                      const text = generatedDrafts[activePlatform] || '';
+                                      if (text) {
+                                        navigator.clipboard.writeText(text);
+                                        toast.success(`Copied ${activePlatformDef.label} draft to clipboard!`);
+                                      } else {
+                                        toast.info('Draft is empty.');
+                                      }
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all text-left cursor-pointer"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Copy Post Text</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowCardMenu(false);
+                                      handleDiagnoseVirality(activePlatform);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all text-left cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Check Virality Score</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 

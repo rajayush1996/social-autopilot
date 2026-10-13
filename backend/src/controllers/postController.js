@@ -3,7 +3,7 @@ import config from '../config/env.js';
 import { catchAsync, successResponse } from '../utils/responseHandler.js';
 import { HttpStatus } from '../utils/httpStatus.js';
 import { ApiError } from '../utils/ApiError.js';
-import { POST_STATUS, SOCIAL_PLATFORM } from '../config/constants.js';
+import { POST_STATUS, SOCIAL_PLATFORM, IMAGE_ASPECT_RATIO } from '../config/constants.js';
 import logger from '../utils/logger.js';
 import { generatePostContent, optimizePostForPlatforms, enhancePrompt } from '../services/aiService.js';
 import { enqueuePostJob, removePostJob } from '../queues/postQueue.js';
@@ -163,6 +163,7 @@ export const generateAiPostContent = catchAsync(async (req, res) => {
   return successResponse(res, HttpStatus.OK, 'AI post content generated successfully.', {
     ...(aiResult.adaptedPosts || {}),
     ...aiResult,
+    visualMeta: aiResult.visualMeta || null,
     aiCreditsRemaining: updatedUser.aiCredits,
   });
 });
@@ -606,11 +607,38 @@ export const regeneratePostImage = catchAsync(async (req, res) => {
  * Controller: Generate a live sample Flux visual graphic from a prompt
  */
 export const generateSampleVisual = catchAsync(async (req, res) => {
-  const { topic, brandName, tone = 'ENGAGING' } = req.body;
+  const { topic, brandName, content = '', tone = 'ENGAGING', renderTypography = true, aspectRatio = IMAGE_ASPECT_RATIO.SQUARE } = req.body;
+  const userId = req.user?.id;
+
+  let resolvedBrand = brandName;
+  let userBrandContext = '';
+
+  if (userId) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { brandContext: true, name: true },
+      });
+      if (user) {
+        userBrandContext = user.brandContext || '';
+        if (!resolvedBrand && user.name) {
+          resolvedBrand = user.name;
+        }
+      }
+    } catch (dbErr) {
+      // Continue gracefully if DB lookup fails
+    }
+  }
+
+  const enrichedContent = content || userBrandContext || '';
+
   const visualRes = await ImageService.generatePostVisual({
     topic: topic || 'Tech Innovation & AI Productivity Workflows',
-    brandName,
+    brandName: resolvedBrand,
+    content: enrichedContent,
     tone,
+    renderTypography,
+    aspectRatio,
   });
 
   if (!visualRes || !visualRes.imageUrl) {
