@@ -7,6 +7,7 @@ import socketManager from '../socketService.js';
 import NotificationService from '../notificationService.js';
 import CacheService from '../cacheService.js';
 import { CACHE_KEYS } from '../../config/cacheKeys.js';
+import emailService from '../emailService.js';
 
 /**
  * Validates, refreshes (if needed), and returns a valid decrypted access token for the specified user and platform.
@@ -117,16 +118,33 @@ export async function getValidAccessToken(userId, platform) {
       socketManager.emitAccountStatusChange({
         userId,
         platform: platformUpper,
+        action: 'DISCONNECTED',
         connected: false,
         reason: 'TOKEN_EXPIRED',
       });
 
       await NotificationService.createNotification({
         userId,
-        title: `⚠️ ${platformUpper} Session Expired`,
+        title: `${platformUpper} Session Expired`,
         message: `Your ${platformUpper} account session has expired. Please reconnect your account to resume publishing.`,
         type: 'warning',
       }).catch(() => {});
+
+      // Dispatch urgent transactional email alert
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, name: true },
+      }).catch(() => null);
+
+      if (user && user.email) {
+        emailService.sendAccountDisconnectedEmail({
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.name,
+          platform: platformUpper,
+          reason: err.message,
+        }).catch((emailErr) => logger.warn(`[TokenManager] Failed to dispatch disconnect email: ${emailErr.message}`));
+      }
     } catch (dbErr) {
       logger.warn(`[TokenManager] Failed to auto-deactivate expired account ${account.id}: ${dbErr.message}`);
     }

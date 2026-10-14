@@ -52,7 +52,7 @@ export function RichPromptEditor({
     const isValid = Boolean(currentVal && currentVal.trim());
     
     return `<span class="${CHIP_CLASS} ${isValid ? 'valid' : 'empty'}" data-name="${name}" contenteditable="false" title="Click to view & edit {{${cleanLabel}}} value">
-      <span class="chip-dot">${isValid ? '✓' : '✨'}</span>
+      <span class="chip-dot">${isValid ? '✓' : '•'}</span>
       <span class="chip-label">{{${cleanLabel}}}</span>
       ${currentVal ? `<span class="chip-value">(${currentVal})</span>` : ''}
     </span>`;

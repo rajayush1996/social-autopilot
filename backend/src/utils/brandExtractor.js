@@ -94,15 +94,20 @@ export async function extractBrandAndVisualIntentWithAI({ content, topic, tone =
   const heuristicBrand = extractBrandFromContent(content);
   const cleanTopic = topic || 'Product Growth & Technology Innovation';
 
+  const rawFirstLine = (content ? content.split('\n')[0] : cleanTopic) || cleanTopic;
+  const cleanedHook = rawFirstLine.replace(/^[📌🎯💡🚀🔥✨\s\d\.\:\#]+/, '').trim().slice(0, 110);
+
   const isSpiritualOrDevotional = /shiv|durga|ganesh|krishna|ram|hanuman|god|deity|festival|diwali|navratri|shivratri|devotional|spiritual|bhakti|temple|puja|blessing/i.test(`${content} ${cleanTopic}`);
 
   const fallbackResult = {
     brandName: heuristicBrand || null,
     coreSubject: heuristicBrand || cleanTopic,
+    heroHook: cleanedHook || 'How simplicity and focused execution redefined an entire market.',
+    categoryPill: isSpiritualOrDevotional ? 'SACRED INSIGHT' : (heuristicBrand ? 'BRAND TEARDOWN' : 'STRATEGIC PLAYBOOK'),
     niche: isSpiritualOrDevotional ? 'SPIRITUAL' : (heuristicBrand ? 'TECH_STARTUP' : 'BUSINESS_GROWTH'),
     visualPrompt: isSpiritualOrDevotional
       ? `Majestic 3D digital artwork illustration representing ${heuristicBrand || cleanTopic}, divine serene cosmic lighting, gold and deep indigo glowing aura, high-resolution artistic aesthetic, respectful cultural illustration, ultra-sharp 8k resolution, cinematic social media poster. Zero distorted text.`
-      : `Minimalist 3D tech visual for ${heuristicBrand || cleanTopic}, featuring official company logo emblem and sleek modern product UI dashboard of ${heuristicBrand || cleanTopic}, deep indigo and electric cyan glowing neon accents, dark mode studio aesthetic, clean geometry, ultra-sharp 8k digital art, premium social media post banner visual. Zero distorted text.`
+      : `Minimalist 3D isometric tech illustration for ${heuristicBrand || cleanTopic}, subject positioned on right side with dark gradient negative space on left side, deep indigo and electric cyan glowing neon accents, clean geometry, 8k digital render. Zero distorted text, no letters, no words.`
   };
 
   const openai = getOpenAIClient();
@@ -111,7 +116,7 @@ export async function extractBrandAndVisualIntentWithAI({ content, topic, tone =
   }
 
   try {
-    const prompt = `Analyze this social media post content and extract key visual metadata as a strictly valid JSON object.
+    const prompt = `Analyze this social media post content and extract visual metadata & typography hook for diffusion image generation. Return a strictly valid JSON object.
 Post Content:
 """
 ${content ? content.slice(0, 1000) : cleanTopic}
@@ -121,8 +126,10 @@ Return JSON format:
 {
   "brandName": "Exact primary company/startup/brand/deity name featured in post, or null if none",
   "coreSubject": "Primary hero subject or problem solved (max 5 words)",
+  "heroHook": "Clean opening hook line (max 12 words) without emojis, suitable for bold headline typography",
+  "categoryPill": "Short 2-3 word uppercase header pill (e.g. TECH TEARDOWN, PRODUCT INSIGHT, GROWTH PLAYBOOK)",
   "niche": "TECH_STARTUP" | "DEVTOOLS" | "SPIRITUAL" | "SPORTS" | "FINTECH" | "PRODUCTIVITY" | "GENERAL_BUSINESS",
-  "visualPrompt": "A single compelling 3D minimalist image generation prompt (max 35 words) specifying visual elements, lighting, and product UI/metaphor for this exact subject. No distorted text."
+  "visualPrompt": "A single compelling 3D minimalist image generation prompt (max 35 words) specifying visual elements, lighting, subject placed on right side with generous dark negative space on left side for text overlay. CRITICAL: Zero distorted text, no letters, no words."
 }`;
 
     const completionPromise = openai.chat.completions.create({
@@ -132,7 +139,7 @@ Return JSON format:
         { role: 'user', content: prompt }
       ],
       temperature: 0.1,
-      max_tokens: 200,
+      max_tokens: 250,
       response_format: { type: 'json_object' }
     });
 
@@ -145,10 +152,12 @@ Return JSON format:
     const jsonText = completion.choices[0]?.message?.content?.trim();
     if (jsonText) {
       const parsed = JSON.parse(jsonText);
-      logger.info(`[BrandExtractor] 🧠 AI Intent Extracted -> Brand: "${parsed.brandName || 'N/A'}", Subject: "${parsed.coreSubject}", Niche: "${parsed.niche}"`);
+      logger.info(`[BrandExtractor] 🧠 AI Intent Extracted -> Brand: "${parsed.brandName || 'N/A'}", Subject: "${parsed.coreSubject}", Hook: "${(parsed.heroHook || '').slice(0, 40)}...", Niche: "${parsed.niche}"`);
       return {
         brandName: parsed.brandName || heuristicBrand || null,
         coreSubject: parsed.coreSubject || heuristicBrand || cleanTopic,
+        heroHook: parsed.heroHook || fallbackResult.heroHook,
+        categoryPill: parsed.categoryPill || fallbackResult.categoryPill,
         niche: parsed.niche || fallbackResult.niche,
         visualPrompt: parsed.visualPrompt || fallbackResult.visualPrompt,
       };

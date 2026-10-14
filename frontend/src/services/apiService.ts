@@ -2,6 +2,7 @@ import { apiClient, User, SocialAccount, Post, AIGeneratePayload, AIGeneratedRes
 import CONFIG from '@/config';
 import { API_ENDPOINTS } from '@/config/constants';
 import type { PlatformId } from '@/config/platforms';
+import { IMAGE_ASPECT_RATIOS, type ImageAspectRatio } from '@/constants/platforms';
 
 export interface FeatureConfig {
   id: string;
@@ -347,8 +348,8 @@ export class ApiService {
    */
   static async updateAutopilotSettings(payload: {
     userId: string;
-    autopilotEnabled: boolean;
-    brandContext: string;
+    autopilotEnabled?: boolean;
+    brandContext?: string;
   }): Promise<any> {
     const response = await apiClient.post(API_ENDPOINTS.UPDATE_SETTINGS, payload);
     return response.data?.data;
@@ -572,6 +573,18 @@ export class ApiService {
   }
 
   /**
+   * 📈 Fetch Real PostgreSQL Analytics & Intelligence Report
+   */
+  static async getAnalyticsReport(params?: { range?: string; platform?: string }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.range) query.set('range', params.range);
+    if (params?.platform) query.set('platform', params.platform);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await apiClient.get(`/api/analytics/report${qs}`);
+    return response.data;
+  }
+
+  /**
    * 🎨 Generate Multi-Day Themed Batch Assets for Visual Campaigns.
    */
   static async generateBatchAssets(payload: {
@@ -656,10 +669,21 @@ export class ApiService {
   /**
    * ⚡ Generate a live sample Flux visual graphic from a prompt
    */
-  static async generateSampleVisual(topic: string, brandName?: string): Promise<{ imageUrl: string; provider: string }> {
+  static async generateSampleVisual(
+    topic: string,
+    brandName?: string,
+    content?: string,
+    tone?: string,
+    renderTypography: boolean = true,
+    aspectRatio: ImageAspectRatio = IMAGE_ASPECT_RATIOS.SQUARE
+  ): Promise<{ imageUrl: string; provider: string }> {
     const response = await apiClient.post('/api/posts/sample-visual', {
       topic,
       brandName,
+      content,
+      tone,
+      renderTypography,
+      aspectRatio,
     });
     return response.data?.data;
   }

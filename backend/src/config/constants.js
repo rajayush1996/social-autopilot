@@ -90,6 +90,26 @@ export const PLATFORM_VIDEO_SCALING = Object.freeze({
   LANDSCAPE_FEED: 'scale=1920:1080:force_original_aspect_ratio=decrease',
 });
 
+export const IMAGE_ASPECT_RATIO = Object.freeze({
+  SQUARE: '1:1',
+  LANDSCAPE: '16:9',
+  PORTRAIT: '4:5',
+});
+
+export const IMAGE_DIMENSIONS = Object.freeze({
+  [IMAGE_ASPECT_RATIO.SQUARE]: Object.freeze({ width: 1080, height: 1080, label: 'Square' }),
+  [IMAGE_ASPECT_RATIO.LANDSCAPE]: Object.freeze({ width: 1200, height: 675, label: 'Landscape' }),
+  [IMAGE_ASPECT_RATIO.PORTRAIT]: Object.freeze({ width: 1080, height: 1350, label: 'Portrait' }),
+});
+
+export const IMAGE_PROVIDER = Object.freeze({
+  FLUX: 'FLUX_1_SCHNELL',
+  DALLE: 'DALL-E-3',
+  BRANDED_CARD: 'BRANDED_SVG_CARD',
+  HYBRID_SHARP: 'HYBRID_SHARP_COMPOSITE',
+  FALLBACK_STOCK: 'FALLBACK_STOCK',
+});
+
 export default {
   SOCIAL_PLATFORM,
   POST_STATUS,
@@ -100,4 +120,7 @@ export default {
   TARGET_PLATFORM,
   PLATFORM_IMAGE_DIMENSIONS,
   PLATFORM_VIDEO_SCALING,
+  IMAGE_ASPECT_RATIO,
+  IMAGE_DIMENSIONS,
+  IMAGE_PROVIDER,
 };

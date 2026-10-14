@@ -264,6 +264,7 @@ export class ScheduleService {
       brandContext: context,
       contentSummary: memorySummaryStr,
       includeImage: isImageRequested,
+      userId: schedule.userId,
     });
 
     if (!aiResult || !aiResult.content) {
