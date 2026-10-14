@@ -254,7 +254,7 @@ export class UserService {
 
     await NotificationService.createNotification({
       userId: updatedUser.id,
-      title: 'AI Credits Granted 🎁',
+      title: 'AI Credits Granted',
       message: `Super Admin granted you ${creditAmount} AI Credits!`,
       type: 'success',
     });

@@ -386,7 +386,7 @@ When a token cannot be refreshed (revoked access, changed password, or expired O
    - Emits `account_status_changed` (`action: 'DISCONNECTED'`) so channel chips in all open tabs instantly transition to offline status.
    - Emits `notification:new` triggering an immediate floating alert toast on the active dashboard.
 4. **Urgent Transactional Email Alert:**
-   - Dispatches `sendAccountDisconnectedEmail` with direct action button: `🔗 Reconnect {Platform} Now` pointing to `/accounts`.
+   - Dispatches `sendAccountDisconnectedEmail` with direct action button: `Reconnect {Platform} Account` pointing to `/accounts`.
 
 ---
 

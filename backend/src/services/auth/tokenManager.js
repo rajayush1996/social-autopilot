@@ -125,7 +125,7 @@ export async function getValidAccessToken(userId, platform) {
 
       await NotificationService.createNotification({
         userId,
-        title: `⚠️ ${platformUpper} Session Expired`,
+        title: `${platformUpper} Session Expired`,
         message: `Your ${platformUpper} account session has expired. Please reconnect your account to resume publishing.`,
         type: 'warning',
       }).catch(() => {});

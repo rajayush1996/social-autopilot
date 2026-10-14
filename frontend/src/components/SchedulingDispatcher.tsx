@@ -106,7 +106,7 @@ export function CampaignCreativeStudio({
             url: res.imageUrl,
             prompt: baseTopic,
           }]);
-          toast.success('🎨 Sample Flux.1 visual generated!');
+          toast.success('Sample visual generated');
         }
       } else {
         // Generate primary Flux visual
@@ -121,7 +121,7 @@ export function CampaignCreativeStudio({
         }));
         
         onAssetsUpdate(batchList);
-        toast.success(`⚡ Generated ${selectedDays}-Day Campaign Visual Bundle!`);
+        toast.success(`Generated ${selectedDays}-Day Campaign Visual Bundle`);
       }
     } catch (err: any) {
       toast.error('Failed to generate Flux visuals.');
@@ -194,16 +194,16 @@ export function CampaignCreativeStudio({
               : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
           }`}
         >
-          <span>📝 No Image</span>
+          <span>No Image</span>
         </button>
       </div>
 
       {/* Dynamic Content Area based on Selected Mode */}
       {imageMode === 'NONE' && (
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-4 text-center space-y-1.5 shadow-xs">
-          <p className="text-xs font-bold text-[var(--text-primary)]">📝 Text Only Posts</p>
+          <p className="text-xs font-bold text-[var(--text-primary)]">Text Only Posts</p>
           <p className="text-[11px] text-[var(--text-secondary)]">
-            Posts will be formatted and published as clean text without any images attached.
+            Posts will be published as clean text without any image assets attached.
           </p>
         </div>
       )}
@@ -218,7 +218,7 @@ export function CampaignCreativeStudio({
               >
                 <img src={customImageUrl} alt="Custom Upload" className="max-h-40 w-full object-contain rounded-lg group-hover:scale-105 transition-transform" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 rounded-xl">
-                  🔍 Click to preview full screen
+                  Click to preview full screen
                 </div>
               </div>
 
@@ -284,7 +284,7 @@ export function CampaignCreativeStudio({
                   aiVisualSubMode === 'DYNAMIC' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-secondary)]'
                 }`}
               >
-                ⚡ Generate per post
+                Generate per post
               </button>
               <button
                 type="button"
@@ -293,7 +293,7 @@ export function CampaignCreativeStudio({
                   aiVisualSubMode === 'BATCH' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-secondary)]'
                 }`}
               >
-                📦 Image Pack
+                Image Pack
               </button>
             </div>
 
@@ -383,7 +383,7 @@ export function CampaignCreativeStudio({
                         Day {asset.day}
                       </span>
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
-                        🔍 View
+                        View
                       </div>
                     </div>
                   </div>
@@ -397,7 +397,7 @@ export function CampaignCreativeStudio({
             >
               <img src={assets[0].url} alt="Flux Preview" className="max-h-40 w-full object-contain rounded-lg group-hover:scale-105 transition-transform" />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 rounded-xl">
-                🔍 Click to preview full screen
+                Click to preview full screen
               </div>
             </div>
           )}
@@ -575,7 +575,7 @@ export function SchedulingDispatcher() {
       if (url) {
         setFormCustomImageUrl(url);
         setFormImageMode('CUSTOM_UPLOAD');
-        toast.success('📁 Custom brand image uploaded!');
+        toast.success('Custom brand image uploaded');
       }
     } catch (err) {
       toast.error('Failed to upload custom image.');
@@ -707,7 +707,7 @@ export function SchedulingDispatcher() {
 
       await ApiService.runScheduleNow(sched.id, updateTargetId);
       setPendingUpdateIds(prev => prev.filter(id => id !== sched.id));
-      toast.success(`🚀 Dispatched campaign "${sched.name}"!`);
+      toast.success(`Dispatched campaign "${sched.name}"`);
       fetchSchedulesData();
       fetchPostsData();
     } catch (err: any) {
@@ -819,12 +819,12 @@ export function SchedulingDispatcher() {
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-[var(--bg-input)] border border-[var(--border-color)] px-3.5 py-2 rounded-xl shrink-0">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
-                    <span>🌅 Draft:</span>
+                    <span>Draft:</span>
                     <span className="font-mono text-xs font-bold text-[var(--text-primary)]">{formatTimeDisplay(sched.draftTimeOfDay || '09:00')}</span>
                   </div>
                   <span className="hidden sm:inline text-slate-400">➔</span>
                   <div className="flex items-center gap-1.5 sm:border-r border-[var(--border-color)] sm:pr-3">
-                    <span className="text-[11px] text-[#2563EB] font-bold">🚀 Live:</span>
+                    <span className="text-[11px] text-[#2563EB] font-bold">Live:</span>
                     <span className="font-mono text-xs font-black text-[var(--text-primary)]">{formatTimeDisplay(sched.timeOfDay || '20:00')}</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-[var(--text-secondary)]">{formatDaysSummary(sched.daysOfWeek)}</span>
@@ -840,11 +840,11 @@ export function SchedulingDispatcher() {
                   {/* Media Mode Badge */}
                   {(sched as any).imageMode === 'AI_FLUX' || (sched as any).includeImage ? (
                     <span className="text-[9px] font-extrabold px-2 py-1 rounded-md bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/25 flex items-center gap-1">
-                      <span>✨ AI Visual</span>
+                      <span>AI Visual</span>
                     </span>
                   ) : (sched as any).imageMode === 'CUSTOM_UPLOAD' ? (
                     <span className="text-[9px] font-extrabold px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/25 flex items-center gap-1">
-                      <span>📁 Brand Media</span>
+                      <span>Brand Media</span>
                     </span>
                   ) : (
                     <span className="text-[9px] font-medium px-2 py-1 rounded-md bg-[var(--bg-input)] text-[var(--text-secondary)] border border-[var(--border-color)]">
@@ -992,7 +992,7 @@ export function SchedulingDispatcher() {
                     {/* Stage 1: AI Draft & Review Email Time */}
                     <div className="space-y-1 bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl">
                       <label className="text-[11px] font-bold text-[var(--text-primary)] block">
-                        🌅 1. AI Draft & Review Email
+                        1. AI Draft & Review Email
                       </label>
                       <p className="text-[10px] text-[var(--text-secondary)]">Time when AI generates content & sends approval link</p>
                       <input
@@ -1007,7 +1007,7 @@ export function SchedulingDispatcher() {
                     {/* Stage 2: Live Publishing Dispatch Time */}
                     <div className="space-y-1 bg-[var(--bg-card)] border border-[var(--border-color)] p-3 rounded-xl">
                       <label className="text-[11px] font-bold text-[var(--text-primary)] block">
-                        🚀 2. Live Social Dispatch
+                        2. Live Social Dispatch
                       </label>
                       <p className="text-[10px] text-[var(--text-secondary)]">Time when approved post goes live to channels</p>
                       <input
@@ -1162,7 +1162,7 @@ export function SchedulingDispatcher() {
                       className="flex items-center gap-1.5 text-xs font-bold text-[#2563EB] bg-blue-50 dark:bg-blue-900/20 border border-blue-200 px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 cursor-pointer shadow-xs"
                     >
                       <Sparkles className={`w-3.5 h-3.5 ${isEnhancingTopic ? 'animate-spin' : ''}`} />
-                      {isEnhancingTopic ? 'Improving...' : '✨ Improve with AI'}
+                      {isEnhancingTopic ? 'Improving...' : 'Improve with AI'}
                     </button>
 
                     <button
@@ -1239,12 +1239,12 @@ export function SchedulingDispatcher() {
                   <div className="space-y-1">
                     <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Format Style</label>
                     <select value={formFormatStyle} onChange={(e) => setFormFormatStyle(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-2.5 py-1.5 text-[var(--text-primary)] text-[11px] font-medium">
-                      <option value="DYNAMIC_AUTO">✨ Dynamic Rotation (Fresh Each Time)</option>
-                      <option value="PARAGRAPHS">📄 Standard Paragraphs (Pure Prose)</option>
-                      <option value="BULLETS">📌 Bullet Points List</option>
-                      <option value="ONE_LINERS">⚡ Punchy One-Liners</option>
-                      <option value="CAROUSEL">🎠 Carousel Slide Deck</option>
-                      <option value="THREAD">🧵 Numbered Thread</option>
+                      <option value="DYNAMIC_AUTO">Dynamic Rotation (Fresh Each Time)</option>
+                      <option value="PARAGRAPHS">Standard Paragraphs (Pure Prose)</option>
+                      <option value="BULLETS">Bullet Points List</option>
+                      <option value="ONE_LINERS">Punchy One-Liners</option>
+                      <option value="CAROUSEL">Carousel Slide Deck</option>
+                      <option value="THREAD">Numbered Thread</option>
                     </select>
                   </div>
 

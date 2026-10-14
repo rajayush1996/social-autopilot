@@ -213,7 +213,7 @@ export class SocketServerManager {
     if (resolvedAction === 'DISCONNECTED') {
       this.emitNotification({
         userId,
-        title: `⚠️ ${platformUpper} Account Disconnected`,
+        title: `${platformUpper} Account Disconnected`,
         message: `Your ${platformUpper} authorization has expired or was revoked. Please reconnect on the Accounts page.`,
         type: 'warning',
       });

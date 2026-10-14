@@ -339,7 +339,7 @@ export default function OnboardingModal({
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-3 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans"
             />
             <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">
-              💡 The AI Engine uses this to understand your background and formulate daily relevant posts. You can edit this anytime in Settings.
+              The AI Engine uses this to understand your background and formulate daily relevant posts. You can edit this anytime in Settings.
             </p>
           </div>
 

@@ -41,7 +41,8 @@ import {
   Compass,
   Square,
   Monitor,
-  Smartphone
+  Smartphone,
+  TrendingUp,
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -89,10 +90,10 @@ const ASPECT_RATIO_ICONS: Record<ImageAspectRatio, React.ComponentType<{ classNa
 };
 
 const PRESET_PROMPTS = [
-  { label: '🚀 Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
-  { label: '💡 Tech Tip', text: 'Share a weekly tip explaining the benefits of decoupling API queries into structured client services.' },
-  { label: '💬 Client Review', text: 'Draft a thank-you note highlighting a recent client success story and expressing appreciation for their feedback.' },
-  { label: '📈 Progress Update', text: 'Summarize our engineering progress this week, detailing backend performance improvements.' },
+  { label: 'Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
+  { label: 'Tech Tip', text: 'Share a weekly tip explaining the benefits of decoupling API queries into structured client services.' },
+  { label: 'Client Review', text: 'Draft a thank-you note highlighting a recent client success story and expressing appreciation for their feedback.' },
+  { label: 'Progress Update', text: 'Summarize our engineering progress this week, detailing backend performance improvements.' },
 ];
 
 const TONE_OPTIONS = [
@@ -243,7 +244,7 @@ export default function ComposerPage() {
       if (hookParam) {
         setTopic(hookParam);
         dispatch(setTopicAction(hookParam));
-        toast.info('🪄 Viral Hook loaded into composer!');
+        toast.info('Viral Hook loaded into composer');
       }
 
       if (tagsParam) {
@@ -252,7 +253,7 @@ export default function ComposerPage() {
           dispatch(setTopicAction(newTopic));
           return newTopic;
         });
-        toast.info('🏷️ Trending hashtags appended!');
+        toast.info('Trending hashtags appended');
       }
 
       if (scheduleTimeParam === 'today-peak') {
@@ -262,7 +263,7 @@ export default function ComposerPage() {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
         setScheduledDate(`${yyyy}-${mm}-${dd}T17:45`);
-        toast.info('⚡ Auto-filled with Today 5:45 PM Peak Window!');
+        toast.info('Auto-filled with Today 5:45 PM Peak Window');
       }
     }
   }, []);
@@ -364,15 +365,15 @@ export default function ComposerPage() {
     const key = phName.toLowerCase();
     if (key.includes('link') || key.includes('url') || key.includes('web') || key.includes('site') || key.includes('cta')) {
       const formattedUrl = val.startsWith('http://') || val.startsWith('https://') ? val : `https://${val}`;
-      const formattedVal = platform === 'INSTAGRAM' ? `🔗 ${formattedUrl}` : formattedUrl;
+      const formattedVal = formattedUrl;
       return { formattedVal, labelWithPrefix: formattedVal };
     }
     if (key.includes('code') || key.includes('promo') || key.includes('coupon')) {
-      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? `🎟️ ${toUnicodeBold(val)}` : `🎟️ ${val}`;
+      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
       return { formattedVal, labelWithPrefix: formattedVal };
     }
     if (key.includes('author') || key.includes('creator') || key.includes('user')) {
-      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? `✍️ ${toUnicodeBold(val)}` : `✍️ ${val}`;
+      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
       return { formattedVal, labelWithPrefix: formattedVal };
     }
     const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
@@ -642,7 +643,7 @@ export default function ComposerPage() {
       if (res && res.imageUrl) {
         setMediaFileUrl(res.imageUrl);
         setMediaType('IMAGE');
-        toast.success(`✨ AI image (${ratioToUse}) generated and attached to your post!`);
+        toast.success(`AI image (${ratioToUse}) generated and attached to your post.`);
       } else {
         toast.error('Failed to generate AI image.');
       }
@@ -961,7 +962,7 @@ export default function ComposerPage() {
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      ✍️ Custom Prompt
+                      Custom Prompt
                     </button>
                     <button
                       type="button"
@@ -972,7 +973,7 @@ export default function ComposerPage() {
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      🔗 Summarize Article URL
+                      Summarize Article URL
                     </button>
                   </div>
 
@@ -980,9 +981,9 @@ export default function ComposerPage() {
                   <div className="flex items-center gap-1.5 overflow-x-auto">
                     <span className="text-[11px] font-bold text-[var(--text-secondary)]">Presets:</span>
                     {[
-                      { label: '🚀 Product Launch', text: 'Excited to announce the launch of our new product feature! Here is why we built it and what it unlocks for users:' },
-                      { label: '💡 Tech Insight', text: '3 critical lessons we learned while scaling our background processing architecture:' },
-                      { label: '📈 Growth Story', text: 'How we increased user engagement by 400% in 30 days without spending a dollar on ads:' },
+                      { label: 'Product Launch', text: 'Excited to announce the launch of our new product feature! Here is why we built it and what it unlocks for users:' },
+                      { label: 'Tech Insight', text: '3 critical lessons we learned while scaling our background processing architecture:' },
+                      { label: 'Growth Story', text: 'How we increased user engagement by 400% in 30 days without spending a dollar on ads:' },
                     ].map((p, idx) => (
                       <button
                         key={idx}
@@ -1019,7 +1020,7 @@ export default function ComposerPage() {
                     </label>
 
                     <div className="flex items-center gap-2.5">
-                      {/* 1. ✨ Improve with AI Button */}
+                      {/* 1. Improve with AI Button */}
                       <button
                         type="button"
                         onClick={handleEnhancePrompt}
@@ -1028,10 +1029,10 @@ export default function ComposerPage() {
                         title="AI will improve and structure your prompt for better engagement"
                       >
                         <Wand2 className={`w-4 h-4 ${isEnhancing ? 'animate-spin' : ''}`} />
-                        <span>{isEnhancing ? 'Improving...' : '✨ Improve with AI'}</span>
+                        <span>{isEnhancing ? 'Improving...' : 'Improve with AI'}</span>
                       </button>
 
-                      {/* 2. 🏷️ Smart Tags Dropdown */}
+                      {/* 2. Smart Tags Dropdown */}
                       <div className="relative">
                         <button
                           type="button"
@@ -1149,7 +1150,7 @@ export default function ComposerPage() {
                   {trendingHashtags.length > 0 && (
                     <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1.5 custom-scrollbar">
                       <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider shrink-0 flex items-center gap-1.5">
-                        <span className="text-amber-500">🔥</span>
+                        <TrendingUp className="w-3.5 h-3.5 text-[#2563EB]" />
                         <span>Trending:</span>
                       </span>
                       {trendingHashtags.map((t, idx) => {
@@ -1295,9 +1296,9 @@ export default function ComposerPage() {
                                 onChange={(e) => setContentLength(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="CONCISE">⚡ Concise (Short & punchy &lt; 280 chars)</option>
-                                <option value="BALANCED">⚖️ Balanced (Standard 1-2 paragraphs)</option>
-                                <option value="LONG_FORM">📚 Deep Dive (Detailed long-form post)</option>
+                                <option value="CONCISE">Concise (Short & punchy &lt; 280 chars)</option>
+                                <option value="BALANCED">Balanced (Standard 1-2 paragraphs)</option>
+                                <option value="LONG_FORM">Deep Dive (Detailed long-form post)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1316,10 +1317,10 @@ export default function ComposerPage() {
                                 onChange={(e) => setFormatStyle(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="PARAGRAPHS">📄 Standard Paragraphs (Rotates Fresh Prose Layouts Every Time)</option>
-                                <option value="BULLETS">📌 Bullet Points (Rotates Fresh Bullet Layouts Every Time)</option>
-                                <option value="ONE_LINERS">⚡ Punchy One-Liners (Rotates Fresh White-Space Layouts)</option>
-                                <option value="CAROUSEL">🎠 Carousel Slide Deck (Rotates Fresh Slide Structures)</option>
+                                <option value="PARAGRAPHS">Standard Paragraphs (Prose layout)</option>
+                                <option value="BULLETS">Bullet Points (Structured layout)</option>
+                                <option value="ONE_LINERS">Punchy One-Liners (Spaced layout)</option>
+                                <option value="CAROUSEL">Carousel Slide Deck (Slide structure)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1341,9 +1342,9 @@ export default function ComposerPage() {
                                 onChange={(e) => setEmojiDensity(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="MINIMAL">⚪ Minimal (0-1 subtle emojis)</option>
-                                <option value="BALANCED">✨ Standard (2-4 natural emojis)</option>
-                                <option value="EXPRESSIVE">🔥 Expressive (5+ vibrant emojis)</option>
+                                <option value="MINIMAL">Minimal (0-1 subtle emojis)</option>
+                                <option value="BALANCED">Standard (2-4 natural emojis)</option>
+                                <option value="EXPRESSIVE">Expressive (5+ vibrant emojis)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1362,9 +1363,9 @@ export default function ComposerPage() {
                                 onChange={(e) => setHashtagCount(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="NONE">🚫 None (0 hashtags - clean text)</option>
-                                <option value="FOCUSED">🎯 Focused (2-3 targeted hashtags)</option>
-                                <option value="MAX_REACH">🚀 Max Reach (5-8 trending hashtags)</option>
+                                <option value="NONE">None (0 hashtags - clean text)</option>
+                                <option value="FOCUSED">Focused (2-3 targeted hashtags)</option>
+                                <option value="MAX_REACH">Max Reach (5-8 trending hashtags)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1439,7 +1440,7 @@ export default function ComposerPage() {
                         : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
                     }`}
                   >
-                    <span>📝 No Image</span>
+                    <span>No Image</span>
                   </button>
                 </div>
 
@@ -1541,10 +1542,10 @@ export default function ComposerPage() {
                           {/* Quick visual style presets */}
                           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-0.5">
                             {[
-                              { label: '✨ 3D Isometric', cue: '3D isometric render, translucent glassmorphism, soft studio lighting' },
-                              { label: '📸 Editorial Photo', cue: 'Realistic editorial photography, 35mm lens, natural daylight, candid' },
-                              { label: '🎨 Vector Minimal', cue: 'Clean flat vector illustration, bold geometric shapes, high contrast' },
-                              { label: '🌌 Cyber Dark', cue: 'Dark mode aesthetic, neon cyan and deep indigo glow, cinematic rim light' },
+                              { label: '3D Isometric', cue: '3D isometric render, translucent glassmorphism, soft studio lighting' },
+                              { label: 'Editorial Photo', cue: 'Realistic editorial photography, 35mm lens, natural daylight, candid' },
+                              { label: 'Vector Minimal', cue: 'Clean flat vector illustration, bold geometric shapes, high contrast' },
+                              { label: 'Cyber Dark', cue: 'Dark mode aesthetic, neon cyan and deep indigo glow, cinematic rim light' },
                             ].map((preset) => (
                               <button
                                 key={preset.label}
@@ -1591,7 +1592,7 @@ export default function ComposerPage() {
                                   : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)]'
                               }`}
                             >
-                              {renderTypography ? '✨ Overlay ON' : '🖼️ Raw Art Only'}
+                              {renderTypography ? 'Overlay ON' : 'Raw Art Only'}
                             </button>
                           </div>
 
@@ -1678,7 +1679,7 @@ export default function ComposerPage() {
 
                 {mediaMode === 'NONE' && (
                   <div className="bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-xl p-3.5 text-center space-y-1 animate-fadeIn">
-                    <p className="text-xs font-bold text-[var(--text-primary)]">📝 Text Only Post</p>
+                    <p className="text-xs font-bold text-[var(--text-primary)]">Text Only Post</p>
                     <p className="text-[11px] text-[var(--text-secondary)]">Your post will be published without images.</p>
                   </div>
                 )}
@@ -1702,11 +1703,11 @@ export default function ComposerPage() {
                   </div>
                 )}
 
-                {/* 💬 Auto-Post First Comment (LinkedIn Algorithm Reach Protection) */}
+                {/* Auto-Post First Comment (LinkedIn Algorithm Reach Protection) */}
                 <div className="bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                      <span>💬 Auto-Post First Comment</span>
+                      <span>Auto-Post First Comment</span>
                       <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 font-bold">LinkedIn Boost</span>
                     </label>
                   </div>
@@ -1716,7 +1717,7 @@ export default function ComposerPage() {
                   <textarea
                     value={firstComment}
                     onChange={(e) => setFirstComment(e.target.value)}
-                    placeholder="e.g. 🔗 Here's the link to check it out: https://... (or 'Leave a comment to get the playbook!')"
+                    placeholder="e.g. Here is the link to check it out: https://... (or 'Leave a comment to get the playbook!')"
                     rows={2}
                     className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium"
                   />
@@ -1739,11 +1740,11 @@ export default function ComposerPage() {
                         <span>Processing...</span>
                       </>
                     ) : hasZeroSelectedActivePlatform ? (
-                      '⚠️ Select Target Destination Above'
+                      'Select Target Destination Above'
                     ) : publishMode === 'NOW' ? (
-                      '⚡ Publish Now'
+                      'Publish Now'
                     ) : (
-                      '🗓️ Schedule Post'
+                      'Schedule Post'
                     )}
                   </button>
                   <div className="w-[1px] bg-blue-700/50"></div>
@@ -1936,7 +1937,7 @@ export default function ComposerPage() {
                                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                   }`}
                                 >
-                                  🎠 Slides
+                                  Slides
                                 </button>
                                 <button
                                   type="button"
@@ -1947,7 +1948,7 @@ export default function ComposerPage() {
                                       : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                   }`}
                                 >
-                                  📝 Text
+                                  Text
                                 </button>
                               </div>
                             )}
@@ -2082,7 +2083,7 @@ export default function ComposerPage() {
                               className="text-[11px] font-extrabold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
                             >
                               <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
-                              <span>{diagnosingVirality ? 'Analyzing...' : '⚡ Check Post Score'}</span>
+                              <span>{diagnosingVirality ? 'Analyzing...' : 'Check Post Score'}</span>
                             </button>
                           </div>
                           <div className="flex items-center gap-2">
@@ -2254,13 +2255,13 @@ export default function ComposerPage() {
         </div>
       )}
 
-      {/* 🧭 Universal AI Persona & Niche Setup Wizard */}
+      {/* Universal AI Persona & Niche Setup Wizard */}
       <OnboardingModal
         isOpen={showPersonaModal}
         onClose={() => setShowPersonaModal(false)}
         onSaved={(newCtx, newName) => {
           setCurrentUser((prev) => (prev ? { ...prev, brandContext: newCtx, name: newName || prev.name } : null));
-          toast.success('✨ Brand Voice & Niche updated! Single Post Composer is now tuned to this voice.');
+          toast.success('Brand Voice & Niche updated! Single Post Composer is now tuned to this voice.');
         }}
         initialBrandContext={currentUser?.brandContext || ''}
         initialName={currentUser?.name || ''}

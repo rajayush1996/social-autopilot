@@ -123,7 +123,7 @@ class EmailService {
         await prisma.notification.create({
           data: {
             userId,
-            title: '⚠️ Email Delivery Notice',
+            title: 'Email Delivery Notice',
             message: `Email "${subject}" could not be sent to ${to}. Reason: ${lastError?.message || 'Delivery failed'}`,
             type: 'warning',
           }
@@ -345,7 +345,7 @@ class EmailService {
                     <tr>
                       <td align="left" valign="middle">
                         <span style="display:inline-block; background-color:#2563eb; color:#ffffff; font-weight:800; font-size:12px; padding:6px 12px; border-radius:6px; letter-spacing:0.8px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                          ⚡ OMNISYNC
+                          OMNISYNC
                         </span>
                       </td>
                       <td align="right" valign="middle">
@@ -391,7 +391,7 @@ class EmailService {
                   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; margin-bottom:20px;">
                     <tr>
                       <td style="padding:10px 14px; font-size:12.5px; line-height:18px; color:#1e40af; font-weight:600; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                        📅 <strong>Target Publishing Time:</strong> ${formattedDate}
+                        <strong>Target Publishing Time:</strong> ${formattedDate}
                       </td>
                     </tr>
                   </table>
@@ -401,7 +401,7 @@ class EmailService {
                     <tr>
                       <td align="center" bgcolor="#2563eb" style="border-radius:10px; background-color:#2563eb;">
                         <a href="${approveLink}" target="_blank" class="btn-primary" style="display:block; width:100%; padding:14px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:14.5px; font-weight:700; color:#ffffff; text-decoration:none; text-align:center; border-radius:10px; line-height:20px;">
-                          ✅ 1-Click Approve &amp; Schedule
+                          Approve &amp; Schedule
                         </a>
                       </td>
                     </tr>
@@ -411,14 +411,14 @@ class EmailService {
                     <tr>
                       <td align="center" bgcolor="#ffffff" style="border-radius:10px; background-color:#ffffff; border:1px solid #cbd5e1;">
                         <a href="${editLink}" target="_blank" class="btn-secondary" style="display:block; width:100%; padding:12px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:13.5px; font-weight:600; color:#334155; text-decoration:none; text-align:center; border-radius:10px; line-height:18px;">
-                          ✏️ Edit in Composer
+                          Edit in Composer
                         </a>
                       </td>
                     </tr>
                   </table>
 
                   <p style="margin:0; text-align:center; font-size:11.5px; line-height:16px; color:#64748b; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    🔒 <em>Safe 1-Click Approval &bull; No password or login required.</em>
+                    <em>Secure 1-Click Approval &bull; No password or login required.</em>
                   </p>
 
                 </td>
@@ -457,7 +457,7 @@ class EmailService {
       to: userEmail,
       subject: `[Action Required] Review & Approve: Post for ${targetPlatforms.join(', ') || 'Social Media'}`,
       html: htmlContent,
-      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${displayContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
+      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${displayContent}"\n\nScheduled for: ${formattedDate}\n\nApprove & Schedule: ${approveLink}\nEdit in Composer: ${editLink}`,
       from: fromAddress,
       userId,
       metadata: { postId, type: 'POST_APPROVAL', targetPlatforms },
@@ -489,7 +489,7 @@ class EmailService {
     <body>
       <div class="card">
         <div class="header">
-          <h2 style="margin:0; font-size:18px; font-weight:800; color:#ffffff;">⚠️ ${platformName} Connection Alert</h2>
+          <h2 style="margin:0; font-size:18px; font-weight:800; color:#ffffff;">${platformName} Connection Alert</h2>
           <p style="margin:4px 0 0 0; font-size:13px; opacity:0.95; color:#fee2e2;">Action Required &bull; Auto-Publishing Paused</p>
         </div>
         <div class="content">
@@ -503,7 +503,7 @@ class EmailService {
           ${reason ? `<div style="padding:12px 14px; background:#fef2f2; border-left:3px solid #ef4444; border-radius:6px; font-size:12px; color:#991b1b; margin-bottom:20px;"><em>Details: ${reason}</em></div>` : ''}
           <div style="text-align:center; margin:26px 0 20px 0;">
             <a href="${reconnectLink}" class="btn" style="color:#ffffff;">
-              🔗 Reconnect ${platformName} Account
+              Reconnect ${platformName} Account
             </a>
           </div>
           <p style="margin:24px 0 0 0; font-size:11.5px; color:#94a3b8; text-align:center;">
@@ -517,7 +517,7 @@ class EmailService {
 
     return this.sendEmail({
       to: userEmail,
-      subject: `🚨 [Action Required] Your ${platformName} Account has Disconnected`,
+      subject: `[Action Required] Your ${platformName} Account has Disconnected`,
       html: htmlContent,
       text: `Hi ${userName || 'Creator'},\n\nYour ${platformName} authorization session has expired or the connection was revoked.\n\nPlease reconnect your account to resume automated publishing:\n${reconnectLink}\n\nReason: ${reason || 'Session expired'}`,
       from: fromAddress,
