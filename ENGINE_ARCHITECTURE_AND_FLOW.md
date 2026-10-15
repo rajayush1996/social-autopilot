@@ -23,6 +23,7 @@
 14. [Cross-Niche Comparative Synthesis Table](#-14-cross-niche-comparative-synthesis-table)
 15. [End-to-End Sequence Flow & Lifecycle](#-15-end-to-end-sequence-flow--lifecycle)
 16. [Key Architectural Invariants](#-16-key-architectural-invariants)
+17. [CI/CD Pipeline & Automated Verification Matrix](#-17-cicd-pipeline--automated-verification-matrix)
 
 ---
 
@@ -455,3 +456,30 @@ sequenceDiagram
 4. **Zero Hallucinated Links:** Never invent `.com` URLs. Real links only when provided or describing real historical companies.
 5. **Decoupled 3-Layer Pipeline:** Semantic Parsing $\rightarrow$ Contextual Governance $\rightarrow$ Multi-Agent Synthesis.
 6. **Self-Healing Execution:** Zero skipped cron jobs; auto-recovering token refreshers and fail-safe timeouts.
+
+---
+
+## 🚀 17. CI/CD Pipeline & Automated Verification Matrix
+
+Located in [`.github/workflows/ci-dev.yml`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/social-autopilot/.github/workflows/ci-dev.yml) and [`.github/workflows/deploy-production.yml`](file:///C:/Users/AYUSH%20RAJ/Documents/ayush/social-autopilot/.github/workflows/deploy-production.yml):
+
+### 1. Dual-Track Workflow Topology
+- **Continuous Integration (`ci-dev.yml`)**:
+  - Automatically triggers on `push` to `dev` and on `pull_request` targeting `master` or `dev`.
+  - Runs in clean `ubuntu-latest` containers with Node.js 20.
+  - **Job 1: `validate-backend`**:
+    - Installs dependencies via `npm ci`.
+    - **Prisma Schema Syntax Validation (`npx prisma validate`)**: Provided with dummy `DATABASE_URL` (`postgresql://postgres:postgres@localhost:5432/omnisync_test?schema=public`) directly inside the workflow file environment block. Bypasses requirement for production credentials while rigorously validating schema syntax and relation integrity (resolves error `P1012`).
+    - **Prisma Client Compilation (`npx prisma generate`)**: Compiles typed Prisma Client models prior to running backend integration tests.
+    - **Test Runner (`npm test`)**: Runs automated suites (`imageEngine.test.js`, `tokenManager.test.js`, `socket.test.js`, `aiService.test.js`).
+  - **Job 2: `validate-frontend`**:
+    - Runs strict TypeScript compilation (`npx tsc --noEmit`).
+    - Executes Next.js production build (`npm run build`) ensuring 100% type safety and asset compilation.
+- **Continuous Deployment (`deploy-production.yml`)**:
+  - Manual 1-click trigger (`workflow_dispatch`) with audit logging.
+  - SSH deployment to Oracle Cloud VM (`140.245.202.135`).
+  - Symlinks production secrets (`/var/secrets/social-autopilot/`).
+  - Executes `prisma db push` and `prisma generate`.
+  - Rebuilds frontend and executes zero-downtime PM2 reload (`pm2 reload all --update-env`).
+  - Performs automated healthcheck query (`/health`).
+
