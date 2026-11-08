@@ -169,9 +169,8 @@ export default function ComposerPage() {
   const [portalMounted, setPortalMounted] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Publish Split Button States
+  // Publish Mode State
   const [publishMode, setPublishMode] = useState<'NOW' | 'SCHEDULE'>('NOW');
-  const [showPublishDropdown, setShowPublishDropdown] = useState(false);
 
   // Post Card 3-Dot Actions Menu
   const [showCardMenu, setShowCardMenu] = useState(false);
@@ -392,16 +391,6 @@ export default function ComposerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreenPreview]);
 
-  // Click outside to close publish dropdown
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showPublishDropdown && !(e.target as Element).closest('.publish-dropdown-container')) {
-        setShowPublishDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPublishDropdown]);
 
   // Click outside to close post card 3-dot menu
   useEffect(() => {
@@ -423,8 +412,58 @@ export default function ComposerPage() {
 
   const [scheduledDate, setScheduledDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showFirstCommentDrawer, setShowFirstCommentDrawer] = useState(false);
   const toast = useToast();
   const isFetchingRef = useRef(false);
+
+  const userTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
+
+  const formatFriendlySchedule = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const target = new Date(dateStr);
+      if (isNaN(target.getTime())) return '';
+      const now = new Date();
+      const isToday = target.toDateString() === now.toDateString();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = target.toDateString() === tomorrow.toDateString();
+
+      const timePart = target.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      if (isToday) return `Today at ${timePart}`;
+      if (isTomorrow) return `Tomorrow at ${timePart}`;
+      return `${target.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} at ${timePart}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const applySchedulePreset = (type: 'TOMORROW_MORNING' | 'TODAY_PEAK' | 'IN_2_HOURS') => {
+    setPublishMode('SCHEDULE');
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const d = new Date();
+
+    if (type === 'TOMORROW_MORNING') {
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 30, 0, 0);
+      setScheduledDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:30`);
+      toast.info('Set to Tomorrow 9:30 AM (Peak morning window)');
+    } else if (type === 'TODAY_PEAK') {
+      if (d.getHours() >= 17 && d.getMinutes() >= 30) {
+        d.setDate(d.getDate() + 1);
+        toast.info('Set to Tomorrow 5:45 PM (Peak evening window)');
+      } else {
+        toast.info('Set to Today 5:45 PM (Peak evening window)');
+      }
+      d.setHours(17, 45, 0, 0);
+      setScheduledDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T17:45`);
+    } else if (type === 'IN_2_HOURS') {
+      d.setTime(d.getTime() + 2 * 60 * 60 * 1000);
+      d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
+      setScheduledDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+      toast.info('Set for 2 hours from now');
+    }
+  };
 
   const insertPlaceholderAtCursor = (placeholder: string) => {
     const editor = document.querySelector('[contentEditable][data-placeholder]') as HTMLElement;
@@ -1378,9 +1417,14 @@ export default function ComposerPage() {
                   </div>
                 </div>
 
-                <button onClick={handleAIGenerate} disabled={generating || !topic || platforms.length === 0} className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-extrabold text-sm transition-all disabled:opacity-50 shadow-md cursor-pointer mt-2">
-                  {generating ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {generating ? 'Drafting Content...' : 'Generate Preview'}
+                <button
+                  type="button"
+                  onClick={handleAIGenerate}
+                  disabled={generating || !topic || platforms.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-extrabold text-xs sm:text-sm transition-all disabled:opacity-50 shadow-sm cursor-pointer mt-2"
+                >
+                  {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  <span>{generating ? 'Drafting Channel Previews...' : 'Generate Channel Previews'}</span>
                 </button>
               </div>
 
@@ -1685,95 +1729,246 @@ export default function ComposerPage() {
                 )}
               </div>
 
-              {/* Step 3: Publish Options with Split Dropdown */}
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm space-y-5">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase text-[#2563EB] pb-3 border-b border-[var(--border-color)]">
-                  <Send className="h-4 w-4" /> 3. Publish Options
+              {/* Step 3: Publish & Schedule (Master Execution Studio) */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 md:p-6 shadow-sm space-y-5">
+                {/* Header with Step Identity & Destination Count */}
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase text-[#2563EB]">
+                    <Send className="h-4 w-4" /> 3. Publish & Schedule
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {platforms.length > 0 ? (
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> {platforms.length} {platforms.length === 1 ? 'Channel' : 'Channels'} Selected
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                        No Channel Selected
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* 1. High-Visibility Segmented Hero Switcher */}
+                <div className="p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPublishMode('NOW')}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      publishMode === 'NOW'
+                        ? 'bg-[#2563EB] text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/50'
+                    }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Publish Immediately</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPublishMode('SCHEDULE');
+                      if (!scheduledDate) {
+                        applySchedulePreset('TOMORROW_MORNING');
+                      }
+                    }}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      publishMode === 'SCHEDULE'
+                        ? 'bg-[#2563EB] text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/50'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Schedule for Later</span>
+                  </button>
+                </div>
+
+                {/* 2. Intelligent Scheduling Matrix (Visible when Schedule Mode is Selected) */}
                 {publishMode === 'SCHEDULE' && (
-                  <div className="space-y-1.5 animate-fadeIn">
-                    <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Target Date & Time</label>
-                    <input
-                      type="datetime-local"
-                      value={scheduledDate}
-                      onChange={(e) => setScheduledDate(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-4 py-3 text-xs font-bold focus:border-[#2563EB] outline-none"
-                    />
+                  <div className="bg-[var(--bg-input)]/50 border border-[#2563EB]/25 rounded-2xl p-4 space-y-3.5 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
+                        <span>Recommended Release Time</span>
+                      </label>
+                      <span className="text-[10px] text-[var(--text-secondary)] font-medium flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-[#2563EB]" />
+                        <span className="truncate max-w-[140px] sm:max-w-none">{userTimezone}</span>
+                      </span>
+                    </div>
+
+                    {/* 1-Click Smart Presets */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => applySchedulePreset('TOMORROW_MORNING')}
+                        className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-extrabold text-[#2563EB] uppercase">Morning Peak</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-500 font-bold">Best Reach</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB]">Tomorrow 9:30 AM</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applySchedulePreset('TODAY_PEAK')}
+                        className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-extrabold text-[#2563EB] uppercase">Evening Rush</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-500 font-bold">High Clicks</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB]">5:45 PM Peak</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applySchedulePreset('IN_2_HOURS')}
+                        className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-extrabold text-[#2563EB] uppercase">Quick Buffer</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 font-bold">Auto Delay</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB]">In 2 Hours</p>
+                      </button>
+                    </div>
+
+                    {/* Custom DateTime Input & Friendly Summary */}
+                    <div className="pt-2 border-t border-[var(--border-color)]/70 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Custom Date & Time</span>
+                        {scheduledDate && (
+                          <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            ✓ {formatFriendlySchedule(scheduledDate)}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="datetime-local"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-4 py-2.5 text-xs font-bold focus:border-[#2563EB] outline-none shadow-2xs"
+                      />
+                    </div>
                   </div>
                 )}
 
-                {/* Auto-Post First Comment (LinkedIn Algorithm Reach Protection) */}
-                <div className="bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-xl p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                      <span>Auto-Post First Comment</span>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 font-bold">LinkedIn Boost</span>
-                    </label>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-secondary)]">
-                    Protect your reach by keeping links out of the main post. Our server will auto-comment 5s after publishing.
-                  </p>
-                  <textarea
-                    value={firstComment}
-                    onChange={(e) => setFirstComment(e.target.value)}
-                    placeholder="e.g. Here is the link to check it out: https://... (or 'Leave a comment to get the playbook!')"
-                    rows={2}
-                    className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium"
-                  />
-                </div>
-
-                {/* Integrated Split Button Component */}
-                <div className="relative flex shadow-md rounded-xl publish-dropdown-container">
+                {/* 3. Engagement Boost: Auto-Post First Comment (Dedicated Add-on Drawer) */}
+                <div className="border border-[var(--border-color)] rounded-2xl overflow-hidden bg-[var(--bg-input)]/30">
                   <button
-                    onClick={handleSchedulePost}
-                    disabled={submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0 || hasZeroSelectedActivePlatform}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-l-xl font-extrabold text-[13px] transition-all cursor-pointer ${
-                      submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0 || hasZeroSelectedActivePlatform
-                        ? 'bg-slate-400 dark:bg-slate-700 text-slate-200 cursor-not-allowed opacity-60'
-                        : 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-blue-600 hover:to-blue-700 text-white shadow-md shadow-blue-500/20'
-                    }`}
+                    type="button"
+                    onClick={() => setShowFirstCommentDrawer(!showFirstCommentDrawer)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-input)]/60 transition-colors cursor-pointer text-left"
                   >
-                    {submitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Processing...</span>
-                      </>
-                    ) : hasZeroSelectedActivePlatform ? (
-                      'Select Target Destination Above'
-                    ) : publishMode === 'NOW' ? (
-                      'Publish Now'
-                    ) : (
-                      'Schedule Post'
-                    )}
-                  </button>
-                  <div className="w-[1px] bg-blue-700/50"></div>
-                  <button
-                    onClick={() => setShowPublishDropdown(!showPublishDropdown)}
-                    disabled={submitting || hasZeroSelectedActivePlatform}
-                    className="px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-r-xl flex items-center justify-center transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {showPublishDropdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-extrabold text-[var(--text-primary)] block">Auto-Post First Comment</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">Keep links out of the main post to boost reach</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {firstComment.trim() ? (
+                        <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-[var(--text-secondary)]">
+                          Optional
+                        </span>
+                      )}
+                      {showFirstCommentDrawer ? <ChevronUp className="w-4 h-4 text-[var(--text-secondary)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-secondary)]" />}
+                    </div>
                   </button>
 
-                  {/* Dropdown Menu */}
-                  {showPublishDropdown && (
-                    <div className="absolute right-0 bottom-full mb-2 w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 p-1.5 overflow-hidden animate-fadeIn">
-                      <button
-                        onClick={() => { setPublishMode('NOW'); setShowPublishDropdown(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'NOW' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
-                      >
-                        <Zap className="w-4 h-4" /> Publish Now
-                      </button>
-                      <button
-                        onClick={() => { setPublishMode('SCHEDULE'); setShowPublishDropdown(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'SCHEDULE' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
-                      >
-                        <Calendar className="w-4 h-4" /> Schedule Later
-                      </button>
+                  {(showFirstCommentDrawer || Boolean(firstComment.trim())) && (
+                    <div className="p-4 pt-1 border-t border-[var(--border-color)]/60 space-y-2 bg-[var(--bg-card)]/50 animate-fadeIn">
+                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                        Algorithm reach drops up to 40% when external links are inside the main post body. OmniSync will automatically post this comment 5 seconds after release.
+                      </p>
+                      <textarea
+                        value={firstComment}
+                        onChange={(e) => setFirstComment(e.target.value)}
+                        placeholder="e.g. 🔗 Here is the link to download the blueprint: https://... (or 'Drop a comment below and I will DM you the playbook!')"
+                        rows={2}
+                        className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium leading-relaxed"
+                      />
                     </div>
                   )}
                 </div>
+
+                {/* Validation Warnings (Non-intrusive Helper Badges above CTA) */}
+                {platforms.length === 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-bold animate-fadeIn">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Please select at least one target social destination in Step 1 to enable publishing.</span>
+                  </div>
+                )}
+
+                {platforms.length > 0 && hasZeroSelectedActivePlatform && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-bold animate-fadeIn">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Please select at least one account or page in the channel dropdown above.</span>
+                  </div>
+                )}
+
+                {publishMode === 'SCHEDULE' && !scheduledDate && (
+                  <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[#2563EB] text-xs font-bold animate-fadeIn">
+                    <Calendar className="w-4 h-4 shrink-0" />
+                    <span>Select a 1-click preset or pick a target time above to finalize scheduling.</span>
+                  </div>
+                )}
+
+                {/* 4. Single Master Action Button (The Undisputed Primary CTA) */}
+                <button
+                  type="button"
+                  onClick={handleSchedulePost}
+                  disabled={
+                    submitting ||
+                    (publishMode === 'SCHEDULE' && !scheduledDate) ||
+                    platforms.length === 0 ||
+                    hasZeroSelectedActivePlatform
+                  }
+                  className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base transition-all flex items-center justify-center gap-2.5 shadow-lg cursor-pointer ${
+                    submitting ||
+                    (publishMode === 'SCHEDULE' && !scheduledDate) ||
+                    platforms.length === 0 ||
+                    hasZeroSelectedActivePlatform
+                      ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-60 shadow-none'
+                      : 'bg-[#2563EB] hover:bg-blue-600 text-white shadow-blue-500/25 active:scale-[0.99]'
+                  }`}
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{publishMode === 'NOW' ? 'Publishing Live Post...' : 'Scheduling Post...'}</span>
+                    </>
+                  ) : publishMode === 'NOW' ? (
+                    <>
+                      <Zap className="w-5 h-5" />
+                      <span>
+                        {platforms.length > 1
+                          ? `Publish to ${platforms.length} Channels Now`
+                          : platforms.length === 1
+                          ? `Publish to ${platforms[0]} Now`
+                          : 'Publish Live Post Now'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-5 h-5" />
+                      <span>
+                        {scheduledDate
+                          ? `Schedule Post for ${formatFriendlySchedule(scheduledDate)}`
+                          : 'Select Schedule Time Above'}
+                      </span>
+                    </>
+                  )}
+                </button>
               </div>
 
             </div>
@@ -1781,8 +1976,13 @@ export default function ComposerPage() {
             {/* Right Column: Realistic Social Media Preview Feed */}
             <div className="lg:col-span-5 space-y-6 xl:col-span-5">
               <div className="sticky top-6">
-                <div className="flex items-center justify-between mb-3.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Social Feed Preview</h2>
+                <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Social Feed Preview</h2>
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Edit2 className="w-2.5 h-2.5" /> Editable Draft
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsFullscreenPreview(true)}
