@@ -181,11 +181,67 @@ export async function processPostPublishing(postId) {
           });
           executionLogs.push(log);
 
-          // LinkedIn Algorithm Anti-Spam Safety Shield Engine
-          if (platform === 'LINKEDIN' && typeof adapter.postComment === 'function' && result.externalPostId) {
-            try {
-              // Shield 1: Check Daily Rate Limit Cap (Max 12 auto-comments per 24 hrs to stay 100% safe from LinkedIn bans)
-              const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          // LinkedIn Algorithm Anti-Spam Safety Shield Engine (Auto-Comment & Auto-Like)
+          if (platform === 'LINKEDIN' && result.externalPostId) {
+            // 1. AUTO-LIKE WITH TRI-SHIELD HUMAN JITTER
+            const isAutoLikeDisabled = post.aiPrompt?.includes('AutoLike:false');
+            if (!isAutoLikeDisabled && typeof adapter.reactToPost === 'function') {
+              try {
+                // Shield 1: Check Daily Rate Limit Cap (Max 10 auto-likes per 24 hrs to stay safe from bot detection)
+                const twentyFourHoursAgoLike = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                const dailyLikeCount = await prisma.socialPostLog.count({
+                  where: {
+                    platform: 'LINKEDIN',
+                    status: SOCIAL_POST_STATUS.SUCCESS,
+                    errorMessage: { contains: 'auto_like_posted' },
+                    createdAt: { gte: twentyFourHoursAgoLike },
+                  },
+                });
+
+                if (dailyLikeCount >= 10) {
+                  logger.warn(`[BullMQ Worker] 🛡️ Anti-Spam Safety Shield: Daily auto-like limit (10/day) reached for LinkedIn. Skipping self-like to protect account.`);
+                } else {
+                  // Shield 2: Randomized Human Jitter Delay (35s to 65s - NEVER instant 2s, simulating natural human reading cadence)
+                  const likeJitterDelayMs = Math.floor(Math.random() * 30000) + 35000;
+                  logger.info(`[BullMQ Worker] 🛡️ Anti-Spam Shield: Scheduling LinkedIn Auto-Like with ${Math.round(likeJitterDelayMs / 1000)}s human jitter delay...`);
+
+                  setTimeout(async () => {
+                    try {
+                      const reactRes = await adapter.reactToPost({
+                        accessToken: validAccessToken,
+                        authorUrn: platformAccountId,
+                        postUrn: result.externalPostId,
+                        reactionType: 'LIKE',
+                      });
+                      if (reactRes?.success) {
+                        logger.info(`[BullMQ Worker] ✅ Tri-Shield Auto-Like registered for LinkedIn post ${result.externalPostId}!`);
+                        await prisma.socialPostLog.create({
+                          data: {
+                            postId: post.id,
+                            socialAccountId: account.id,
+                            platform: 'LINKEDIN',
+                            status: SOCIAL_POST_STATUS.SUCCESS,
+                            externalPostId: result.externalPostId,
+                            errorMessage: 'auto_like_posted',
+                            publishedAt: new Date(),
+                          },
+                        }).catch(() => {});
+                      }
+                    } catch (likeErr) {
+                      logger.warn(`[BullMQ Worker] 🛡️ Auto-like execution warning: ${likeErr.message}`);
+                    }
+                  }, likeJitterDelayMs);
+                }
+              } catch (likeShieldErr) {
+                logger.warn(`[BullMQ Worker] Auto-like safety shield check warning: ${likeShieldErr.message}`);
+              }
+            }
+
+            // 2. AUTO FIRST COMMENT WITH REACH PROTECTION SHIELD
+            if (typeof adapter.postComment === 'function') {
+              try {
+                // Shield 1: Check Daily Rate Limit Cap (Max 12 auto-comments per 24 hrs to stay 100% safe from LinkedIn bans)
+                const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
               const dailyCommentCount = await prisma.socialPostLog.count({
                 where: {
                   platform: 'LINKEDIN',
@@ -198,7 +254,11 @@ export async function processPostPublishing(postId) {
               if (dailyCommentCount >= 12) {
                 logger.warn(`[BullMQ Worker] 🛡️ Anti-Spam Safety Shield: Daily auto-comment limit (12/day) reached for LinkedIn. Skipping first comment to protect account health.`);
               } else {
-                let firstCommentText = post.firstComment || (post.aiPrompt?.includes('FirstComment:') ? post.aiPrompt.split('FirstComment:')[1]?.trim() : null);
+                let firstCommentText = post.firstComment;
+                if (!firstCommentText && post.aiPrompt?.includes('FirstComment:')) {
+                  const commentMatch = post.aiPrompt.match(/FirstComment:\s*([\s\S]+?)(?:\s+AutoLike:|$)/i);
+                  firstCommentText = commentMatch ? commentMatch[1].trim() : null;
+                }
                 
                 // Shield 2: AI Contextual Unique Comment (Prevents repetitive spam flagging)
                 if (!firstCommentText) {
@@ -223,6 +283,17 @@ export async function processPostPublishing(postId) {
                         commentText: firstCommentText,
                       });
                       logger.info(`[BullMQ Worker] ✅ First comment posted safely to LinkedIn post ${result.externalPostId}!`);
+                      await prisma.socialPostLog.create({
+                        data: {
+                          postId: post.id,
+                          socialAccountId: account.id,
+                          platform: 'LINKEDIN',
+                          status: SOCIAL_POST_STATUS.SUCCESS,
+                          externalPostId: result.externalPostId,
+                          errorMessage: 'first_comment_posted',
+                          publishedAt: new Date(),
+                        },
+                      }).catch(() => {});
                     } catch (cErr) {
                       logger.warn(`[BullMQ Worker] 🛡️ First comment safety guard warning: ${cErr.message}`);
                     }
@@ -234,7 +305,8 @@ export async function processPostPublishing(postId) {
             }
           }
         }
-      } catch (err) {
+      }
+    } catch (err) {
         failureCount++;
         logger.error(`[BullMQ Worker] Publishing failed for platform ${platform}: ${err.message}`);
 

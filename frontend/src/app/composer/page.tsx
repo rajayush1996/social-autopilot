@@ -37,7 +37,12 @@ import {
   ChevronUp,
   Wand2,
   Image as ImageIcon,
-  RefreshCw
+  RefreshCw,
+  Compass,
+  Square,
+  Monitor,
+  Smartphone,
+  TrendingUp,
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -47,7 +52,8 @@ import LiquidUploadButton from '@/components/LiquidUploadButton';
 import PlatformIcon from '@/components/PlatformIcon';
 import ChannelTargetChips from '@/components/ChannelTargetChips';
 import CarouselSlideDeck from '@/components/CarouselSlideDeck';
-import { SocialAccount } from '@/lib/api';
+import { SocialAccount, User } from '@/lib/api';
+import OnboardingModal from '@/components/OnboardingModal';
 import { RichPromptEditor } from '@/components/RichPromptEditor';
 import {
   getPlatformDefinition,
@@ -56,7 +62,7 @@ import {
   type PlatformId,
   type PlatformDefinition,
 } from '@/config/platforms';
-import { SOCIAL_PLATFORMS, DEFAULT_ALLOWED_PLATFORMS, ALL_PLATFORMS, type PlatformKey } from '@/constants/platforms';
+import { SOCIAL_PLATFORMS, DEFAULT_ALLOWED_PLATFORMS, ALL_PLATFORMS, type PlatformKey, IMAGE_ASPECT_RATIOS, type ImageAspectRatio, ASPECT_RATIO_PRESETS } from '@/constants/platforms';
 import accountEvents from '@/utils/accountEvents';
 import socketClient from '@/utils/socket';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -77,11 +83,17 @@ import {
   resetDraftsAndInputsAction,
 } from '@/store/composerSlice';
 
+const ASPECT_RATIO_ICONS: Record<ImageAspectRatio, React.ComponentType<{ className?: string }>> = {
+  [IMAGE_ASPECT_RATIOS.SQUARE]: Square,
+  [IMAGE_ASPECT_RATIOS.LANDSCAPE]: Monitor,
+  [IMAGE_ASPECT_RATIOS.PORTRAIT]: Smartphone,
+};
+
 const PRESET_PROMPTS = [
-  { label: '🚀 Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
-  { label: '💡 Tech Tip', text: 'Share a weekly tip explaining the benefits of decoupling API queries into structured client services.' },
-  { label: '💬 Client Review', text: 'Draft a thank-you note highlighting a recent client success story and expressing appreciation for their feedback.' },
-  { label: '📈 Progress Update', text: 'Summarize our engineering progress this week, detailing backend performance improvements.' },
+  { label: 'Product Launch', text: 'Write an announcement launching our new software dashboard, highlighting productivity and clean integrations.' },
+  { label: 'Tech Tip', text: 'Share a weekly tip explaining the benefits of decoupling API queries into structured client services.' },
+  { label: 'Client Review', text: 'Draft a thank-you note highlighting a recent client success story and expressing appreciation for their feedback.' },
+  { label: 'Progress Update', text: 'Summarize our engineering progress this week, detailing backend performance improvements.' },
 ];
 
 const TONE_OPTIONS = [
@@ -140,6 +152,9 @@ export default function ComposerPage() {
   const [mediaMode, setMediaMode] = useState<'AI_IMAGE' | 'UPLOAD' | 'NONE'>('AI_IMAGE');
   const [generatingAiImage, setGeneratingAiImage] = useState<boolean>(false);
   const [aiImagePrompt, setAiImagePrompt] = useState<string>('');
+  const [extractedVisualMeta, setExtractedVisualMeta] = useState<any>(null);
+  const [renderTypography, setRenderTypography] = useState<boolean>(true);
+  const [imageAspectRatio, setImageAspectRatio] = useState<ImageAspectRatio>(IMAGE_ASPECT_RATIOS.SQUARE);
   const [firstComment, setFirstComment] = useState<string>('');
 
   const [generating, setGenerating] = useState(false);
@@ -150,12 +165,20 @@ export default function ComposerPage() {
   const [previewDisplayMode, setPreviewDisplayMode] = useState<Record<string, 'CAROUSEL' | 'TEXT'>>({});
 
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
+  const [selectedPreviewPlatform, setSelectedPreviewPlatform] = useState<PlatformKey>('LINKEDIN');
   const [portalMounted, setPortalMounted] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Publish Split Button States
+  // Publish Mode State
   const [publishMode, setPublishMode] = useState<'NOW' | 'SCHEDULE'>('NOW');
-  const [showPublishDropdown, setShowPublishDropdown] = useState(false);
+
+  // Post Card 3-Dot Actions Menu
+  const [showCardMenu, setShowCardMenu] = useState(false);
+  const cardMenuRef = useRef<HTMLDivElement>(null);
+
+  // User Profile & Universal AI Persona States
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showPersonaModal, setShowPersonaModal] = useState(false);
 
   type UserPlaceholder = { id: string; name: string; value: string };
   const [savedPlaceholders, setSavedPlaceholders] = useState<UserPlaceholder[]>([
@@ -220,7 +243,7 @@ export default function ComposerPage() {
       if (hookParam) {
         setTopic(hookParam);
         dispatch(setTopicAction(hookParam));
-        toast.info('🪄 Viral Hook loaded into composer!');
+        toast.info('Viral Hook loaded into composer');
       }
 
       if (tagsParam) {
@@ -229,7 +252,7 @@ export default function ComposerPage() {
           dispatch(setTopicAction(newTopic));
           return newTopic;
         });
-        toast.info('🏷️ Trending hashtags appended!');
+        toast.info('Trending hashtags appended');
       }
 
       if (scheduleTimeParam === 'today-peak') {
@@ -239,7 +262,7 @@ export default function ComposerPage() {
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const dd = String(now.getDate()).padStart(2, '0');
         setScheduledDate(`${yyyy}-${mm}-${dd}T17:45`);
-        toast.info('⚡ Auto-filled with Today 5:45 PM Peak Window!');
+        toast.info('Auto-filled with Today 5:45 PM Peak Window');
       }
     }
   }, []);
@@ -341,15 +364,15 @@ export default function ComposerPage() {
     const key = phName.toLowerCase();
     if (key.includes('link') || key.includes('url') || key.includes('web') || key.includes('site') || key.includes('cta')) {
       const formattedUrl = val.startsWith('http://') || val.startsWith('https://') ? val : `https://${val}`;
-      const formattedVal = platform === 'INSTAGRAM' ? `🔗 ${formattedUrl}` : formattedUrl;
+      const formattedVal = formattedUrl;
       return { formattedVal, labelWithPrefix: formattedVal };
     }
     if (key.includes('code') || key.includes('promo') || key.includes('coupon')) {
-      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? `🎟️ ${toUnicodeBold(val)}` : `🎟️ ${val}`;
+      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
       return { formattedVal, labelWithPrefix: formattedVal };
     }
     if (key.includes('author') || key.includes('creator') || key.includes('user')) {
-      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? `✍️ ${toUnicodeBold(val)}` : `✍️ ${val}`;
+      const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
       return { formattedVal, labelWithPrefix: formattedVal };
     }
     const formattedVal = platform === 'LINKEDIN' || platform === 'FACEBOOK' ? toUnicodeBold(val) : val;
@@ -368,16 +391,19 @@ export default function ComposerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreenPreview]);
 
-  // Click outside to close publish dropdown
+
+  // Click outside to close post card 3-dot menu
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (showPublishDropdown && !(e.target as Element).closest('.publish-dropdown-container')) {
-        setShowPublishDropdown(false);
+      if (showCardMenu && cardMenuRef.current && !cardMenuRef.current.contains(e.target as Node)) {
+        setShowCardMenu(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    if (showCardMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPublishDropdown]);
+  }, [showCardMenu]);
 
   const [connectedPlatforms, setConnectedPlatforms] = useState<PlatformKey[]>([]);
   const [allowedPlatforms, setAllowedPlatforms] = useState<PlatformKey[]>([...DEFAULT_ALLOWED_PLATFORMS]);
@@ -386,8 +412,58 @@ export default function ComposerPage() {
 
   const [scheduledDate, setScheduledDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showFirstCommentDrawer, setShowFirstCommentDrawer] = useState(false);
   const toast = useToast();
   const isFetchingRef = useRef(false);
+
+  const userTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
+
+  const formatFriendlySchedule = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const target = new Date(dateStr);
+      if (isNaN(target.getTime())) return '';
+      const now = new Date();
+      const isToday = target.toDateString() === now.toDateString();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow = target.toDateString() === tomorrow.toDateString();
+
+      const timePart = target.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      if (isToday) return `Today at ${timePart}`;
+      if (isTomorrow) return `Tomorrow at ${timePart}`;
+      return `${target.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} at ${timePart}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const applySchedulePreset = (type: 'TOMORROW_MORNING' | 'TODAY_PEAK' | 'IN_2_HOURS') => {
+    setPublishMode('SCHEDULE');
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const d = new Date();
+
+    if (type === 'TOMORROW_MORNING') {
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 30, 0, 0);
+      setScheduledDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:30`);
+      toast.info('Set to Tomorrow 9:30 AM (Peak morning window)');
+    } else if (type === 'TODAY_PEAK') {
+      if (d.getHours() >= 17 && d.getMinutes() >= 30) {
+        d.setDate(d.getDate() + 1);
+        toast.info('Set to Tomorrow 5:45 PM (Peak evening window)');
+      } else {
+        toast.info('Set to Today 5:45 PM (Peak evening window)');
+      }
+      d.setHours(17, 45, 0, 0);
+      setScheduledDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T17:45`);
+    } else if (type === 'IN_2_HOURS') {
+      d.setTime(d.getTime() + 2 * 60 * 60 * 1000);
+      d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
+      setScheduledDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+      toast.info('Set for 2 hours from now');
+    }
+  };
 
   const insertPlaceholderAtCursor = (placeholder: string) => {
     const editor = document.querySelector('[contentEditable][data-placeholder]') as HTMLElement;
@@ -423,6 +499,10 @@ export default function ComposerPage() {
         ApiService.getConnectedAccounts(),
         ApiService.getMe(),
       ]);
+
+      if (user) {
+        setCurrentUser(user);
+      }
 
       const userAllowed = Array.isArray(user?.allowedPlatforms)
         ? user.allowedPlatforms.map((platform: string) => platform.toUpperCase() as PlatformKey)
@@ -584,19 +664,25 @@ export default function ComposerPage() {
     }
   };
 
-  const handleGenerateAiImage = async () => {
+  const handleGenerateAiImage = async (overrideRatio?: ImageAspectRatio) => {
     const promptToUse = aiImagePrompt.trim() || topic.trim();
     if (!promptToUse) {
       toast.error('Please enter a topic in Step 1 or write an image prompt.');
       return;
     }
+    const ratioToUse = overrideRatio || imageAspectRatio;
+    if (overrideRatio && overrideRatio !== imageAspectRatio) {
+      setImageAspectRatio(overrideRatio);
+    }
     setGeneratingAiImage(true);
     try {
-      const res = await ApiService.generateSampleVisual(promptToUse);
+      const activeDraft = generatedDrafts[selectedPreviewPlatform] || Object.values(generatedDrafts).find(t => t && t.trim().length > 0) || '';
+      const brandName = currentUser?.name || (currentUser?.brandContext ? currentUser.brandContext.split(/[,.\n]/)[0].slice(0, 30).trim() : '');
+      const res = await ApiService.generateSampleVisual(promptToUse, brandName, activeDraft, tone, renderTypography, ratioToUse);
       if (res && res.imageUrl) {
         setMediaFileUrl(res.imageUrl);
         setMediaType('IMAGE');
-        toast.success('✨ AI image generated and attached to your post!');
+        toast.success(`AI image (${ratioToUse}) generated and attached to your post.`);
       } else {
         toast.error('Failed to generate AI image.');
       }
@@ -685,6 +771,14 @@ export default function ComposerPage() {
             return drafts;
           }, {})
         );
+
+        if (generated.visualMeta) {
+          setExtractedVisualMeta(generated.visualMeta);
+          if (generated.visualMeta.visualPrompt && !aiImagePrompt.trim()) {
+            setAiImagePrompt(generated.visualMeta.visualPrompt);
+          }
+        }
+
         toast.success('AI content generated for selected platforms!');
       }
     } catch (err: any) {
@@ -743,6 +837,17 @@ export default function ComposerPage() {
 
     setSubmitting(true);
     try {
+      let autoLikePref = true;
+      try {
+        const savedEng = localStorage.getItem('engagement_studio_settings');
+        if (savedEng) {
+          const parsed = JSON.parse(savedEng);
+          if (parsed.LINKEDIN && parsed.LINKEDIN.autoLike !== undefined) {
+            autoLikePref = Boolean(parsed.LINKEDIN.autoLike);
+          }
+        }
+      } catch (e) {}
+
       const payload = {
         content: JSON.stringify(platformDraftMap),
         mediaUrls: mediaFileUrl ? [mediaFileUrl] : [],
@@ -752,6 +857,7 @@ export default function ComposerPage() {
         scheduledAt: publishMode === 'SCHEDULE' ? new Date(scheduledDate).toISOString() : null,
         publishNow: publishMode === 'NOW',
         firstComment: firstComment.trim() || undefined,
+        autoLike: autoLikePref,
       };
 
       await ApiService.createPost(payload);
@@ -797,6 +903,8 @@ export default function ComposerPage() {
     dispatch(setDraftForPlatformAction({ platform: plt, content: val }));
   };
 
+  // Allowed platforms on the plan are always available to compose for.
+  // ChannelTargetChips displays offline status and prompts account connection when appropriate.
   const selectablePlatforms = getPlatformDefinitions(allowedPlatforms);
   const mediaRequiredPlatforms = platforms.filter(p => getPlatformDefinition(p).requiresMedia);
 
@@ -853,6 +961,34 @@ export default function ComposerPage() {
                   </h2>
                 </div>
 
+                {/* Active Brand Voice & Niche Banner (Applies directly to this Single Post) */}
+                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-blue-500/20 rounded-xl flex-wrap gap-2.5">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <Compass className="w-4 h-4 text-[#2563EB] shrink-0" />
+                    <span className="text-xs font-bold text-[var(--text-primary)] shrink-0">
+                      Active Brand Voice:
+                    </span>
+                    {currentUser?.brandContext ? (
+                      <span className="text-[11px] font-bold text-[#2563EB] dark:text-[#60A5FA] bg-[#2563EB]/10 px-2.5 py-0.5 rounded-lg border border-[#2563EB]/25 truncate max-w-[260px] sm:max-w-md inline-block" title={currentUser.brandContext}>
+                        {currentUser.brandContext}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/25">
+                        Default Brand Voice (No custom niche set)
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPersonaModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-extrabold transition-all cursor-pointer shadow-xs shrink-0"
+                    title="Customize or switch your brand voice and niche"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Edit Brand Voice</span>
+                  </button>
+                </div>
+
                 {/* Input Mode Switcher (Custom Prompt vs Summarize Article URL) */}
                 <div className="flex items-center justify-between pb-2 border-b border-[var(--border-color)]/70 flex-wrap gap-2">
                   <div className="inline-flex p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl gap-1">
@@ -865,7 +1001,7 @@ export default function ComposerPage() {
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      ✍️ Custom Prompt
+                      Custom Prompt
                     </button>
                     <button
                       type="button"
@@ -876,7 +1012,7 @@ export default function ComposerPage() {
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
-                      🔗 Summarize Article URL
+                      Summarize Article URL
                     </button>
                   </div>
 
@@ -884,9 +1020,9 @@ export default function ComposerPage() {
                   <div className="flex items-center gap-1.5 overflow-x-auto">
                     <span className="text-[11px] font-bold text-[var(--text-secondary)]">Presets:</span>
                     {[
-                      { label: '🚀 Product Launch', text: 'Excited to announce the launch of our new product feature! Here is why we built it and what it unlocks for users:' },
-                      { label: '💡 Tech Insight', text: '3 critical lessons we learned while scaling our background processing architecture:' },
-                      { label: '📈 Growth Story', text: 'How we increased user engagement by 400% in 30 days without spending a dollar on ads:' },
+                      { label: 'Product Launch', text: 'Excited to announce the launch of our new product feature! Here is why we built it and what it unlocks for users:' },
+                      { label: 'Tech Insight', text: '3 critical lessons we learned while scaling our background processing architecture:' },
+                      { label: 'Growth Story', text: 'How we increased user engagement by 400% in 30 days without spending a dollar on ads:' },
                     ].map((p, idx) => (
                       <button
                         key={idx}
@@ -923,7 +1059,7 @@ export default function ComposerPage() {
                     </label>
 
                     <div className="flex items-center gap-2.5">
-                      {/* 1. ✨ Improve with AI Button */}
+                      {/* 1. Improve with AI Button */}
                       <button
                         type="button"
                         onClick={handleEnhancePrompt}
@@ -932,10 +1068,10 @@ export default function ComposerPage() {
                         title="AI will improve and structure your prompt for better engagement"
                       >
                         <Wand2 className={`w-4 h-4 ${isEnhancing ? 'animate-spin' : ''}`} />
-                        <span>{isEnhancing ? 'Improving...' : '✨ Improve with AI'}</span>
+                        <span>{isEnhancing ? 'Improving...' : 'Improve with AI'}</span>
                       </button>
 
-                      {/* 2. 🏷️ Smart Tags Dropdown */}
+                      {/* 2. Smart Tags Dropdown */}
                       <div className="relative">
                         <button
                           type="button"
@@ -1053,7 +1189,7 @@ export default function ComposerPage() {
                   {trendingHashtags.length > 0 && (
                     <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1.5 custom-scrollbar">
                       <span className="text-xs font-extrabold text-[var(--text-primary)] uppercase tracking-wider shrink-0 flex items-center gap-1.5">
-                        <span className="text-amber-500">🔥</span>
+                        <TrendingUp className="w-3.5 h-3.5 text-[#2563EB]" />
                         <span>Trending:</span>
                       </span>
                       {trendingHashtags.map((t, idx) => {
@@ -1199,9 +1335,9 @@ export default function ComposerPage() {
                                 onChange={(e) => setContentLength(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="CONCISE">⚡ Concise (Short & punchy &lt; 280 chars)</option>
-                                <option value="BALANCED">⚖️ Balanced (Standard 1-2 paragraphs)</option>
-                                <option value="LONG_FORM">📚 Deep Dive (Detailed long-form post)</option>
+                                <option value="CONCISE">Concise (Short & punchy &lt; 280 chars)</option>
+                                <option value="BALANCED">Balanced (Standard 1-2 paragraphs)</option>
+                                <option value="LONG_FORM">Deep Dive (Detailed long-form post)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1220,10 +1356,10 @@ export default function ComposerPage() {
                                 onChange={(e) => setFormatStyle(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="PARAGRAPHS">📄 Standard Paragraphs</option>
-                                <option value="BULLETS">📌 Bullet Points List</option>
-                                <option value="ONE_LINERS">💡 Punchy One-Liners</option>
-                                <option value="CAROUSEL">🎠 Carousel Slide Deck (Slide-by-Slide)</option>
+                                <option value="PARAGRAPHS">Standard Paragraphs (Prose layout)</option>
+                                <option value="BULLETS">Bullet Points (Structured layout)</option>
+                                <option value="ONE_LINERS">Punchy One-Liners (Spaced layout)</option>
+                                <option value="CAROUSEL">Carousel Slide Deck (Slide structure)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1245,9 +1381,9 @@ export default function ComposerPage() {
                                 onChange={(e) => setEmojiDensity(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="MINIMAL">⚪ Minimal (0-1 subtle emojis)</option>
-                                <option value="BALANCED">✨ Standard (2-4 natural emojis)</option>
-                                <option value="EXPRESSIVE">🔥 Expressive (5+ vibrant emojis)</option>
+                                <option value="MINIMAL">Minimal (0-1 subtle emojis)</option>
+                                <option value="BALANCED">Standard (2-4 natural emojis)</option>
+                                <option value="EXPRESSIVE">Expressive (5+ vibrant emojis)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1266,9 +1402,9 @@ export default function ComposerPage() {
                                 onChange={(e) => setHashtagCount(e.target.value)}
                                 className="w-full appearance-none bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold rounded-xl px-4 py-2.5 pr-10 outline-none focus:border-[#2563EB] cursor-pointer transition-all shadow-xs"
                               >
-                                <option value="NONE">🚫 None (0 hashtags - clean text)</option>
-                                <option value="FOCUSED">🎯 Focused (2-3 targeted hashtags)</option>
-                                <option value="MAX_REACH">🚀 Max Reach (5-8 trending hashtags)</option>
+                                <option value="NONE">None (0 hashtags - clean text)</option>
+                                <option value="FOCUSED">Focused (2-3 targeted hashtags)</option>
+                                <option value="MAX_REACH">Max Reach (5-8 trending hashtags)</option>
                               </select>
                               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-[var(--text-secondary)]">
                                 <ChevronDown className="w-4 h-4" />
@@ -1281,9 +1417,14 @@ export default function ComposerPage() {
                   </div>
                 </div>
 
-                <button onClick={handleAIGenerate} disabled={generating || !topic || platforms.length === 0} className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl font-extrabold text-sm transition-all disabled:opacity-50 shadow-md cursor-pointer mt-2">
-                  {generating ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {generating ? 'Drafting Content...' : 'Generate Preview'}
+                <button
+                  type="button"
+                  onClick={handleAIGenerate}
+                  disabled={generating || !topic || platforms.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-extrabold text-xs sm:text-sm transition-all disabled:opacity-50 shadow-sm cursor-pointer mt-2"
+                >
+                  {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  <span>{generating ? 'Drafting Channel Previews...' : 'Generate Channel Previews'}</span>
                 </button>
               </div>
 
@@ -1343,7 +1484,7 @@ export default function ComposerPage() {
                         : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
                     }`}
                   >
-                    <span>📝 No Image</span>
+                    <span>No Image</span>
                   </button>
                 </div>
 
@@ -1355,7 +1496,39 @@ export default function ComposerPage() {
                         <div className="relative h-48 w-full bg-slate-900 rounded-xl overflow-hidden group border border-[var(--border-color)] flex items-center justify-center">
                           <img src={mediaFileUrl} alt="AI Generated Graphic" className="h-full w-full object-contain" />
                           <div className="absolute top-2 right-2 bg-black/70 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 shadow">
-                            <Sparkles className="w-3 h-3 text-amber-400" /> AI Generated
+                            <Sparkles className="w-3 h-3 text-amber-400" /> AI Generated ({imageAspectRatio})
+                          </div>
+                        </div>
+
+                        {/* Phase 3: Quick Aspect Ratio Switcher on generated card */}
+                        <div className="flex items-center justify-between p-2 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-xl text-[11px]">
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Format:</span>
+                          <div className="flex items-center gap-1">
+                            {ASPECT_RATIO_PRESETS.map(({ ratio, label }) => {
+                              const active = imageAspectRatio === ratio;
+                              const IconComp = ASPECT_RATIO_ICONS[ratio];
+                              return (
+                                <button
+                                  key={ratio}
+                                  type="button"
+                                  disabled={generatingAiImage}
+                                  onClick={() => {
+                                    if (ratio !== imageAspectRatio) {
+                                      handleGenerateAiImage(ratio);
+                                    }
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50 ${
+                                    active
+                                      ? 'bg-[#2563EB] text-white shadow-xs'
+                                      : 'bg-[var(--bg-card)] hover:bg-[#2563EB]/10 text-[var(--text-secondary)] hover:text-[#2563EB] border border-[var(--border-color)]'
+                                  }`}
+                                  title={`Switch format to ${label} and regenerate`}
+                                >
+                                  <IconComp className="w-2.5 h-2.5" />
+                                  <span>{ratio}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -1366,7 +1539,7 @@ export default function ComposerPage() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={handleGenerateAiImage}
+                              onClick={() => handleGenerateAiImage()}
                               disabled={generatingAiImage}
                               className="text-xs font-bold px-3 py-1.5 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white transition-all cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
                             >
@@ -1388,22 +1561,125 @@ export default function ComposerPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
-                            Image Style or Custom Prompt (Optional)
-                          </label>
-                          <input
-                            type="text"
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider block">
+                              Image Style or Custom Visual Prompt (Optional)
+                            </label>
+                            {aiImagePrompt && (
+                              <button
+                                type="button"
+                                onClick={() => setAiImagePrompt('')}
+                                className="text-[10px] text-slate-400 hover:text-rose-500 font-bold transition-colors cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            rows={3}
                             value={aiImagePrompt}
                             onChange={(e) => setAiImagePrompt(e.target.value)}
-                            placeholder={topic ? `Using topic: "${topic.slice(0, 45)}..."` : 'e.g. Modern minimal tech graphic, clean dark mode SaaS dashboard'}
-                            className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3.5 py-2.5 outline-none focus:border-[#2563EB] font-medium"
+                            placeholder={topic ? `Using topic: "${topic.slice(0, 45)}..." (or describe specific visual style, colors, lighting, subjects)` : 'e.g. Modern minimal 3D isometric tech illustration, dark glassmorphic dashboard, glowing cyan accents, clean studio lighting'}
+                            className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium leading-relaxed resize-y min-h-[76px] custom-scrollbar"
                           />
+                          {/* Quick visual style presets */}
+                          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-0.5">
+                            {[
+                              { label: '3D Isometric', cue: '3D isometric render, translucent glassmorphism, soft studio lighting' },
+                              { label: 'Editorial Photo', cue: 'Realistic editorial photography, 35mm lens, natural daylight, candid' },
+                              { label: 'Vector Minimal', cue: 'Clean flat vector illustration, bold geometric shapes, high contrast' },
+                              { label: 'Cyber Dark', cue: 'Dark mode aesthetic, neon cyan and deep indigo glow, cinematic rim light' },
+                            ].map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => {
+                                  setAiImagePrompt((prev) => {
+                                    const trimmed = prev.trim();
+                                    if (!trimmed) return preset.cue;
+                                    if (trimmed.includes(preset.cue)) return trimmed;
+                                    return `${trimmed}, ${preset.cue}`;
+                                  });
+                                }}
+                                className="px-2 py-1 bg-[var(--bg-input)] hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-[#2563EB] border border-[var(--border-color)] rounded-lg text-[10px] font-bold text-[var(--text-secondary)] whitespace-nowrap transition-all cursor-pointer shrink-0"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {extractedVisualMeta && (
+                            <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#2563EB]/5 border border-[#2563EB]/20 rounded-xl text-[11px] animate-fadeIn">
+                              <span className="font-extrabold text-[#2563EB] flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+                                <span>{extractedVisualMeta.categoryPill || 'VISUAL BLUEPRINT'}</span>
+                              </span>
+                              <span className="text-[10px] text-[var(--text-secondary)] font-medium truncate max-w-[200px]" title={extractedVisualMeta.heroHook}>
+                                Hook: "{extractedVisualMeta.heroHook?.slice(0, 32)}..."
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Phase 2: Typography Overlay Toggle */}
+                          <div className="flex items-center justify-between p-2 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-xl">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-bold text-[var(--text-primary)]">Vector Typography Overlay</span>
+                              <span className="text-[10px] text-[var(--text-secondary)] font-medium hidden sm:inline">(Hero Hook & Brand Logo)</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setRenderTypography(!renderTypography)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                                renderTypography
+                                  ? 'bg-[#2563EB] text-white shadow-xs'
+                                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)]'
+                              }`}
+                            >
+                              {renderTypography ? 'Overlay ON' : 'Raw Art Only'}
+                            </button>
+                          </div>
+
+                          {/* Phase 3: Multi-Channel Aspect Ratio Selector */}
+                          <div className="space-y-1.5 p-2.5 bg-[var(--bg-input)]/60 border border-[var(--border-color)] rounded-xl">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-[var(--text-primary)]">Canvas Format & Ratio</span>
+                              <span className="text-[10px] text-[#2563EB] font-extrabold">
+                                {ASPECT_RATIO_PRESETS.find((p) => p.ratio === imageAspectRatio)?.resolution || '1080×1080 (Feed)'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                              {ASPECT_RATIO_PRESETS.map(({ ratio, label, channel }) => {
+                                const active = imageAspectRatio === ratio;
+                                const IconComp = ASPECT_RATIO_ICONS[ratio];
+                                return (
+                                  <button
+                                    key={ratio}
+                                    type="button"
+                                    onClick={() => setImageAspectRatio(ratio)}
+                                    className={`py-2 px-1.5 rounded-xl text-center transition-all cursor-pointer border flex flex-col items-center justify-center gap-0.5 ${
+                                      active
+                                        ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                                        : 'bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[#2563EB]/40'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1 text-[11px] font-extrabold">
+                                      <IconComp className="w-3 h-3" />
+                                      <span>{label}</span>
+                                    </div>
+                                    <span className={`text-[9px] font-medium leading-none ${active ? 'text-blue-100' : 'text-[var(--text-secondary)]'}`}>
+                                      {channel}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
 
                         <button
                           type="button"
-                          onClick={handleGenerateAiImage}
+                          onClick={() => handleGenerateAiImage()}
                           disabled={generatingAiImage || (!topic.trim() && !aiImagePrompt.trim())}
                           className="w-full py-3 bg-[#2563EB] hover:bg-blue-600 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
@@ -1447,101 +1723,252 @@ export default function ComposerPage() {
 
                 {mediaMode === 'NONE' && (
                   <div className="bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-xl p-3.5 text-center space-y-1 animate-fadeIn">
-                    <p className="text-xs font-bold text-[var(--text-primary)]">📝 Text Only Post</p>
+                    <p className="text-xs font-bold text-[var(--text-primary)]">Text Only Post</p>
                     <p className="text-[11px] text-[var(--text-secondary)]">Your post will be published without images.</p>
                   </div>
                 )}
               </div>
 
-              {/* Step 3: Publish Options with Split Dropdown */}
-              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-sm space-y-5">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase text-[#2563EB] pb-3 border-b border-[var(--border-color)]">
-                  <Send className="h-4 w-4" /> 3. Publish Options
+              {/* Step 3: Publish & Schedule (Master Execution Studio) */}
+              <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 md:p-6 shadow-sm space-y-5">
+                {/* Header with Step Identity & Destination Count */}
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase text-[#2563EB]">
+                    <Send className="h-4 w-4" /> 3. Publish & Schedule
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {platforms.length > 0 ? (
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> {platforms.length} {platforms.length === 1 ? 'Channel' : 'Channels'} Selected
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                        No Channel Selected
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* 1. High-Visibility Segmented Hero Switcher */}
+                <div className="p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPublishMode('NOW')}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      publishMode === 'NOW'
+                        ? 'bg-[#2563EB] text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/50'
+                    }`}
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Publish Immediately</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPublishMode('SCHEDULE');
+                      if (!scheduledDate) {
+                        applySchedulePreset('TOMORROW_MORNING');
+                      }
+                    }}
+                    className={`py-2.5 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      publishMode === 'SCHEDULE'
+                        ? 'bg-[#2563EB] text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/50'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Schedule for Later</span>
+                  </button>
+                </div>
+
+                {/* 2. Intelligent Scheduling Matrix (Visible when Schedule Mode is Selected) */}
                 {publishMode === 'SCHEDULE' && (
-                  <div className="space-y-1.5 animate-fadeIn">
-                    <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider block">Target Date & Time</label>
-                    <input
-                      type="datetime-local"
-                      value={scheduledDate}
-                      onChange={(e) => setScheduledDate(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-4 py-3 text-xs font-bold focus:border-[#2563EB] outline-none"
-                    />
+                  <div className="bg-[var(--bg-input)]/50 border border-[#2563EB]/25 rounded-2xl p-4 space-y-3.5 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#2563EB]" />
+                        <span>Recommended Release Time</span>
+                      </label>
+                      <span className="text-[10px] text-[var(--text-secondary)] font-medium flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-[#2563EB]" />
+                        <span className="truncate max-w-[140px] sm:max-w-none">{userTimezone}</span>
+                      </span>
+                    </div>
+
+                    {/* 1-Click Smart Presets */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => applySchedulePreset('TOMORROW_MORNING')}
+                        className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-extrabold text-[#2563EB] uppercase">Morning Peak</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-500 font-bold">Best Reach</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB]">Tomorrow 9:30 AM</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applySchedulePreset('TODAY_PEAK')}
+                        className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-extrabold text-[#2563EB] uppercase">Evening Rush</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-500 font-bold">High Clicks</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB]">5:45 PM Peak</p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => applySchedulePreset('IN_2_HOURS')}
+                        className="p-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[#2563EB] hover:bg-[#2563EB]/5 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-extrabold text-[#2563EB] uppercase">Quick Buffer</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 font-bold">Auto Delay</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-[var(--text-primary)] group-hover:text-[#2563EB]">In 2 Hours</p>
+                      </button>
+                    </div>
+
+                    {/* Custom DateTime Input & Friendly Summary */}
+                    <div className="pt-2 border-t border-[var(--border-color)]/70 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">Custom Date & Time</span>
+                        {scheduledDate && (
+                          <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            ✓ {formatFriendlySchedule(scheduledDate)}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="datetime-local"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-4 py-2.5 text-xs font-bold focus:border-[#2563EB] outline-none shadow-2xs"
+                      />
+                    </div>
                   </div>
                 )}
 
-                {/* 💬 Auto-Post First Comment (LinkedIn Algorithm Reach Protection) */}
-                <div className="bg-[var(--bg-input)]/40 border border-[var(--border-color)] rounded-xl p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                      <span>💬 Auto-Post First Comment</span>
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20 font-bold">LinkedIn Boost</span>
-                    </label>
-                  </div>
-                  <p className="text-[11px] text-[var(--text-secondary)]">
-                    Protect your reach by keeping links out of the main post. Our server will auto-comment 5s after publishing.
-                  </p>
-                  <textarea
-                    value={firstComment}
-                    onChange={(e) => setFirstComment(e.target.value)}
-                    placeholder="e.g. 🔗 Here's the link to check it out: https://... (or 'Leave a comment to get the playbook!')"
-                    rows={2}
-                    className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium"
-                  />
-                </div>
-
-                {/* Integrated Split Button Component */}
-                <div className="relative flex shadow-md rounded-xl publish-dropdown-container">
+                {/* 3. Engagement Boost: Auto-Post First Comment (Dedicated Add-on Drawer) */}
+                <div className="border border-[var(--border-color)] rounded-2xl overflow-hidden bg-[var(--bg-input)]/30">
                   <button
-                    onClick={handleSchedulePost}
-                    disabled={submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0 || hasZeroSelectedActivePlatform}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-l-xl font-extrabold text-[13px] transition-all cursor-pointer ${
-                      submitting || (publishMode === 'SCHEDULE' && !scheduledDate) || platforms.length === 0 || hasZeroSelectedActivePlatform
-                        ? 'bg-slate-400 dark:bg-slate-700 text-slate-200 cursor-not-allowed opacity-60'
-                        : 'bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] hover:from-blue-600 hover:to-blue-700 text-white shadow-md shadow-blue-500/20'
-                    }`}
+                    type="button"
+                    onClick={() => setShowFirstCommentDrawer(!showFirstCommentDrawer)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-input)]/60 transition-colors cursor-pointer text-left"
                   >
-                    {submitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Processing...</span>
-                      </>
-                    ) : hasZeroSelectedActivePlatform ? (
-                      '⚠️ Select Target Destination Above'
-                    ) : publishMode === 'NOW' ? (
-                      '⚡ Publish Now'
-                    ) : (
-                      '🗓️ Schedule Post'
-                    )}
-                  </button>
-                  <div className="w-[1px] bg-blue-700/50"></div>
-                  <button
-                    onClick={() => setShowPublishDropdown(!showPublishDropdown)}
-                    disabled={submitting || hasZeroSelectedActivePlatform}
-                    className="px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-r-xl flex items-center justify-center transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {showPublishDropdown ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-extrabold text-[var(--text-primary)] block">Auto-Post First Comment</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-medium">Keep links out of the main post to boost reach</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {firstComment.trim() ? (
+                        <span className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-[var(--text-secondary)]">
+                          Optional
+                        </span>
+                      )}
+                      {showFirstCommentDrawer ? <ChevronUp className="w-4 h-4 text-[var(--text-secondary)]" /> : <ChevronDown className="w-4 h-4 text-[var(--text-secondary)]" />}
+                    </div>
                   </button>
 
-                  {/* Dropdown Menu */}
-                  {showPublishDropdown && (
-                    <div className="absolute right-0 bottom-full mb-2 w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-xl z-50 p-1.5 overflow-hidden animate-fadeIn">
-                      <button
-                        onClick={() => { setPublishMode('NOW'); setShowPublishDropdown(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'NOW' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
-                      >
-                        <Zap className="w-4 h-4" /> Publish Now
-                      </button>
-                      <button
-                        onClick={() => { setPublishMode('SCHEDULE'); setShowPublishDropdown(false); }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${publishMode === 'SCHEDULE' ? 'bg-[#2563EB] text-white shadow-xs' : 'text-[var(--text-primary)] hover:bg-[var(--bg-input)]'}`}
-                      >
-                        <Calendar className="w-4 h-4" /> Schedule Later
-                      </button>
+                  {(showFirstCommentDrawer || Boolean(firstComment.trim())) && (
+                    <div className="p-4 pt-1 border-t border-[var(--border-color)]/60 space-y-2 bg-[var(--bg-card)]/50 animate-fadeIn">
+                      <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                        Algorithm reach drops up to 40% when external links are inside the main post body. OmniSync will automatically post this comment 5 seconds after release.
+                      </p>
+                      <textarea
+                        value={firstComment}
+                        onChange={(e) => setFirstComment(e.target.value)}
+                        placeholder="e.g. 🔗 Here is the link to download the blueprint: https://... (or 'Drop a comment below and I will DM you the playbook!')"
+                        rows={2}
+                        className="w-full text-xs bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl p-3 outline-none focus:border-[#2563EB] font-medium leading-relaxed"
+                      />
                     </div>
                   )}
                 </div>
+
+                {/* Validation Warnings (Non-intrusive Helper Badges above CTA) */}
+                {platforms.length === 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-bold animate-fadeIn">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Please select at least one target social destination in Step 1 to enable publishing.</span>
+                  </div>
+                )}
+
+                {platforms.length > 0 && hasZeroSelectedActivePlatform && (
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-bold animate-fadeIn">
+                    <Info className="w-4 h-4 shrink-0" />
+                    <span>Please select at least one account or page in the channel dropdown above.</span>
+                  </div>
+                )}
+
+                {publishMode === 'SCHEDULE' && !scheduledDate && (
+                  <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[#2563EB] text-xs font-bold animate-fadeIn">
+                    <Calendar className="w-4 h-4 shrink-0" />
+                    <span>Select a 1-click preset or pick a target time above to finalize scheduling.</span>
+                  </div>
+                )}
+
+                {/* 4. Single Master Action Button (The Undisputed Primary CTA) */}
+                <button
+                  type="button"
+                  onClick={handleSchedulePost}
+                  disabled={
+                    submitting ||
+                    (publishMode === 'SCHEDULE' && !scheduledDate) ||
+                    platforms.length === 0 ||
+                    hasZeroSelectedActivePlatform
+                  }
+                  className={`w-full py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base transition-all flex items-center justify-center gap-2.5 shadow-lg cursor-pointer ${
+                    submitting ||
+                    (publishMode === 'SCHEDULE' && !scheduledDate) ||
+                    platforms.length === 0 ||
+                    hasZeroSelectedActivePlatform
+                      ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-60 shadow-none'
+                      : 'bg-[#2563EB] hover:bg-blue-600 text-white shadow-blue-500/25 active:scale-[0.99]'
+                  }`}
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>{publishMode === 'NOW' ? 'Publishing Live Post...' : 'Scheduling Post...'}</span>
+                    </>
+                  ) : publishMode === 'NOW' ? (
+                    <>
+                      <Zap className="w-5 h-5" />
+                      <span>
+                        {platforms.length > 1
+                          ? `Publish to ${platforms.length} Channels Now`
+                          : platforms.length === 1
+                          ? `Publish to ${platforms[0]} Now`
+                          : 'Publish Live Post Now'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-5 h-5" />
+                      <span>
+                        {scheduledDate
+                          ? `Schedule Post for ${formatFriendlySchedule(scheduledDate)}`
+                          : 'Select Schedule Time Above'}
+                      </span>
+                    </>
+                  )}
+                </button>
               </div>
 
             </div>
@@ -1549,8 +1976,22 @@ export default function ComposerPage() {
             {/* Right Column: Realistic Social Media Preview Feed */}
             <div className="lg:col-span-5 space-y-6 xl:col-span-5">
               <div className="sticky top-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Social Feed Preview</h2>
+                <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Social Feed Preview</h2>
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Edit2 className="w-2.5 h-2.5" /> Editable Draft
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreenPreview(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-[var(--border-color)] hover:border-[#2563EB] text-xs font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] transition-all cursor-pointer shadow-2xs shrink-0"
+                    title="Open Full View live device modal preview"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                    <span>Full View</span>
+                  </button>
                 </div>
 
                 {/* Engagement Diagnostics Card (When analyzed) */}
@@ -1599,158 +2040,268 @@ export default function ComposerPage() {
                     <p className="text-[var(--text-primary)] text-sm font-bold">No Preview Available</p>
                     <p className="text-[var(--text-secondary)] text-xs">Select target channels and generate drafts to see how they look.</p>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-6">
-                    {platforms.map((platform) => (
-                      <div key={platform} className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm transition-all hover:shadow-md">
+                ) : (() => {
+                  const activePlatform: PlatformKey = platforms.includes(selectedPreviewPlatform)
+                    ? selectedPreviewPlatform
+                    : (platforms[0] || 'LINKEDIN');
+                  const activePlatformDef = getPlatformDefinition(activePlatform);
+                  const isCarouselFormat = (formatStyle && formatStyle.toUpperCase().startsWith('CAROUSEL')) || (generatedDrafts[activePlatform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[activePlatform]));
+                  const currentMode = previewDisplayMode[activePlatform] || (isCarouselFormat ? 'CAROUSEL' : 'TEXT');
 
-                        {/* Mock Header with Full View Button & Carousel View Switcher */}
-                        {(() => {
-                          const isCarouselFormat = formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform]));
-                          const currentMode = previewDisplayMode[platform] || (isCarouselFormat ? 'CAROUSEL' : 'TEXT');
+                  const brandDisplayName = currentUser?.name || (currentUser?.brandContext ? currentUser.brandContext.split(/[,.\n]/)[0].slice(0, 24).trim() : 'Your Brand');
+                  const brandHandle = `@${brandDisplayName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'brand'}`;
 
-                          return (
-                            <>
-                              <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)]/50">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-[2px]">
-                                    <img src="https://ui-avatars.com/api/?name=Brand&background=1e1e1e&color=fff" alt="Avatar" className="w-full h-full rounded-full border-2 border-[var(--bg-card)] object-cover" />
-                                  </div>
-                                  <div className="leading-tight">
-                                    <p className="text-[13px] font-extrabold text-[var(--text-primary)] flex items-center gap-1">Avenar Engineering <CheckCircle2 className="w-3 h-3 text-blue-500" /></p>
-                                    <p className="text-[11px] text-[var(--text-secondary)] font-medium">@avenar_dev • Just now</p>
-                                  </div>
-                                </div>
+                  const charLimit = activePlatform === SOCIAL_PLATFORMS.X ? 280 : activePlatform === SOCIAL_PLATFORMS.LINKEDIN ? 3000 : activePlatform === SOCIAL_PLATFORMS.INSTAGRAM ? 2200 : 5000;
+                  const charCount = (generatedDrafts[activePlatform] || '').length;
+                  const isOverLimit = charCount > charLimit;
 
-                                <div className="flex items-center gap-2">
-                                  {/* Carousel View Mode Toggle */}
-                                  {isCarouselFormat && (
-                                    <div className="flex items-center bg-[var(--bg-input)] p-0.5 rounded-lg border border-[var(--border-color)] text-[10px] font-extrabold mr-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [platform]: 'CAROUSEL' }))}
-                                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                                          currentMode === 'CAROUSEL'
-                                            ? 'bg-[#2563EB] text-white shadow-xs'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                      >
-                                        🎠 Slides
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [platform]: 'TEXT' }))}
-                                        className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                                          currentMode === 'TEXT'
-                                            ? 'bg-[#2563EB] text-white shadow-xs'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                      >
-                                        📝 Text
-                                      </button>
-                                    </div>
-                                  )}
+                  return (
+                    <div className="space-y-3 animate-fadeIn">
+                      {/* Platform Switcher Tab Bar */}
+                      <div className="flex items-center justify-between gap-2 p-1.5 bg-[var(--bg-input)]/80 border border-[var(--border-color)] rounded-2xl">
+                        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
+                          {platforms.map((platformKey) => {
+                            const def = getPlatformDefinition(platformKey);
+                            const isSelected = activePlatform === platformKey;
+                            const hasDraft = Boolean(generatedDrafts[platformKey] && generatedDrafts[platformKey].trim().length > 0);
 
-                                  {/* Full View Button */}
-                                  <button
-                                    onClick={() => setIsFullscreenPreview(true)}
-                                    className="p-1.5 bg-[var(--bg-input)] hover:bg-[var(--border-color)] border border-[var(--border-color)] rounded-lg transition-all text-slate-500 hover:text-blue-500 cursor-pointer"
-                                    title="Open Full Screen Editor"
-                                  >
-                                    <Maximize2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <PlatformIcon platform={platform} className={`w-5 h-5 opacity-50 ${getPlatformDefinition(platform).accentClass}`} />
-                                  <MoreHorizontal className="w-4 h-4 text-[var(--text-secondary)] cursor-pointer" />
-                                </div>
-                              </div>
+                            return (
+                              <button
+                                key={platformKey}
+                                type="button"
+                                onClick={() => setSelectedPreviewPlatform(platformKey)}
+                                className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                                  isSelected
+                                    ? 'bg-[#2563EB] text-white shadow-xs'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
+                                }`}
+                              >
+                                <PlatformIcon platform={platformKey} className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : def.accentClass}`} />
+                                <span>{def.label}</span>
+                                {hasDraft && (
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} title="Draft Ready" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                              {/* Post Body: Platform-tailored layout */}
-                              {currentMode === 'CAROUSEL' ? (
-                                /* Dedicated Carousel Mode (Pure Slide Deck Display) */
-                                <div className="p-3 bg-[var(--bg-card)]">
-                                  <CarouselSlideDeck
-                                    text={generatedDrafts[platform] || ''}
-                                    onTextChange={(newText) => handleTextChange(platform, newText)}
-                                    platformLabel={getPlatformDefinition(platform).label}
-                                  />
-                                </div>
+                        {/* Expand All Channels Grid Button */}
+                        {platforms.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setIsFullscreenPreview(true)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-card)] hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-[var(--border-color)] hover:border-[#2563EB] text-[11px] font-extrabold text-[var(--text-secondary)] hover:text-[#2563EB] transition-all cursor-pointer shadow-2xs shrink-0"
+                            title="Compare and edit all channels side-by-side"
+                          >
+                            <Maximize2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                            <span className="hidden sm:inline">Compare All</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Active Social Media Card Preview */}
+                      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl overflow-hidden shadow-sm transition-all hover:shadow-md">
+                        {/* Mock Header with Channel Icon & Carousel Switcher */}
+                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[var(--border-color)]/50">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-500 to-purple-500 p-[2px]">
+                              {currentUser?.avatarUrl ? (
+                                <img src={currentUser.avatarUrl} alt="Avatar" className="w-full h-full rounded-full border-2 border-[var(--bg-card)] object-cover" />
                               ) : (
-                                /* Standard Raw Text / Caption Mode */
-                                <>
-                                  <div className="px-4 py-3 bg-[var(--bg-card)]">
-                                    <textarea
-                                      value={generatedDrafts[platform] || ''}
-                                      onChange={(e) => handleTextChange(platform, e.target.value)}
-                                      placeholder={`Write your ${getPlatformDefinition(platform).label} post content...`}
-                                      className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-slate-500 border-none outline-none resize-none leading-relaxed min-h-[90px]"
-                                      rows={generatedDrafts[platform] ? Math.min(10, generatedDrafts[platform].split('\n').length + 1) : 4}
-                                    />
-                                  </div>
-
-                                  {mediaFileUrl && (
-                                    <div className="w-full bg-[var(--bg-input)] border-t border-[var(--border-color)]/50 flex items-center justify-center p-2 min-h-[240px] max-h-[420px]">
-                                      {mediaType === 'VIDEO' ? (
-                                        <video src={mediaFileUrl} controls className="w-full max-h-[400px] object-contain rounded-xl" />
-                                      ) : (
-                                        <img src={mediaFileUrl} alt="Attached Media" className="w-full max-h-[400px] object-contain rounded-xl" />
-                                      )}
-                                    </div>
-                                  )}
-                                </>
+                                <div className="w-full h-full rounded-full border-2 border-[var(--bg-card)] bg-[var(--bg-input)] flex items-center justify-center font-extrabold text-xs text-[#2563EB]">
+                                  {brandDisplayName.charAt(0).toUpperCase()}
+                                </div>
                               )}
+                            </div>
+                            <div className="leading-tight">
+                              <p className="text-[13px] font-extrabold text-[var(--text-primary)] flex items-center gap-1">
+                                {brandDisplayName} <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
+                              </p>
+                              <p className="text-[11px] text-[var(--text-secondary)] font-medium">
+                                {brandHandle} • Active {activePlatformDef.label} Preview
+                              </p>
+                            </div>
+                          </div>
 
-                              {/* Social Action Bar */}
-                              <div className="flex items-center justify-between px-5 py-2.5 text-[var(--text-secondary)] border-t border-[var(--border-color)]/30">
-                                <div className="flex items-center gap-6">
-                                  <Heart className="w-[18px] h-[18px] cursor-pointer hover:text-rose-500 transition-colors" />
-                                  <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-blue-500 transition-colors" />
-                                  <Repeat className="w-[18px] h-[18px] cursor-pointer hover:text-green-500 transition-colors" />
-                                </div>
-                                <div className="flex items-center gap-4">
-                                  <Bookmark className="w-[18px] h-[18px] cursor-pointer hover:text-amber-500 transition-colors" />
-                                  <Share2 className="w-[18px] h-[18px] cursor-pointer hover:text-indigo-500 transition-colors" />
-                                </div>
-                              </div>
-                            </>
-                          );
-                        })()}
-
-                        {/* Character Limit & Virality Diagnostics Action Bar */}
-                        {(() => {
-                          const charLimit = platform === SOCIAL_PLATFORMS.X ? 280 : platform === SOCIAL_PLATFORMS.LINKEDIN ? 3000 : platform === SOCIAL_PLATFORMS.INSTAGRAM ? 2200 : 5000;
-                          const charCount = (generatedDrafts[platform] || '').length;
-                          const isOverLimit = charCount > charLimit;
-                          return (
-                            <div className="px-4 py-2 bg-[var(--bg-input)]/50 border-t border-[var(--border-color)]/30 flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            {/* Carousel View Mode Toggle */}
+                            {isCarouselFormat && (
+                              <div className="flex items-center bg-[var(--bg-input)] p-0.5 rounded-lg border border-[var(--border-color)] text-[10px] font-extrabold mr-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleDiagnoseVirality(platform)}
-                                  disabled={diagnosingVirality}
-                                  className="text-[11px] font-bold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                                  onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [activePlatform]: 'CAROUSEL' }))}
+                                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                    currentMode === 'CAROUSEL'
+                                      ? 'bg-[#2563EB] text-white shadow-xs'
+                                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                  }`}
                                 >
-                                  <Sparkles className="w-3 h-3 text-[#2563EB]" />
-                                  {diagnosingVirality ? 'Analyzing...' : '⚡ Check Post Score'}
+                                  Slides
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewDisplayMode(prev => ({ ...prev, [activePlatform]: 'TEXT' }))}
+                                  className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                    currentMode === 'TEXT'
+                                      ? 'bg-[#2563EB] text-white shadow-xs'
+                                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                  }`}
+                                >
+                                  Text
                                 </button>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[11px] font-bold ${isOverLimit ? 'text-rose-500' : 'text-[var(--text-secondary)]'}`}>
-                                  {charCount} / {charLimit}
-                                </span>
-                                <div className="w-16 h-1.5 bg-[var(--border-color)] rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full transition-all ${isOverLimit ? 'bg-rose-500' : charCount > charLimit * 0.9 ? 'bg-amber-500' : 'bg-[#2563EB]'}`}
-                                    style={{ width: `${Math.min(100, (charCount / charLimit) * 100)}%` }}
-                                  />
+                            )}
+
+                            <PlatformIcon platform={activePlatform} className={`w-5 h-5 opacity-70 ${activePlatformDef.accentClass}`} />
+                            
+                            <div className="relative" ref={cardMenuRef}>
+                              <button
+                                type="button"
+                                onClick={() => setShowCardMenu(!showCardMenu)}
+                                className="p-1 rounded-lg hover:bg-[var(--bg-input)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer"
+                                title="Post options & Full View"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+
+                              {showCardMenu && (
+                                <div className="absolute right-0 top-full mt-1.5 w-52 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 p-1.5 space-y-1 animate-fadeIn backdrop-blur-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowCardMenu(false);
+                                      setIsFullscreenPreview(true);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-extrabold text-[var(--text-primary)] hover:bg-[#2563EB]/10 hover:text-[#2563EB] transition-all text-left cursor-pointer"
+                                  >
+                                    <Maximize2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                                    <span>Full View Preview</span>
+                                  </button>
+
+                                  {mediaFileUrl && (
+                                    <a
+                                      href={mediaFileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setShowCardMenu(false)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[#2563EB]/10 hover:text-[#2563EB] transition-all text-left cursor-pointer"
+                                    >
+                                      <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                                      <span>View Image Full Size</span>
+                                    </a>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowCardMenu(false);
+                                      const text = generatedDrafts[activePlatform] || '';
+                                      if (text) {
+                                        navigator.clipboard.writeText(text);
+                                        toast.success(`Copied ${activePlatformDef.label} draft to clipboard!`);
+                                      } else {
+                                        toast.info('Draft is empty.');
+                                      }
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all text-left cursor-pointer"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Copy Post Text</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowCardMenu(false);
+                                      handleDiagnoseVirality(activePlatform);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all text-left cursor-pointer"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>Check Virality Score</span>
+                                  </button>
                                 </div>
-                              </div>
+                              )}
                             </div>
-                          );
-                        })()}
+                          </div>
+                        </div>
+
+                        {/* Post Body: Platform-tailored layout */}
+                        {currentMode === 'CAROUSEL' ? (
+                          <div className="p-3 bg-[var(--bg-card)]">
+                            <CarouselSlideDeck
+                              text={generatedDrafts[activePlatform] || ''}
+                              onTextChange={(newText) => handleTextChange(activePlatform, newText)}
+                              platformLabel={activePlatformDef.label}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <div className="px-4 py-3 bg-[var(--bg-card)]">
+                              <textarea
+                                value={generatedDrafts[activePlatform] || ''}
+                                onChange={(e) => handleTextChange(activePlatform, e.target.value)}
+                                placeholder={`Write or customize your ${activePlatformDef.label} post content here...`}
+                                className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-slate-500 border-none outline-none resize-none leading-relaxed min-h-[140px] focus:ring-0"
+                                rows={generatedDrafts[activePlatform] ? Math.min(14, generatedDrafts[activePlatform].split('\n').length + 2) : 6}
+                              />
+                            </div>
+
+                            {mediaFileUrl && (
+                              <div className="w-full bg-[var(--bg-input)] border-t border-[var(--border-color)]/50 flex items-center justify-center p-2 min-h-[220px] max-h-[380px]">
+                                {mediaType === 'VIDEO' ? (
+                                  <video src={mediaFileUrl} controls className="w-full max-h-[360px] object-contain rounded-xl" />
+                                ) : (
+                                  <img src={mediaFileUrl} alt="Attached Media" className="w-full max-h-[360px] object-contain rounded-xl" />
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Social Action Bar */}
+                        <div className="flex items-center justify-between px-5 py-2.5 text-[var(--text-secondary)] border-t border-[var(--border-color)]/30">
+                          <div className="flex items-center gap-6">
+                            <Heart className="w-[18px] h-[18px] cursor-pointer hover:text-rose-500 transition-colors" />
+                            <MessageSquare className="w-[18px] h-[18px] cursor-pointer hover:text-blue-500 transition-colors" />
+                            <Repeat className="w-[18px] h-[18px] cursor-pointer hover:text-green-500 transition-colors" />
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <Bookmark className="w-[18px] h-[18px] cursor-pointer hover:text-amber-500 transition-colors" />
+                            <Share2 className="w-[18px] h-[18px] cursor-pointer hover:text-indigo-500 transition-colors" />
+                          </div>
+                        </div>
+
+                        {/* Character Limit & Virality Diagnostics Action Bar */}
+                        <div className="px-4 py-2.5 bg-[var(--bg-input)]/50 border-t border-[var(--border-color)]/30 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDiagnoseVirality(activePlatform)}
+                              disabled={diagnosingVirality}
+                              className="text-[11px] font-extrabold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[#2563EB]" />
+                              <span>{diagnosingVirality ? 'Analyzing...' : 'Check Post Score'}</span>
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[11px] font-bold ${isOverLimit ? 'text-rose-500' : 'text-[var(--text-secondary)]'}`}>
+                              {charCount} / {charLimit}
+                            </span>
+                            <div className="w-16 h-1.5 bg-[var(--border-color)] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all ${isOverLimit ? 'bg-rose-500' : charCount > charLimit * 0.9 ? 'bg-amber-500' : 'bg-[#2563EB]'}`}
+                                style={{ width: `${Math.min(100, (charCount / charLimit) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1771,10 +2322,10 @@ export default function ComposerPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-extrabold text-[var(--text-primary)] flex items-center gap-2.5">
-                    Live Feed Device Preview
-                    <span className="text-xs bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20 px-3 py-0.5 rounded-full uppercase tracking-wider font-extrabold">Full Screen</span>
+                    Multi-Channel Studio Grid
+                    <span className="text-xs bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20 px-3 py-0.5 rounded-full uppercase tracking-wider font-extrabold">All Channels</span>
                   </h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Interactive full-resolution post editor & feed preview across all selected channels</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Compare, refine, and customize dispatches across all your active channels side-by-side</p>
                 </div>
               </div>
 
@@ -1821,7 +2372,7 @@ export default function ComposerPage() {
                           <div className="space-y-2.5 flex-1 flex flex-col">
                             <label className="text-xs text-[#2563EB] font-extrabold uppercase tracking-wider block shrink-0">Caption & Slide Editor</label>
 
-                            {formatStyle === 'CAROUSEL' || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform])) ? (
+                            {(formatStyle && formatStyle.toUpperCase().startsWith('CAROUSEL')) || (generatedDrafts[platform] && /(?:SLIDE|Slide)\s*\d+/i.test(generatedDrafts[platform])) ? (
                               <div className="flex-1">
                                 <CarouselSlideDeck
                                   text={generatedDrafts[platform] || ''}
@@ -1903,6 +2454,18 @@ export default function ComposerPage() {
           <SchedulingDispatcher />
         </div>
       )}
+
+      {/* Universal AI Persona & Niche Setup Wizard */}
+      <OnboardingModal
+        isOpen={showPersonaModal}
+        onClose={() => setShowPersonaModal(false)}
+        onSaved={(newCtx, newName) => {
+          setCurrentUser((prev) => (prev ? { ...prev, brandContext: newCtx, name: newName || prev.name } : null));
+          toast.success('Brand Voice & Niche updated! Single Post Composer is now tuned to this voice.');
+        }}
+        initialBrandContext={currentUser?.brandContext || ''}
+        initialName={currentUser?.name || ''}
+      />
     </div>
   );
 }

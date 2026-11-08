@@ -103,6 +103,7 @@ export default function PostsPage() {
   const [filterTab, setFilterTab] = useState<'ALL' | 'SCHEDULED' | 'PUBLISHED' | 'DRAFT' | 'CANCELLED' | 'FAILED'>('ALL');
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<'ALL' | 'LINKEDIN' | 'INSTAGRAM' | 'X' | 'FACEBOOK'>('ALL');
   const [allowedPlatforms, setAllowedPlatforms] = useState<string[]>([...DEFAULT_ALLOWED_PLATFORMS]);
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [viralityDiagnosis, setViralityDiagnosis] = useState<any>(null);
   const [diagnosingVirality, setDiagnosingVirality] = useState(false);
   
@@ -258,11 +259,20 @@ export default function PostsPage() {
     setPortalMounted(true);
     fetchPosts();
 
-    ApiService.getMe().then((me) => {
+    Promise.all([
+      ApiService.getMe().catch(() => null),
+      ApiService.getConnectedAccounts().catch(() => []),
+    ]).then(([me, accs]) => {
       if (me && Array.isArray(me.allowedPlatforms)) {
         setAllowedPlatforms(me.allowedPlatforms.map((p: string) => p.toUpperCase()));
       }
-    }).catch(() => {});
+      if (Array.isArray(accs)) {
+        const active = accs
+          .filter((a: any) => a.isActive !== false)
+          .map((a: any) => a.platform?.toUpperCase());
+        setConnectedPlatforms(active);
+      }
+    });
 
     socketClient.connect();
 
@@ -418,38 +428,49 @@ export default function PostsPage() {
       {/* Channel Switcher Buttons */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <span className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider mr-1">Channel Filter:</span>
-        {[
-          { key: 'ALL', label: '🌐 All Channels' },
-          { key: 'LINKEDIN', label: '💼 LinkedIn' },
-          { key: 'INSTAGRAM', label: '📸 Instagram' },
-          { key: 'X', label: '🐦 X (Twitter)' },
-          { key: 'FACEBOOK', label: '📘 Facebook' },
-        ].filter(c => c.key === 'ALL' || allowedPlatforms.includes(c.key)).map(({ key, label }) => {
-          const isSelected = selectedPlatformFilter === key;
-          const count = key === 'ALL' 
-            ? posts.length 
-            : posts.filter(p => p.targetPlatforms?.includes(key as any)).length;
-          
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSelectedPlatformFilter(key as any)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                isSelected
-                  ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
-                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[#2563EB]/40'
-              }`}
-            >
-              <span>{label}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                isSelected ? 'bg-white/20 text-white' : 'bg-[var(--bg-input)] text-[var(--text-secondary)]'
-              }`}>
-                {count}
-              </span>
-            </button>
+        {(() => {
+          const postPlatformSet = new Set(
+            posts.flatMap((p) => (Array.isArray(p.targetPlatforms) ? p.targetPlatforms : [])).map((plat) => String(plat).toUpperCase())
           );
-        })}
+          const effectiveFilterPlatforms = Array.from(
+            new Set([...allowedPlatforms, ...Array.from(postPlatformSet)])
+          );
+
+          return [
+            { key: 'ALL', label: '🌐 All Channels' },
+            { key: 'LINKEDIN', label: '💼 LinkedIn' },
+            { key: 'INSTAGRAM', label: '📸 Instagram' },
+            { key: 'X', label: '🐦 X (Twitter)' },
+            { key: 'FACEBOOK', label: '📘 Facebook' },
+          ]
+            .filter((c) => c.key === 'ALL' || effectiveFilterPlatforms.includes(c.key))
+            .map(({ key, label }) => {
+              const isSelected = selectedPlatformFilter === key;
+              const count = key === 'ALL' 
+                ? posts.length 
+                : posts.filter(p => p.targetPlatforms?.includes(key as any)).length;
+              
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedPlatformFilter(key as any)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    isSelected
+                      ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                      : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[#2563EB]/40'
+                  }`}
+                >
+                  <span>{label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isSelected ? 'bg-white/20 text-white' : 'bg-[var(--bg-input)] text-[var(--text-secondary)]'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            });
+        })()}
       </div>
 
       {/* Grid of posts */}
@@ -1084,9 +1105,11 @@ export default function PostsPage() {
                       <div>
                         <p className="font-bold text-[var(--text-primary)] text-xs">Auto-Like & Algorithm Signal</p>
                         <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">
-                          {selectedPost.status === 'PUBLISHED'
-                            ? '✅ Post was automatically liked post-publication to boost initial algorithm reach.'
-                            : '⚡ Auto-Like will automatically trigger 2s after publication to boost initial reach.'}
+                          {selectedPost.aiPrompt?.includes('AutoLike:false')
+                            ? '⚪ Auto-Like disabled by user for this dispatch.'
+                            : selectedPost.status === 'PUBLISHED'
+                            ? '✅ Tri-Shield Auto-Like registered post-publication with human jitter delay.'
+                            : '⚡ Auto-Like will trigger 35s–65s post-publication with anti-bot human jitter.'}
                         </p>
                       </div>
                     </div>

@@ -253,6 +253,73 @@ export class LinkedinAdapter extends SocialAdapter {
   }
 
   /**
+   * React (Like) on LinkedIn Post with Anti-Bot Safety Guard
+   */
+  async reactToPost({ accessToken, authorUrn, postUrn, reactionType = 'LIKE' }) {
+    if (!accessToken || !postUrn) {
+      return null;
+    }
+
+    if (accessToken.startsWith('mock_')) {
+      logger.info(`[LinkedinAdapter] (Mock Mode) Safely simulated reaction ${reactionType} on ${postUrn}`);
+      return { success: true, mock: true, reactionType };
+    }
+
+    const targetUrn = encodeURIComponent(postUrn);
+    const actor = authorUrn?.startsWith('urn:li:') ? authorUrn : `urn:li:person:${authorUrn}`;
+
+    try {
+      logger.info(`[LinkedinAdapter] 👍 Sending ${reactionType} reaction for ${postUrn}...`);
+
+      // Try v2 socialActions reactions endpoint first
+      const res = await axios.post(
+        `${config.social.linkedin.apiBaseUrl}/socialActions/${targetUrn}/reactions`,
+        {
+          root: postUrn,
+          reactionType,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+            'Content-Type': 'application/json',
+          },
+          timeout: 12000,
+        }
+      );
+
+      logger.info(`[LinkedinAdapter] ✅ Successfully registered ${reactionType} reaction on ${postUrn}! (Status: ${res.status})`);
+      return { success: true, status: res.status };
+    } catch (err) {
+      logger.warn(`[LinkedinAdapter] v2 reaction endpoint warning: ${err.response?.data?.message || err.message}. Attempting REST fallback...`);
+      try {
+        // Fallback to versioned rest/reactions endpoint
+        const restRes = await axios.post(
+          `https://api.linkedin.com/rest/reactions?actor=${encodeURIComponent(actor)}`,
+          {
+            root: postUrn,
+            reactionType,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'X-Restli-Protocol-Version': '2.0.0',
+              'LinkedIn-Version': '202607',
+              'Content-Type': 'application/json',
+            },
+            timeout: 12000,
+          }
+        );
+        logger.info(`[LinkedinAdapter] ✅ Successfully registered ${reactionType} reaction via REST fallback!`);
+        return { success: true, status: restRes.status };
+      } catch (fallbackErr) {
+        logger.warn(`[LinkedinAdapter] Reaction API REST fallback warning for ${postUrn}: ${fallbackErr.response?.data?.message || fallbackErr.message}`);
+        return null;
+      }
+    }
+  }
+
+  /**
    * Exchange LinkedIn Authorization Code for Access Token
    */
   async exchangeToken({ code, redirectUri, clientId, clientSecret }) {

@@ -100,12 +100,13 @@ export class UserService {
    * @returns {Promise<Object>} Updated user record
    */
   static async updateAutopilotSettings(userId, { autopilotEnabled, brandContext }) {
+    const data = {};
+    if (autopilotEnabled !== undefined) data.autopilotEnabled = autopilotEnabled;
+    if (brandContext !== undefined) data.brandContext = brandContext;
+
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: {
-        autopilotEnabled,
-        brandContext,
-      },
+      data,
     });
     await CacheService.del(CACHE_KEYS.USER_PROFILE(userId));
     return updated;
@@ -253,7 +254,7 @@ export class UserService {
 
     await NotificationService.createNotification({
       userId: updatedUser.id,
-      title: 'AI Credits Granted 🎁',
+      title: 'AI Credits Granted',
       message: `Super Admin granted you ${creditAmount} AI Credits!`,
       type: 'success',
     });

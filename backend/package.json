@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "node prisma/seed.js",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "tunnel:dev": "powershell -ExecutionPolicy Bypass -File ./scripts/start_dev_tunnel.ps1"
   },
   "keywords": [
     "express",

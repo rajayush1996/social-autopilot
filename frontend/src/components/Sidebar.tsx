@@ -17,7 +17,10 @@ import {
   MoreVertical,
   CreditCard,
   MessageSquare,
-  BookOpen
+  BookOpen,
+  Layers,
+  AlarmClock,
+  Share2
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import CONFIG from '@/config';
@@ -70,27 +73,27 @@ export function Sidebar() {
     router.push('/login');
   };
 
-  const mainNav = [
+  const workspaceNav = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Composer', href: '/composer', icon: PenTool },
-    { name: 'Schedule', href: '/posts', icon: Calendar },
+    { name: 'Posts & Queue', href: '/posts', icon: Layers },
+    { name: 'Auto-Pilot Schedules', href: '/schedules', icon: AlarmClock },
     { name: 'Engagement Studio', href: '/engagement', icon: MessageSquare },
   ];
 
-  const managementNav = [
-    { name: 'Channels', href: '/accounts', icon: Users },
-    { name: 'Settings', href: '/settings', icon: Settings },
+  const configNav = [
+    { name: 'Connected Channels', href: '/accounts', icon: Share2 },
+    { name: 'Engine Settings', href: '/settings', icon: Settings },
     { name: 'Documentation', href: '/docs', icon: BookOpen },
-    { name: 'Billing & Plan', href: '/profile', icon: UserIcon },
   ];
 
   const adminNav = role.toUpperCase() === 'SUPER_ADMIN' || role.toUpperCase() === 'ADMIN' 
-    ? [{ name: 'Admin', href: '/admin', icon: Sliders }] 
+    ? [{ name: 'Admin Panel', href: '/admin', icon: Sliders }] 
     : [];
 
   return (
     <aside className="sticky top-0 left-0 h-screen w-64 bg-[var(--bg-card)] border-r border-[var(--border-color)] text-[var(--text-primary)] flex flex-col justify-between p-5 z-40 transition-all shrink-0">
-      <div className="space-y-6">
+      <div className="space-y-6 overflow-y-auto max-h-[calc(100vh-130px)] scrollbar-none pr-1">
         {/* Unified Brand Header */}
         <div className="px-2 py-1">
           <BrandLogo href="/" size="md" />
@@ -99,10 +102,10 @@ export function Sidebar() {
         {/* Section 1: Main Workspace */}
         <div className="space-y-2">
           <span className="text-[11px] font-extrabold text-[var(--text-secondary)]/70 uppercase tracking-wider px-3 block">
-            Publishing
+            Workspace
           </span>
           <nav className="space-y-1">
-            {mainNav.map((link) => {
+            {workspaceNav.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
               return (
@@ -128,13 +131,13 @@ export function Sidebar() {
           </nav>
         </div>
 
-        {/* Section 2: Management & Accounts */}
+        {/* Section 2: Configuration & Channels */}
         <div className="space-y-2">
           <span className="text-[11px] font-extrabold text-[var(--text-secondary)]/70 uppercase tracking-wider px-3 block">
-            Management
+            Configuration
           </span>
           <nav className="space-y-1">
-            {managementNav.map((link) => {
+            {configNav.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
               return (
@@ -234,7 +237,7 @@ export function Sidebar() {
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-extrabold text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all"
             >
               <CreditCard className="h-4 w-4 text-[#2563EB]" />
-              <span>Billing & Plan</span>
+              <span>Account & Billing</span>
             </Link>
 
             <button

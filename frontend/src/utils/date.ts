@@ -90,7 +90,7 @@ export function getReviewPipelineNarrative(
     return {
       isOvernight: false,
       reviewWindowText: 'Instant Dispatch',
-      badgeLabel: '⚡ Direct Dispatch',
+      badgeLabel: 'Direct Dispatch',
       badgeColorClass: 'bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:text-emerald-400',
       headline: 'Direct Generation & Instant Dispatch',
       draftTimeDisplay: draftFormatted,
@@ -109,7 +109,7 @@ export function getReviewPipelineNarrative(
     return {
       isOvernight: false,
       reviewWindowText: windowStr,
-      badgeLabel: `🌅 Same-Day Dispatch (${windowStr} Window)`,
+      badgeLabel: `Same-Day Dispatch (${windowStr} Window)`,
       badgeColorClass: 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-300',
       headline: 'Same-Day Review & Publishing Pipeline',
       draftTimeDisplay: draftFormatted,
@@ -127,7 +127,7 @@ export function getReviewPipelineNarrative(
   return {
     isOvernight: true,
     reviewWindowText: windowStr,
-    badgeLabel: `🌙 Overnight Prep ➔ Next-Day Live (${windowStr} Window)`,
+    badgeLabel: `Overnight Prep ➔ Next-Day Live (${windowStr} Window)`,
     badgeColorClass: 'bg-indigo-500/10 text-indigo-700 border-indigo-300 dark:text-indigo-300',
     headline: 'Overnight Review Pipeline (Prepares Evening Before)',
     draftTimeDisplay: draftFormatted,

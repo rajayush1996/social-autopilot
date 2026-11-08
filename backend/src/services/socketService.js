@@ -156,6 +156,16 @@ export class SocketServerManager {
           socket.emit(SOCKET_EVENTS.PLATFORM_CONNECTION_STATUS, payload);
         } catch (err) {
           logger.error(`⚡ [SocketServerManager] Error in check_platform_connection: ${err.message}`);
+          const errorPayload = {
+            platform: typeof data === 'string' ? data.toUpperCase() : data?.platform?.toUpperCase(),
+            connected: false,
+            isConnected: false,
+            error: err.message,
+            timestamp: new Date().toISOString(),
+          };
+          socket.emit('check_platform', errorPayload);
+          socket.emit('check_platform_response', errorPayload);
+          socket.emit(SOCKET_EVENTS.PLATFORM_CONNECTION_STATUS, errorPayload);
         }
       });
 
@@ -175,15 +185,20 @@ export class SocketServerManager {
   /**
    * Broadcast Account Connection/Disconnection realtime event
    */
-  emitAccountStatusChange({ userId, platform, action }) {
+  emitAccountStatusChange({ userId, platform, action, connected, reason }) {
     if (!this.io) {
       logger.warn('⚠️ [SocketServerManager] Socket server not initialized yet.');
       return;
     }
 
+    const resolvedAction = action || (connected === false ? 'DISCONNECTED' : 'CONNECTED');
+    const platformUpper = platform?.toUpperCase();
+
     const payload = {
-      platform: platform?.toUpperCase(),
-      action, // 'CONNECTED' | 'DISCONNECTED'
+      platform: platformUpper,
+      action: resolvedAction,
+      connected: resolvedAction === 'CONNECTED',
+      reason: reason || undefined,
       timestamp: new Date().toISOString(),
     };
 
@@ -193,6 +208,16 @@ export class SocketServerManager {
       this.io.to(`user_${userId}`).emit(SOCKET_EVENTS.ACCOUNT_STATUS_CHANGED, payload);
     }
     this.io.emit(SOCKET_EVENTS.ACCOUNT_STATUS_CHANGED, payload);
+
+    // If disconnected, broadcast realtime notification toast to the user
+    if (resolvedAction === 'DISCONNECTED') {
+      this.emitNotification({
+        userId,
+        title: `${platformUpper} Account Disconnected`,
+        message: `Your ${platformUpper} authorization has expired or was revoked. Please reconnect on the Accounts page.`,
+        type: 'warning',
+      });
+    }
   }
 
   /**

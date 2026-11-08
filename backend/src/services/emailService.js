@@ -123,7 +123,7 @@ class EmailService {
         await prisma.notification.create({
           data: {
             userId,
-            title: '⚠️ Email Delivery Notice',
+            title: 'Email Delivery Notice',
             message: `Email "${subject}" could not be sent to ${to}. Reason: ${lastError?.message || 'Delivery failed'}`,
             type: 'warning',
           }
@@ -345,7 +345,7 @@ class EmailService {
                     <tr>
                       <td align="left" valign="middle">
                         <span style="display:inline-block; background-color:#2563eb; color:#ffffff; font-weight:800; font-size:12px; padding:6px 12px; border-radius:6px; letter-spacing:0.8px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                          ⚡ OMNISYNC
+                          OMNISYNC
                         </span>
                       </td>
                       <td align="right" valign="middle">
@@ -391,7 +391,7 @@ class EmailService {
                   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; margin-bottom:20px;">
                     <tr>
                       <td style="padding:10px 14px; font-size:12.5px; line-height:18px; color:#1e40af; font-weight:600; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                        📅 <strong>Target Publishing Time:</strong> ${formattedDate}
+                        <strong>Target Publishing Time:</strong> ${formattedDate}
                       </td>
                     </tr>
                   </table>
@@ -401,7 +401,7 @@ class EmailService {
                     <tr>
                       <td align="center" bgcolor="#2563eb" style="border-radius:10px; background-color:#2563eb;">
                         <a href="${approveLink}" target="_blank" class="btn-primary" style="display:block; width:100%; padding:14px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:14.5px; font-weight:700; color:#ffffff; text-decoration:none; text-align:center; border-radius:10px; line-height:20px;">
-                          ✅ 1-Click Approve &amp; Schedule
+                          Approve &amp; Schedule
                         </a>
                       </td>
                     </tr>
@@ -411,14 +411,14 @@ class EmailService {
                     <tr>
                       <td align="center" bgcolor="#ffffff" style="border-radius:10px; background-color:#ffffff; border:1px solid #cbd5e1;">
                         <a href="${editLink}" target="_blank" class="btn-secondary" style="display:block; width:100%; padding:12px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:13.5px; font-weight:600; color:#334155; text-decoration:none; text-align:center; border-radius:10px; line-height:18px;">
-                          ✏️ Edit in Composer
+                          Edit in Composer
                         </a>
                       </td>
                     </tr>
                   </table>
 
                   <p style="margin:0; text-align:center; font-size:11.5px; line-height:16px; color:#64748b; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    🔒 <em>Safe 1-Click Approval &bull; No password or login required.</em>
+                    <em>Secure 1-Click Approval &bull; No password or login required.</em>
                   </p>
 
                 </td>
@@ -457,10 +457,72 @@ class EmailService {
       to: userEmail,
       subject: `[Action Required] Review & Approve: Post for ${targetPlatforms.join(', ') || 'Social Media'}`,
       html: htmlContent,
-      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${displayContent}"\n\nScheduled for: ${formattedDate}\n\n✅ 1-Click Approve: ${approveLink}\n✏️ Edit in Composer: ${editLink}`,
+      text: `Hi ${userName || 'Creator'},\n\nYour post is ready for review:\n\n"${displayContent}"\n\nScheduled for: ${formattedDate}\n\nApprove & Schedule: ${approveLink}\nEdit in Composer: ${editLink}`,
       from: fromAddress,
       userId,
       metadata: { postId, type: 'POST_APPROVAL', targetPlatforms },
+    });
+  }
+
+  /**
+   * Send High-Priority Alert when a Social Account Disconnects / Token Expires
+   */
+  async sendAccountDisconnectedEmail({ userId, userEmail, userName, platform, reason }) {
+    const reconnectLink = `${config.frontendUrl || config.clientUrl || 'http://localhost:3000'}/accounts`;
+    const platformName = platform?.toUpperCase() || 'Social Account';
+    const fromAddress = process.env.SMTP_FROM || process.env.FROM_EMAIL || 'info@omnisyncapp.com';
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>${platformName} Session Expired</title>
+      <style>
+        body { margin:0; padding:24px; background-color:#f1f5f9; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .card { max-width:560px; margin:0 auto; background:#ffffff; border-radius:14px; border:1px solid #e2e8f0; overflow:hidden; }
+        .header { padding:24px 28px; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color:#ffffff; }
+        .content { padding:28px; }
+        .btn { display:inline-block; padding:13px 28px; background-color:#2563eb; color:#ffffff !important; font-size:14px; font-weight:700; text-decoration:none; border-radius:10px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header">
+          <h2 style="margin:0; font-size:18px; font-weight:800; color:#ffffff;">${platformName} Connection Alert</h2>
+          <p style="margin:4px 0 0 0; font-size:13px; opacity:0.95; color:#fee2e2;">Action Required &bull; Auto-Publishing Paused</p>
+        </div>
+        <div class="content">
+          <p style="margin:0 0 14px 0; font-size:14.5px; color:#1e293b; line-height:22px;">
+            Hi <strong>${userName || 'Creator'}</strong>,
+          </p>
+          <p style="margin:0 0 16px 0; font-size:13.5px; color:#475569; line-height:22px;">
+            Your <strong>${platformName}</strong> authorization token has expired or the connection was revoked.
+            Scheduled posts targeted for ${platformName} cannot be published until the channel is re-authenticated.
+          </p>
+          ${reason ? `<div style="padding:12px 14px; background:#fef2f2; border-left:3px solid #ef4444; border-radius:6px; font-size:12px; color:#991b1b; margin-bottom:20px;"><em>Details: ${reason}</em></div>` : ''}
+          <div style="text-align:center; margin:26px 0 20px 0;">
+            <a href="${reconnectLink}" class="btn" style="color:#ffffff;">
+              Reconnect ${platformName} Account
+            </a>
+          </div>
+          <p style="margin:24px 0 0 0; font-size:11.5px; color:#94a3b8; text-align:center;">
+            OmniSync Social AutoPilot &bull; Account Health Monitor
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+    `;
+
+    return this.sendEmail({
+      to: userEmail,
+      subject: `[Action Required] Your ${platformName} Account has Disconnected`,
+      html: htmlContent,
+      text: `Hi ${userName || 'Creator'},\n\nYour ${platformName} authorization session has expired or the connection was revoked.\n\nPlease reconnect your account to resume automated publishing:\n${reconnectLink}\n\nReason: ${reason || 'Session expired'}`,
+      from: fromAddress,
+      userId,
+      metadata: { platform, type: 'ACCOUNT_DISCONNECTED' },
     });
   }
 }

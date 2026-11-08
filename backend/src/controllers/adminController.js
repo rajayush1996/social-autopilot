@@ -17,12 +17,17 @@ export const updateAutopilotSettings = catchAsync(async (req, res) => {
     throw ApiError.unauthorized('User authentication required.');
   }
 
-  const updatedUser = await UserService.updateAutopilotSettings(targetUserId, {
-    autopilotEnabled: !!autopilotEnabled,
-    brandContext: brandContext || '',
-  });
+  const updateData = {};
+  if (autopilotEnabled !== undefined) {
+    updateData.autopilotEnabled = Boolean(autopilotEnabled);
+  }
+  if (brandContext !== undefined) {
+    updateData.brandContext = brandContext;
+  }
 
-  return successResponse(res, HttpStatus.OK, 'Autopilot settings updated successfully.', {
+  const updatedUser = await UserService.updateAutopilotSettings(targetUserId, updateData);
+
+  return successResponse(res, HttpStatus.OK, 'Settings updated successfully.', {
     user: {
       id: updatedUser.id,
       autopilotEnabled: updatedUser.autopilotEnabled,

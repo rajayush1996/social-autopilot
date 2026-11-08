@@ -1,5 +1,14 @@
 import 'dotenv/config';
 
+// Automatically detect Node.js test runner execution
+if (
+  process.execArgv.includes('--test') ||
+  process.argv.some((arg) => typeof arg === 'string' && (arg.includes('tests') || arg === '--test')) ||
+  process.env.NODE_ENV === 'test'
+) {
+  process.env.NODE_ENV = 'test';
+}
+
 /**
  * Centralized Application Configuration & Environment Bootstrap.
  * Single source of truth for all environment variables, defaults, and API endpoints.

@@ -92,6 +92,7 @@ export class AutopilotService {
           tone: 'ENGAGING',
           brandContext: context,
           contentSummary: recentMemory ? `PAST 30-DAY COVERED DISPATCHES (STRICTLY DO NOT REPEAT):\n${recentMemory}` : undefined,
+          userId: user.id,
         });
 
         if (!aiResult || !aiResult.content) {

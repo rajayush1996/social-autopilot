@@ -39,3 +39,10 @@ backend/backups/
 # Architecture & Setup Documentation
 ARCHITECTURE_FLOW.md
 SETUP_GUIDE.md
+
+# Local Infrastructure & Tunnel Secrets (Never commit server IPs or SSH paths)
+backend/scripts/start_dev_tunnel.bat
+backend/scripts/start_dev_tunnel.ps1
+backend/scripts/*.bat
+backend/src/scripts/test_*.js
+backend/src/scripts/verify_*.js

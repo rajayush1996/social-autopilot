@@ -11,7 +11,11 @@ import {
   Zap, 
   AlarmClock,
   Moon,
-  Sun
+  Sun,
+  Compass,
+  Layers,
+  Target,
+  RefreshCw
 } from 'lucide-react';
 import ApiService from '@/services/apiService';
 import SchedulingDispatcher from '@/components/SchedulingDispatcher';
@@ -19,6 +23,7 @@ import { User } from '@/lib/api';
 import { useToast } from '@/context/ToastContext';
 import LoadingScreen from '@/components/LoadingScreen';
 import { getReviewPipelineNarrative } from '@/utils/date';
+import OnboardingModal, { PERSONAS, NICHES, INTENTS, buildBrandVoiceNarrative } from '@/components/OnboardingModal';
 
 export default function AutopilotSettingsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,9 +35,16 @@ export default function AutopilotSettingsPage() {
   const [globalDraftTime, setGlobalDraftTime] = useState('09:00');
   const [globalPublishTime, setGlobalPublishTime] = useState('20:00');
   const [globalTimezone, setGlobalTimezone] = useState('Asia/Kolkata');
+
+  // Interactive Persona, Niche & Intent States
+  const [selectedPersona, setSelectedPersona] = useState('FOUNDER');
+  const [selectedNiche, setSelectedNiche] = useState('TECH_SAAS');
+  const [selectedIntent, setSelectedIntent] = useState('VIRAL');
+  const [showWizardModal, setShowWizardModal] = useState(false);
   
   // UX Feedback States
-  const [updatingSettings, setUpdatingSettings] = useState(false);
+  const [savingPersona, setSavingPersona] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const toast = useToast();
 
   const fetchAutopilotProfile = async () => {
@@ -63,14 +75,14 @@ export default function AutopilotSettingsPage() {
     fetchAutopilotProfile();
   }, []);
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
+  // Handler 1: Save Universal Brand Voice & Niche (Applies to Single Post Composer & Autopilot)
+  const handleSaveBrandPersona = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUpdatingSettings(true);
+    setSavingPersona(true);
     try {
-      // 1. Update Autopilot flags & brand context
+      // 1. Update Brand Context (Universal for Single Post & Autopilot)
       await ApiService.updateAutopilotSettings({
         userId: 'me',
-        autopilotEnabled,
         brandContext,
       });
 
@@ -82,7 +94,28 @@ export default function AutopilotSettingsPage() {
         }).catch(() => {});
       }
 
-      // 3. Also ensure default schedule timings match
+      toast.success('✨ Brand Voice & Niche saved! Now actively powering Single Post Composer and AutoPilot.');
+      fetchAutopilotProfile();
+    } catch (err: any) {
+      console.error('Failed to save Brand Voice settings:', err);
+      toast.error(err.response?.data?.message || 'Failed to save Brand Voice settings.');
+    } finally {
+      setSavingPersona(false);
+    }
+  };
+
+  // Handler 2: Save AutoPilot Daily Recurring Timings & Schedule
+  const handleSaveAutopilotSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSchedule(true);
+    try {
+      // 1. Update Autopilot enable/disable flag
+      await ApiService.updateAutopilotSettings({
+        userId: 'me',
+        autopilotEnabled,
+      });
+
+      // 2. Update schedule timings
       const schedRes = await ApiService.getUserSchedules().catch(() => null);
       if (schedRes && schedRes.schedules && schedRes.schedules.length > 0) {
         for (const s of schedRes.schedules) {
@@ -94,21 +127,21 @@ export default function AutopilotSettingsPage() {
         }
       }
 
-      toast.success('Brand Identity & Autopilot settings saved successfully!');
+      toast.success('⏰ AutoPilot publishing schedule & timings saved successfully!');
       fetchAutopilotProfile();
     } catch (err: any) {
-      console.error('Failed to save settings:', err);
-      toast.error(err.response?.data?.message || 'Failed to save autopilot settings.');
+      console.error('Failed to save schedule timings:', err);
+      toast.error(err.response?.data?.message || 'Failed to save autopilot timings.');
     } finally {
-      setUpdatingSettings(false);
+      setSavingSchedule(false);
     }
   };
 
   if (loading) {
     return (
       <LoadingScreen 
-        message="Querying Autopilot engine configurations..." 
-        subMessage="Loading brand context, schedule slots, and AI generation parameters"
+        message="Querying engine configurations..." 
+        subMessage="Loading AI persona context, schedule slots, and generation parameters"
       />
     );
   }
@@ -120,28 +153,233 @@ export default function AutopilotSettingsPage() {
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
-          OmniSync Engine Settings
+          Settings & Brand Voice
         </h1>
         <p className="text-[var(--text-secondary)] mt-1 text-sm font-medium">
-          Configure daily autonomous AI post generation, brand niche context, and recurring alarm dispatches.
+          Manage your universal brand voice, industry niche, and automated social publishing schedule.
         </p>
       </div>
 
-      {/* Autopilot Configuration Layout */}
+      {/* Configuration Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         
-        {/* Main Autopilot Brand & Engine Form */}
+        {/* Left Column: Two Decoupled Forms */}
         <div className="lg:col-span-7 space-y-6">
+
+          {/* CARD 1: Universal Brand Voice & Niche Profile */}
           <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6 shadow-sm">
-            
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)] flex-wrap gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Compass className="h-5 w-5 text-[#2563EB]" />
+                  <h2 className="text-md font-bold text-[var(--text-primary)]">
+                    Brand Voice & Niche Profile
+                  </h2>
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-[#2563EB] dark:text-[#60A5FA] border border-blue-200 dark:border-blue-800">
+                    Powers Composer & AutoPilot
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] font-medium mt-1">
+                  Shapes tone, niche vocabulary, and content generation in both <strong>Single Post Composer (/composer)</strong> and <strong>daily AutoPilot</strong>.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowWizardModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2563EB]/10 hover:bg-[#2563EB]/20 text-[#2563EB] dark:text-[#60A5FA] border border-[#2563EB]/25 text-xs font-extrabold transition-all cursor-pointer shadow-xs"
+                title="Open 3-step setup modal"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Guided Setup Wizard</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBrandPersona} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Brand Name */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                    Brand / Company / Creator Name
+                  </label>
+                  <input
+                    type="text"
+                    value={user?.name || ''}
+                    onChange={(e) => setUser(user ? { ...user, name: e.target.value } : null)}
+                    placeholder="e.g. Ayush Raj / OmniSync"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-[#2563EB]"
+                  />
+                </div>
+
+                {/* Brand Logo URL */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
+                    Brand Logo / Avatar URL
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      value={user?.avatarUrl || ''}
+                      onChange={(e) => setUser(user ? { ...user, avatarUrl: e.target.value } : null)}
+                      placeholder="https://example.com/logo.png"
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[#2563EB]"
+                    />
+                    {user?.avatarUrl && (
+                      <div className="w-9 h-9 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden shrink-0 shadow-xs">
+                        <img src={user.avatarUrl} alt="Logo Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Quick Identity Role Selector */}
+              <div className="space-y-2 pt-1">
+                <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-[#2563EB]" /> 1. Identity / Role
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {PERSONAS.map((p) => {
+                    const isSelected = selectedPersona === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPersona(p.id);
+                          setBrandContext(buildBrandVoiceNarrative(p.id, selectedNiche, selectedIntent, user?.name || ''));
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                          isSelected
+                            ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                            : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <span>{p.icon}</span>
+                        <span>{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Primary Field / Niche Selector */}
+              <div className="space-y-2 pt-1">
+                <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-[#2563EB]" /> 2. Primary Field / Niche
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {NICHES.map((n) => {
+                    const isSelected = selectedNiche === n.id;
+                    return (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedNiche(n.id);
+                          setBrandContext(buildBrandVoiceNarrative(selectedPersona, n.id, selectedIntent, user?.name || ''));
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                          isSelected
+                            ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                            : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <span>{n.icon}</span>
+                        <span>{n.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Primary Content Intent Selector */}
+              <div className="space-y-2 pt-1">
+                <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-[#2563EB]" /> 3. Content Intent & Style
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {INTENTS.map((intent) => {
+                    const isSelected = selectedIntent === intent.id;
+                    return (
+                      <button
+                        key={intent.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedIntent(intent.id);
+                          setBrandContext(buildBrandVoiceNarrative(selectedPersona, selectedNiche, intent.id, user?.name || ''));
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                          isSelected
+                            ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                            : 'bg-[var(--bg-input)] border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <span>{intent.icon}</span>
+                        <span>{intent.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Editable Brand Niche & AI Context */}
+              <div className="space-y-2 pt-2 bg-[var(--bg-input)]/70 border border-[var(--border-color)] p-4 rounded-2xl">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <label className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-wider block">
+                    Brand Voice, Audience Context & Keywords (100% Editable)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandContext(buildBrandVoiceNarrative(selectedPersona, selectedNiche, selectedIntent, user?.name || ''));
+                      toast.info('Template auto-filled from selected chips! You can customize it freely.');
+                    }}
+                    className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Auto-fill from chips
+                  </button>
+                </div>
+                <textarea
+                  value={brandContext}
+                  onChange={(e) => setBrandContext(e.target.value)}
+                  placeholder="Define your niche, target demographics, product offerings, tone of voice, and keywords (e.g. 'Daily spiritual reflections, sacred mantras, mindfulness meditation...')"
+                  rows={4}
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans"
+                />
+                <span className="text-[10px] text-[var(--text-secondary)] block leading-normal font-medium">
+                  💡 This context actively informs <strong>Single Post Composer</strong> prompt generation and <strong>AutoPilot</strong> daily drafts.
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingPersona}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {savingPersona ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" /> Save Brand Voice & Niche
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* CARD 2: AutoPilot Recurring Publishing Timings & Cadence */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 space-y-6 shadow-sm">
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border-color)]">
               <div>
-                <h2 className="text-md font-bold flex items-center gap-2 text-[var(--text-primary)]">
-                  <Settings className="h-5 w-5 text-[#2563EB]" />
-                  OmniSync Engine Controls
-                </h2>
-                <span className="text-[10px] text-[var(--text-secondary)] font-semibold">
-                  Enable or disable automated daily publishing cycles
+                <div className="flex items-center gap-2">
+                  <AlarmClock className="h-5 w-5 text-indigo-500" />
+                  <h2 className="text-md font-bold text-[var(--text-primary)]">
+                    AutoPilot Recurring Schedule Timings
+                  </h2>
+                </div>
+                <span className="text-[11px] text-[var(--text-secondary)] font-medium block mt-0.5">
+                  Automated daily draft creation, approval review window, and live social dispatch
                 </span>
               </div>
 
@@ -150,6 +388,7 @@ export default function AutopilotSettingsPage() {
                 type="button"
                 onClick={() => setAutopilotEnabled(!autopilotEnabled)}
                 className="focus:outline-none transition-transform active:scale-95 text-[#2563EB] cursor-pointer"
+                title={autopilotEnabled ? 'Autopilot Active' : 'Autopilot Disabled'}
               >
                 {autopilotEnabled ? (
                   <ToggleRight className="h-11 w-11 text-emerald-500" />
@@ -172,76 +411,12 @@ export default function AutopilotSettingsPage() {
               </div>
             )}
 
-            <form onSubmit={handleSaveSettings} className="space-y-5">
-              {/* Brand Identity Section */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-color)]">
-                  <Building2 className="h-4 w-4 text-[#2563EB]" />
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-primary)]">
-                    Brand Identity & Visual Customization
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Brand Name */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
-                      Brand / Company Name
-                    </label>
-                    <input
-                      type="text"
-                      value={user?.name || ''}
-                      onChange={(e) => setUser(user ? { ...user, name: e.target.value } : null)}
-                      placeholder="e.g. Ayush Raj / OmniSync"
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-[#2563EB]"
-                    />
-                  </div>
-
-                  {/* Brand Logo URL */}
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
-                      Brand Logo / Avatar URL
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="url"
-                        value={user?.avatarUrl || ''}
-                        onChange={(e) => setUser(user ? { ...user, avatarUrl: e.target.value } : null)}
-                        placeholder="https://example.com/logo.png"
-                        className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-primary)] font-mono focus:outline-none focus:border-[#2563EB]"
-                      />
-                      {user?.avatarUrl && (
-                        <div className="w-9 h-9 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden shrink-0 shadow-xs">
-                          <img src={user.avatarUrl} alt="Logo Preview" className="w-full h-full object-cover" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Brand Niche & AI Context */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-extrabold text-[var(--text-secondary)] uppercase tracking-wider block">
-                    Brand Niche, Voice & Audience Context
-                  </label>
-                  <textarea
-                    value={brandContext}
-                    onChange={(e) => setBrandContext(e.target.value)}
-                    placeholder="Define your niche, target demographics, product offerings, tone of voice, and keywords (e.g. 'We build SaaS automation workflows, AI dev tools, and growth teardowns for tech founders...')"
-                    rows={5}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-xs focus:outline-none focus:border-[#2563EB] leading-relaxed font-sans"
-                  />
-                  <span className="text-[10px] text-[var(--text-secondary)] block mt-1 leading-normal font-medium">
-                    💡 The AI Engine consumes this context to formulate daily relevant updates, match brand voice, and personalize graphics.
-                  </span>
-                </div>
-              </div>
-
+            <form onSubmit={handleSaveAutopilotSchedule} className="space-y-6">
               {/* 2-Stage Review & Publishing Pipeline Controls */}
               <div className="bg-[var(--bg-input)]/60 border border-[var(--border-color)] p-4 rounded-2xl space-y-3.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-[#2563EB] uppercase tracking-wider flex items-center gap-1.5">
-                    <AlarmClock className="w-4 h-4" /> Global AutoPilot Schedule Timings
+                    <AlarmClock className="w-4 h-4" /> Daily Dispatch Timings
                   </span>
                   <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-[#2563EB] font-bold px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
                     Approval Review Safe
@@ -333,14 +508,14 @@ export default function AutopilotSettingsPage() {
 
               <button
                 type="submit"
-                disabled={updatingSettings}
-                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                disabled={savingSchedule}
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
               >
-                {updatingSettings ? (
+                {savingSchedule ? (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" /> Save Autopilot Engine Settings
+                    <AlarmClock className="h-4 w-4" /> Save AutoPilot Schedule & Timings
                   </>
                 )}
               </button>
@@ -348,25 +523,48 @@ export default function AutopilotSettingsPage() {
           </div>
         </div>
 
-        {/* Right Column: Engine Info & Guidelines */}
+        {/* Right Column: Engine Info & Architectural Guidelines */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 backdrop-blur-md space-y-4 shadow-sm">
+          {/* Card: Universal Brand Voice Impact */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 backdrop-blur-md space-y-4 shadow-sm">
             <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2 pb-3 border-b border-[var(--border-color)]">
-              <Zap className="h-4 w-4 text-[#2563EB]" /> How Autopilot Automation Works
+              <Sparkles className="h-4 w-4 text-[#2563EB]" /> Universal Brand Voice Engine
             </h3>
 
             <ul className="text-xs text-[var(--text-secondary)] space-y-3 leading-relaxed">
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
-                <span><strong className="text-[var(--text-primary)]">AI Context Research:</strong> Uses your brand context to craft tailored captions and select matching visual assets.</span>
+                <span><strong className="text-[var(--text-primary)]">Powers Single Post Composer:</strong> Every prompt you type in <code>/composer</code> inherits this brand voice, niche terminology, and audience tone automatically.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
-                <span><strong className="text-[var(--text-primary)]">BullMQ Worker Queue:</strong> Automatically dispatches posts to Instagram, LinkedIn, and X without manual intervention.</span>
+                <span><strong className="text-[var(--text-primary)]">Zero Hardcoded Niches:</strong> Whether you are in Spiritual guidance, Fitness coaching, B2B SaaS, or Creative Design, the engine strictly speaks in your chosen brand voice.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mt-1.5 shrink-0" />
-                <span><strong className="text-[var(--text-primary)]">Real-time Notifications:</strong> Emits instant WebSocket updates when posts publish or require manual retries.</span>
+                <span><strong className="text-[var(--text-primary)]">Anti-Hallucination Shield:</strong> Spiritual and wellness prompts are shielded from software/tech jargon and fake website URLs.</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Card: Autopilot Schedule Workflow */}
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 backdrop-blur-md space-y-4 shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2 pb-3 border-b border-[var(--border-color)]">
+              <Zap className="h-4 w-4 text-indigo-500" /> AutoPilot Automation Workflow
+            </h3>
+
+            <ul className="text-xs text-[var(--text-secondary)] space-y-3 leading-relaxed">
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                <span><strong className="text-[var(--text-primary)]">AI Context Generation:</strong> Uses your active brand context to craft daily tailored posts and select visual styles.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                <span><strong className="text-[var(--text-primary)]">Approval Window via Email:</strong> You receive an email preview at Draft Time with 1-click Approve or Edit links before anything publishes.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                <span><strong className="text-[var(--text-primary)]">BullMQ Social Dispatch:</strong> Once approved (or if review passes), worker dispatches automatically at your scheduled Publish Time.</span>
               </li>
             </ul>
           </div>
@@ -378,6 +576,19 @@ export default function AutopilotSettingsPage() {
       <div className="pt-6 border-t border-[var(--border-color)]">
         <SchedulingDispatcher />
       </div>
+
+      {/* Guided Setup Wizard Modal */}
+      <OnboardingModal
+        isOpen={showWizardModal}
+        onClose={() => setShowWizardModal(false)}
+        onSaved={(newCtx, newName) => {
+          setBrandContext(newCtx);
+          if (newName) setUser((prev) => (prev ? { ...prev, name: newName } : null));
+          fetchAutopilotProfile();
+        }}
+        initialBrandContext={brandContext}
+        initialName={user?.name || ''}
+      />
     </div>
   );
 }

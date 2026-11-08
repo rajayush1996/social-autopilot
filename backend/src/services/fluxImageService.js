@@ -1,6 +1,7 @@
 import axios from 'axios';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
+import { IMAGE_ASPECT_RATIO } from '../config/constants.js';
 
 // Themed Prompt Modifiers for Studio-Quality Visuals
 const THEME_PROMPTS = {
@@ -48,7 +49,7 @@ export class FluxImageService {
   static async generateSingleImage({
     prompt,
     themeStyle = '3D_SAAS',
-    aspectRatio = '16:9',
+    aspectRatio = IMAGE_ASPECT_RATIO.LANDSCAPE,
   }) {
     if (!prompt || !prompt.trim()) {
       throw new Error('Prompt is required for image generation.');
@@ -68,8 +69,8 @@ export class FluxImageService {
             {
               model: 'black-forest-labs/FLUX.1-schnell',
               prompt: enhancedPrompt,
-              width: aspectRatio === '16:9' ? 1024 : 768,
-              height: aspectRatio === '16:9' ? 576 : 768,
+              width: aspectRatio === IMAGE_ASPECT_RATIO.LANDSCAPE ? 1024 : 768,
+              height: aspectRatio === IMAGE_ASPECT_RATIO.LANDSCAPE ? 576 : 768,
               steps: 4,
               n: 1,
             },
@@ -97,7 +98,7 @@ export class FluxImageService {
             falUrl,
             {
               prompt: enhancedPrompt,
-              image_size: aspectRatio === '16:9' ? 'landscape_16_9' : 'square_hd',
+              image_size: aspectRatio === IMAGE_ASPECT_RATIO.LANDSCAPE ? 'landscape_16_9' : 'square_hd',
               num_inference_steps: 4,
               enable_safety_checker: true,
             },

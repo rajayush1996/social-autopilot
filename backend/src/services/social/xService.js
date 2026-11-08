@@ -65,7 +65,14 @@ export class XAdapter extends SocialAdapter {
         platform: 'X',
         externalPostId: mockId,
         externalPostUrl: `https://x.com/i/status/${mockId}`,
-        rawResponse: { id: mockId, status: 'SIMULATED_SUCCESS' },
+        rawResponse: {
+          id: mockId,
+          data: {
+            id: mockId,
+            text: tweetText,
+          },
+          status: 'SIMULATED_SUCCESS',
+        },
         isMock: true,
         strategyUsed: this.name,
       };

@@ -46,6 +46,8 @@ desktop.ini
 .tmp/
 tmp/
 temp/
+public/uploads/
+
 
 # Coverage directory used by tools like istanbul
 coverage/
@@ -56,3 +58,10 @@ coverage/
 *.seed
 *.pid.lock
 scratch/
+
+# Local Infrastructure & Tunnel Secrets (Never commit server IPs or SSH paths)
+scripts/start_dev_tunnel.bat
+scripts/start_dev_tunnel.ps1
+scripts/*.bat
+src/scripts/test_*.js
+src/scripts/verify_*.js

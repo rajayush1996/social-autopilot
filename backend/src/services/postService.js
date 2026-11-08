@@ -142,7 +142,7 @@ export class PostService {
         queueResult = { immediateExecution: true, result: publishResult };
         await NotificationService.createNotification({
           userId,
-          title: 'Post Published 🚀',
+          title: 'Post Published',
           message: 'Your post was dispatched and published to live social channels!',
           type: 'success',
         });
@@ -154,7 +154,7 @@ export class PostService {
       queueResult = await enqueuePostJob({ postId: post.id, scheduledAt: parseScheduledDate });
       await NotificationService.createNotification({
         userId,
-        title: 'Post Scheduled 📅',
+        title: 'Post Scheduled',
         message: `Your post is scheduled for ${parseScheduledDate.toLocaleDateString()} at ${parseScheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
         type: 'info',
       });

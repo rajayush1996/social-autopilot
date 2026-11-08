@@ -854,19 +854,14 @@ export class AuthService {
       } catch (e) {
         allowedPlatforms = [...ACTIVE_LIVE_PLATFORMS];
       }
-
-      // Regular users: Only allow platforms explicitly ENABLED in the status matrix
-      allowedPlatforms = allowedPlatforms.filter((plat) => {
-        const status = platformStatusMatrix[plat.toUpperCase()];
-        return status === 'ENABLED';
-      });
-    } else {
-      // Super Admin: Has access to all platforms EXCEPT those explicitly marked DISABLED
-      allowedPlatforms = allowedPlatforms.filter((plat) => {
-        const status = platformStatusMatrix[plat.toUpperCase()];
-        return status !== 'DISABLED';
-      });
     }
+
+    // Only include platforms explicitly ENABLED in the live status matrix.
+    // Platforms marked COMING_SOON or DISABLED are not active for posting / engagement.
+    allowedPlatforms = allowedPlatforms.filter((plat) => {
+      const status = platformStatusMatrix[plat.toUpperCase()];
+      return status === 'ENABLED';
+    });
 
     return {
       ...user,
